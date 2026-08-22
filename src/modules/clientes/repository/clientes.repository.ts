@@ -1,14 +1,12 @@
-import { DatabaseService } from "src/database/database.service";
-import { BadRequestException, Injectable } from "@nestjs/common";
-import { CreateClienteDto } from "../dto/create-cliente.dto";
-import { Kysely } from "kysely";
-import { Database } from "src/database/types/types";
+import { DatabaseService } from 'src/database/database.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { CreateClienteDto } from '../dto/create-cliente.dto';
+import { Kysely } from 'kysely';
+import { Database } from 'src/database/types/types';
 
 @Injectable()
 export class ClientesRepository {
-    constructor(
-        private readonly dbService: DatabaseService,
-    ) { }
+    constructor(private readonly dbService: DatabaseService) { }
 
     get db() {
         return this.dbService.client;
@@ -17,7 +15,11 @@ export class ClientesRepository {
     async getAllClientesByOperador(usuarioId: number) {
         const clientes = await this.db
             .selectFrom('clientes')
-            .innerJoin('cliente_operador', 'cliente_operador.cliente_id', 'clientes.id')
+            .innerJoin(
+                'cliente_operador',
+                'cliente_operador.cliente_id',
+                'clientes.id',
+            )
             .leftJoin('productos', 'productos.id', 'clientes.producto_id')
             .select([
                 'clientes.id',
@@ -28,59 +30,12 @@ export class ClientesRepository {
                 'clientes.correo_contacto',
                 'clientes.telefono',
                 'clientes.direccion_planta',
-                'clientes.ubicacionLongitud',
-                'clientes.ubicacionLatitude',
             ])
             .where('cliente_operador.usuario_id', '=', usuarioId)
             .where('clientes.isActive', '=', 1)
             .orderBy('clientes.nombre', 'asc')
             .execute();
         return clientes;
-    }
-
-
-
-    private async validateProducto(productoId: number, db: Kysely<Database>) {
-        const producto = await db
-            .selectFrom('productos')
-            .select(['id', 'nombre', 'isActive'])
-            .where('id', '=', productoId)
-            .executeTakeFirstOrThrow(
-                () => new BadRequestException(`El producto con id '${productoId}' no existe`),
-            );
-
-        if (producto.isActive === 0) {
-            throw new BadRequestException(`El producto '${producto.nombre}' no esta activo`);
-        }
-
-        return producto;
-    }
-
-    private async validateRtnDisponible(rtn: string, db: Kysely<Database>) {
-        const existente = await db
-            .selectFrom('clientes')
-            .select('id')
-            .where('rtn', '=', rtn)
-            .executeTakeFirst();
-
-        if (existente) {
-            throw new BadRequestException(`El RTN '${rtn}' ya esta registrado`);
-        }
-    }
-
-    private async validateCodigoExportacionDisponible(
-        codigoExportacion: string,
-        db: Kysely<Database>,
-    ) {
-        const existente = await db
-            .selectFrom('clientes')
-            .select('id')
-            .where('codigo_exportacion', '=', codigoExportacion)
-            .executeTakeFirst();
-
-        if (existente) {
-            throw new BadRequestException(`El codigo de exportacion '${codigoExportacion}' ya esta registrado`);
-        }
     }
 
     async createCliente(data: CreateClienteDto, userId: number) {
@@ -140,5 +95,54 @@ export class ClientesRepository {
                 })),
             )
             .execute();
+    }
+    private async validateProducto(productoId: number, db: Kysely<Database>) {
+        const producto = await db
+            .selectFrom('productos')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', productoId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El producto con id '${productoId}' no existe`,
+                    ),
+            );
+
+        if (producto.isActive === 0) {
+            throw new BadRequestException(
+                `El producto '${producto.nombre}' no esta activo`,
+            );
+        }
+
+        return producto;
+    }
+
+    private async validateRtnDisponible(rtn: string, db: Kysely<Database>) {
+        const existente = await db
+            .selectFrom('clientes')
+            .select('id')
+            .where('rtn', '=', rtn)
+            .executeTakeFirst();
+
+        if (existente) {
+            throw new BadRequestException(`El RTN '${rtn}' ya esta registrado`);
+        }
+    }
+
+    private async validateCodigoExportacionDisponible(
+        codigoExportacion: string,
+        db: Kysely<Database>,
+    ) {
+        const existente = await db
+            .selectFrom('clientes')
+            .select('id')
+            .where('codigo_exportacion', '=', codigoExportacion)
+            .executeTakeFirst();
+
+        if (existente) {
+            throw new BadRequestException(
+                `El codigo de exportacion '${codigoExportacion}' ya esta registrado`,
+            );
+        }
     }
 }
