@@ -12,12 +12,6 @@ export class ClientesService {
 
 
     async create(dto: CreateClienteDto, userId: number) {
-        const clienteId = await this.clientesRepository.createCliente(dto, userId);
-
-        if (dto.usuario_ids && dto.usuario_ids.length > 0) {
-            await this.clientesRepository.linkOperadores(clienteId, dto.usuario_ids);
-        }
-
-        return clienteId;
+        return await this.clientesRepository.createCliente(dto, userId);
     }
 }

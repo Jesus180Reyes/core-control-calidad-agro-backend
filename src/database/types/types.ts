@@ -75,6 +75,7 @@ export interface ClientesTable {
   id: Generated<number>;
   nombre: string;
   rtn: string;
+  producto_id: number | null;
   codigo_exportacion: string | null;
   correo_contacto: string | null;
   telefono: string | null;
