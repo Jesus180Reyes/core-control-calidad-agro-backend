@@ -1,7 +1,7 @@
 # SPEC 01 — Vinculación de clientes con operadores
 
-> **Status:** Draft
-> **Depends on:** Approved
+> **Status:** Approved
+> **Depends on:** Ninguno
 > **Date:** 2026-08-22
 > **Objective:** Permitir vincular clientes con operadores (usuarios) mediante una relación muchos-a-muchos, de modo que `GET /clientes` solo muestre al operador autenticado los clientes a los que está vinculado.
 
