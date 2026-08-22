@@ -16,7 +16,17 @@ export class ClientesRepository {
         const clientes = await this.db
             .selectFrom('clientes')
             .innerJoin('cliente_operador', 'cliente_operador.cliente_id', 'clientes.id')
-            .selectAll('clientes')
+            .select([
+                'clientes.id',
+                'clientes.nombre',
+                'clientes.rtn',
+                'clientes.codigo_exportacion',
+                'clientes.correo_contacto',
+                'clientes.telefono',
+                'clientes.direccion_planta',
+                'clientes.ubicacionLongitud',
+                'clientes.ubicacionLatitude',
+            ])
             .where('cliente_operador.usuario_id', '=', usuarioId)
             .where('clientes.isActive', '=', 1)
             .orderBy('clientes.nombre', 'asc')
