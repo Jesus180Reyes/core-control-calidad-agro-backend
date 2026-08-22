@@ -36,11 +36,13 @@ NestJS API (Express platform) backed by MySQL via Kysely (no ORM, no migrations 
 - `Database` and the `*Table` interfaces in `src/database/types/types.ts` are the hand-written Kysely schema — when adding a table/column in MySQL, update this file by hand (no codegen).
 
 **Auth/guard flow:**
-- `JwtAuthGuard` (`src/guards/jwt-auth.guard.ts`) is registered globally via `APP_GUARD` in `AppModule`, so every route requires a valid JWT by default.
-- Use `@Public()` (`src/decorators/public.decorator.ts`) to opt a specific route out — see `AuthController.login`. Note `AuthController.register` is *not* marked `@Public()`, so registering a new user currently requires an existing valid token.
+- `JwtAuthGuard` (`src/guards/jwt-auth.guard.ts`) is registered globally both via `APP_GUARD` in `AppModule` and again manually in `main.ts` (`app.useGlobalGuards(new JwtAuthGuard(reflector))`), so every route requires a valid JWT by default.
+- Use `@Public()` (`src/decorators/public.decorator.ts`) to opt a specific route out — both `AuthController.login` and `AuthController.register` are marked `@Public()`.
 - `JwtStrategy` (`src/strategy/jwt.stategy.ts`) validates the bearer token and returns `{ userId, username }`, which becomes `req.user`.
 - Global pipes: `ZodValidationPipe` from `nestjs-zod` is registered both as `APP_PIPE` in `AppModule` and again manually in `main.ts` — DTOs are Zod schemas wrapped with `createZodDto()` (see `src/modules/auth/dto/*.dto.ts`), not `class-validator`.
 
 **Module layout convention** (established by `src/modules/auth`): each feature module has `*.controller.ts` → `*.service.ts` → `repository/*.repository.ts` (does the actual Kysely queries) → `dto/*.dto.ts` (Zod schemas). Controllers stay thin; services currently just pass through to repositories. `src/modules/pesajes` exists as an empty stub for a not-yet-implemented module — follow the auth module's file layout when building it out.
 
 Import path convention: absolute imports from `src/...` are used throughout (e.g. `src/decorators/public.decorator`) rather than relative `../../` paths, even for same-module files in some cases — follow existing files' style per-file rather than assuming one rule.
+
+**Domain** (inferred from `src/database/types/types.ts`, not written down elsewhere): this is a quality-control system for agricultural export batches. Core tables are `clientes` (clients), `lotes` (product batches tied to a client/product), `pesajes` (individual weigh-ins against a lote, with `peso_bruto`/`peso_neto`/`tara`), `estados_calidad` (quality states applied to a pesaje), `productos`, `unidad_medida`, and `roles`/`usuarios` for auth.
