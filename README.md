@@ -57,6 +57,48 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Flujo de Pesaje
+
+Este es el flujo de negocio del proceso de pesaje de lotes (control de calidad agrícola), tal como fue definido:
+
+```mermaid
+flowchart TD
+    A[Inicio del Pesaje] --> B["Operador ingresa:<br/>Cliente + Etapa + Lote"]
+    B --> C["Carga automática de parámetros del Cliente<br/>(Peso Ideal, Tolerancia Min, Tolerancia Max)"]
+    C --> D["Captura de peso desde la<br/>Báscula OHAUS"]
+    D --> E{¿El peso está<br/>dentro del rango?}
+    E -->|SÍ| F[Estado: APROBADO]
+    E -->|NO| G{¿Qué Etapa es?}
+    G -->|EN PROCESO| H["Alerta Amarilla<br/>'Permitir Reajuste'"]
+    H --> I["(Operador corrige<br/>peso en báscula)"]
+    I --> J[Regresa a validar<br/>rango de peso]
+    J --> E
+    G -->|CLIENTE FINAL| K["Alerta Roja: CRÍTICA<br/>'Bloqueo de Pantalla'"]
+    K --> L{¿Supervisor ingresa PIN?}
+    L -->|SÍ| M[APROBADO CON EXCEPCIÓN]
+    L -->|NO| N[RECHAZADO]
+    F --> O((•))
+    M --> O
+    N --> O
+    O --> P[GUARDAR EN BASE DE DATOS]
+    P --> Q[Fin / Listo]
+```
+
+### Pasos
+
+1. **Inicio del pesaje** — el operador ingresa Cliente + Etapa + Lote.
+2. **Carga automática de parámetros** — se cargan Peso Ideal, Tolerancia Mínima y Tolerancia Máxima asociados.
+3. **Captura de peso** — se lee el peso desde la báscula OHAUS.
+4. **Validación de rango**:
+   - Si el peso está dentro del rango → estado **APROBADO**.
+   - Si está fuera de rango, se evalúa la **Etapa**:
+     - **EN PROCESO** → alerta amarilla, se permite reajuste del peso en la báscula y se vuelve a validar el rango (loop hasta que quede dentro de rango).
+     - **CLIENTE FINAL** → alerta roja crítica con bloqueo de pantalla; requiere que un **supervisor ingrese su PIN**:
+       - Si ingresa el PIN → **APROBADO CON EXCEPCIÓN**.
+       - Si no → **RECHAZADO**.
+5. **Persistencia** — el resultado (APROBADO / APROBADO CON EXCEPCIÓN / RECHAZADO) se guarda en base de datos.
+6. **Fin**.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
