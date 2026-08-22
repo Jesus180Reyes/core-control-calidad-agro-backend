@@ -87,6 +87,13 @@ export interface ClientesTable {
   updated_at: Generated<Date | string | null>;
 }
 
+export interface ClienteOperadorTable {
+  id: Generated<number>;
+  cliente_id: number;
+  usuario_id: number;
+  created_at: Generated<Date | string | null>;
+}
+
 export interface Database {
   usuarios: UsuariosTable;
   lotes: LotesTable;
@@ -96,4 +103,5 @@ export interface Database {
   roles: RolesTable;
   unidad_medida: UnidadMedidaTable;
   clientes: ClientesTable;
+  cliente_operador: ClienteOperadorTable;
 }
