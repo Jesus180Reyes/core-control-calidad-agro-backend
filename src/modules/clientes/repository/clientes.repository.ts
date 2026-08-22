@@ -24,17 +24,7 @@ export class ClientesRepository {
         return clientes;
     }
 
-    async getClienteById(id: number) {
-        const cliente = await this.db
-            .selectFrom('clientes')
-            .selectAll()
-            .where('id', '=', id)
-            .where('isActive', '=', 1)
-            .executeTakeFirstOrThrow();
 
-
-        return cliente;
-    }
 
     async createCliente(data: CreateClienteDto, userId: number) {
         const {

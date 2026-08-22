@@ -10,9 +10,6 @@ export class ClientesService {
         return await this.clientesRepository.getAllClientesByOperador(userId);
     }
 
-    async findOne(id: number) {
-        return await this.clientesRepository.getClienteById(id);
-    }
 
     async create(dto: CreateClienteDto, userId: number) {
         const clienteId = await this.clientesRepository.createCliente(dto, userId);

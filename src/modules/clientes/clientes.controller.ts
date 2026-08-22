@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { ClientesService } from './clientes.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
@@ -30,13 +30,4 @@ export class ClientesController {
         };
     }
 
-    @Get(':id')
-    async findOne(@Param('id', ParseIntPipe) id: number) {
-        const cliente = await this.clientesService.findOne(id);
-        return {
-            ok: true,
-            msg: 'Cliente obtenido correctamente',
-            cliente,
-        };
-    }
 }

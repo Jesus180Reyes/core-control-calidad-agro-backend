@@ -5,7 +5,7 @@ const createClienteSchema = z
     .object({
         nombre: z.string().min(1, 'El nombre es requerido'),
         rtn: z.string().min(1, 'El RTN es requerido'),
-        codigo_exportacion: z.string().optional(),
+        codigo_exportacion: z.string({ error: 'Codigo de exportacion requerido' }),
         correo_contacto: z.string().optional(),
         telefono: z.string().optional(),
         direccion_planta: z.string().optional(),
