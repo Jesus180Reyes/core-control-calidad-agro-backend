@@ -1,5 +1,6 @@
 import { DatabaseService } from "src/database/database.service";
 import { Injectable } from "@nestjs/common";
+import { CreateClienteDto } from "../dto/create-cliente.dto";
 
 @Injectable()
 export class ClientesRepository {
@@ -11,12 +12,14 @@ export class ClientesRepository {
         return this.dbService.client;
     }
 
-    async getAllClientes() {
+    async getAllClientesByOperador(usuarioId: number) {
         const clientes = await this.db
             .selectFrom('clientes')
-            .selectAll()
-            .where('isActive', '=', 1)
-            .orderBy('nombre', 'asc')
+            .innerJoin('cliente_operador', 'cliente_operador.cliente_id', 'clientes.id')
+            .selectAll('clientes')
+            .where('cliente_operador.usuario_id', '=', usuarioId)
+            .where('clientes.isActive', '=', 1)
+            .orderBy('clientes.nombre', 'asc')
             .execute();
         return clientes;
     }
@@ -31,5 +34,47 @@ export class ClientesRepository {
 
 
         return cliente;
+    }
+
+    async createCliente(data: CreateClienteDto, userId: number) {
+        const {
+            nombre,
+            rtn,
+            codigo_exportacion,
+            correo_contacto,
+            telefono,
+            direccion_planta,
+            ubicacionLongitud,
+            ubicacionLatitude,
+        } = data;
+
+        const result = await this.db
+            .insertInto('clientes')
+            .values({
+                nombre,
+                rtn,
+                codigo_exportacion,
+                correo_contacto,
+                telefono,
+                direccion_planta,
+                ubicacionLongitud,
+                ubicacionLatitude,
+                created_by: userId,
+            })
+            .executeTakeFirstOrThrow();
+
+        return Number(result.insertId);
+    }
+
+    async linkOperadores(clienteId: number, usuarioIds: number[]) {
+        await this.db
+            .insertInto('cliente_operador')
+            .values(
+                usuarioIds.map((usuarioId) => ({
+                    cliente_id: clienteId,
+                    usuario_id: usuarioId,
+                })),
+            )
+            .execute();
     }
 }
