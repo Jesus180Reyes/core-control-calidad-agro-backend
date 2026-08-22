@@ -1,6 +1,6 @@
 # SPEC 01 — Vinculación de clientes con operadores
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** Ninguno
 > **Date:** 2026-08-22
 > **Objective:** Permitir vincular clientes con operadores (usuarios) mediante una relación muchos-a-muchos, de modo que `GET /clientes` solo muestre al operador autenticado los clientes a los que está vinculado.
@@ -88,15 +88,15 @@ DTO nuevo `src/modules/clientes/dto/create-cliente.dto.ts` (Zod, siguiendo el pa
 
 ## Acceptance criteria
 
-- [ ] La tabla `cliente_operador` existe en la base de datos según el DDL de este spec.
-- [ ] `src/database/types/types.ts` incluye `ClienteOperadorTable` registrada en `Database`.
-- [ ] `POST /clientes` crea un cliente nuevo con `nombre` y `rtn` como únicos campos obligatorios.
-- [ ] `POST /clientes` con `usuario_ids` no vacío crea los registros correspondientes en `cliente_operador`.
-- [ ] `POST /clientes` sin `usuario_ids` (u omitido) crea el cliente sin ningún vínculo.
-- [ ] El campo `created_by` del cliente creado corresponde al `userId` del token JWT usado en la petición.
-- [ ] `GET /clientes` devuelve únicamente los clientes vinculados al `userId` del token JWT del solicitante.
-- [ ] Un usuario autenticado sin ningún cliente vinculado recibe `clientes: []` en `GET /clientes`.
-- [ ] `GET /clientes/:id` no cambia su comportamiento (sigue sin restricción por vínculo).
+- [X] La tabla `cliente_operador` existe en la base de datos según el DDL de este spec.
+- [X] `src/database/types/types.ts` incluye `ClienteOperadorTable` registrada en `Database`.
+- [X] `POST /clientes` crea un cliente nuevo con `nombre` y `rtn` como únicos campos obligatorios.
+- [X] `POST /clientes` con `usuario_ids` no vacío crea los registros correspondientes en `cliente_operador`.
+- [X] `POST /clientes` sin `usuario_ids` (u omitido) crea el cliente sin ningún vínculo.
+- [X] El campo `created_by` del cliente creado corresponde al `userId` del token JWT usado en la petición.
+- [X] `GET /clientes` devuelve únicamente los clientes vinculados al `userId` del token JWT del solicitante.
+- [X] Un usuario autenticado sin ningún cliente vinculado recibe `clientes: []` en `GET /clientes`.
+- [X] `GET /clientes/:id` no cambia su comportamiento (sigue sin restricción por vínculo).
 
 ---
 
