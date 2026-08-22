@@ -24,10 +24,8 @@ export class ClientesRepository {
             .select([
                 'clientes.id',
                 'clientes.nombre',
-                'clientes.rtn',
                 'productos.nombre as producto',
                 'clientes.codigo_exportacion',
-                'clientes.correo_contacto',
                 'clientes.telefono',
                 'clientes.direccion_planta',
             ])
