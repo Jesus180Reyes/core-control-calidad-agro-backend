@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { Database } from 'src/database/types/types';
+import { CreateLoteDto } from '../dto/create-lote.dto';
 
 @Injectable()
 export class LotesRepository {
@@ -38,6 +39,47 @@ export class LotesRepository {
             .orderBy('lotes.created_at', 'desc')
             .execute();
         return lotes;
+    }
+
+    async createLote(data: CreateLoteDto, userId: number) {
+        const {
+            cliente_id,
+            nombre_lote,
+            producto_id,
+            unidad_medida_id,
+            peso_minimo,
+            peso_ideal,
+            peso_maximo,
+            variedad_o_talla,
+        } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateCliente(cliente_id, trx);
+            await this.validateVinculoOperador(cliente_id, userId, trx);
+            await this.validateProducto(producto_id, trx);
+            await this.validateUnidadMedida(unidad_medida_id, trx);
+            await this.validateNombreLoteDisponible(cliente_id, nombre_lote, trx);
+
+            const result = await trx
+                .insertInto('lotes')
+                .values({
+                    cliente_id,
+                    nombre_lote,
+                    producto_id,
+                    unidad_medida_id,
+                    peso_minimo,
+                    peso_ideal,
+                    peso_maximo,
+                    variedad_o_talla,
+                    estado: 'abierto',
+                    created_by: userId,
+                })
+                .executeTakeFirstOrThrow(
+                    () => new BadRequestException('Error al crear el lote'),
+                );
+
+            return Number(result.insertId);
+        });
     }
 
     private async validateVinculoOperador(
