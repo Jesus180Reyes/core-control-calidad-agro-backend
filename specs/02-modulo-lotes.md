@@ -1,6 +1,6 @@
 # SPEC 02 — Módulo de lotes: creación vinculada al cliente y listado por cliente
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01
 > **Date:** 2026-08-22
 > **Objective:** Implementar el módulo `lotes` con `POST /lotes` para crear un lote vinculado a un cliente existente y `GET /lotes/cliente/:clienteId` para listar los lotes de ese cliente, en ambos casos solo si el operador autenticado está vinculado al cliente vía `cliente_operador`.
