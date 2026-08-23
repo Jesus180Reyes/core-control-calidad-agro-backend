@@ -102,7 +102,7 @@ export interface Database {
   pesajes: PesajesTable;
   productos: ProductosTable;
   roles: RolesTable;
-  unidad_medida: UnidadMedidaTable;
+  unidades_medida: UnidadMedidaTable;
   clientes: ClientesTable;
   cliente_operador: ClienteOperadorTable;
 }

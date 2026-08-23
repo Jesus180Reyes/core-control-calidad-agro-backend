@@ -24,7 +24,7 @@ export class LotesController {
         const { userId } = req.user as { userId: number };
         const lotes = await this.lotesService.findAllByCliente(clienteId, userId);
         return {
-            ok: true,
+            ok: !!lotes,
             msg: 'Lotes obtenidos correctamente',
             lotes,
         };
@@ -36,9 +36,8 @@ export class LotesController {
         const { userId } = req.user as { userId: number };
         const lote = await this.lotesService.create(dto, userId);
         return {
-            ok: true,
+            ok: !!lote,
             msg: 'Lote creado correctamente',
-            lote,
         };
     }
 }

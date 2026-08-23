@@ -22,13 +22,13 @@ export class LotesRepository {
         const lotes = await this.db
             .selectFrom('lotes')
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
-            .leftJoin('unidad_medida', 'unidad_medida.id', 'lotes.unidad_medida_id')
+            .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
                 'lotes.variedad_o_talla',
                 'productos.nombre as producto',
-                'unidad_medida.nombre as unidad_medida',
+                'unidades_medida.nombre as unidad_medida',
                 'lotes.peso_minimo',
                 'lotes.peso_ideal',
                 'lotes.peso_maximo',
@@ -148,7 +148,7 @@ export class LotesRepository {
         db: Kysely<Database>,
     ) {
         return await db
-            .selectFrom('unidad_medida')
+            .selectFrom('unidades_medida')
             .select(['id', 'nombre'])
             .where('id', '=', unidadMedidaId)
             .executeTakeFirstOrThrow(

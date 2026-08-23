@@ -82,26 +82,26 @@ Campos devueltos por `GET /lotes/cliente/:clienteId`:
 
 ## Acceptance criteria
 
-- [ ] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
-- [ ] `LotesModule` está registrado en `src/app.module.ts` y la app arranca sin errores (`npm run start:dev`).
-- [ ] `POST /lotes` sin token JWT válido responde 401.
-- [ ] `POST /lotes` con `cliente_id`, `nombre_lote`, `producto_id`, `unidad_medida_id` y los tres pesos crea el lote y responde 201.
-- [ ] El lote creado tiene `created_by` igual al `userId` del token JWT usado en la petición.
-- [ ] El lote creado tiene `estado = 'abierto'`.
-- [ ] `POST /lotes` con un `cliente_id` al que el operador autenticado **no** está vinculado en `cliente_operador` es rechazado y no inserta ninguna fila.
-- [ ] `POST /lotes` con un `cliente_id` inexistente o con `isActive = 0` es rechazado.
-- [ ] `POST /lotes` con un `producto_id` inexistente o inactivo es rechazado.
-- [ ] `POST /lotes` con un `unidad_medida_id` inexistente es rechazado.
-- [ ] `POST /lotes` con `peso_minimo > peso_ideal` o `peso_ideal > peso_maximo` es rechazado por el DTO.
-- [ ] `POST /lotes` con un `nombre_lote` que ya existe para ese mismo `cliente_id` es rechazado con un mensaje que nombra el lote duplicado.
-- [ ] `POST /lotes` con el mismo `nombre_lote` pero un `cliente_id` distinto sí crea el lote.
-- [ ] `POST /lotes` omitiendo `variedad_o_talla` crea el lote con ese campo en `null`.
-- [ ] `GET /lotes/cliente/:clienteId` devuelve únicamente los lotes cuyo `cliente_id` coincide con el parámetro.
-- [ ] `GET /lotes/cliente/:clienteId` incluye `producto` y `unidad_medida` como nombres, no como ids.
-- [ ] `GET /lotes/cliente/:clienteId` con un `clienteId` al que el operador autenticado no está vinculado es rechazado.
-- [ ] `GET /lotes/cliente/:clienteId` de un cliente vinculado sin lotes devuelve `lotes: []`.
-- [ ] La respuesta del listado no incluye `resumen_ia`.
-- [ ] `GET /clientes` y `POST /clientes` (SPEC 01) siguen funcionando igual.
+- [X] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
+- [X] `LotesModule` está registrado en `src/app.module.ts` y la app arranca sin errores (`npm run start:dev`).
+- [X] `POST /lotes` sin token JWT válido responde 401.
+- [X] `POST /lotes` con `cliente_id`, `nombre_lote`, `producto_id`, `unidad_medida_id` y los tres pesos crea el lote y responde 201.
+- [X] El lote creado tiene `created_by` igual al `userId` del token JWT usado en la petición.
+- [X] El lote creado tiene `estado = 'abierto'`.
+- [X] `POST /lotes` con un `cliente_id` al que el operador autenticado **no** está vinculado en `cliente_operador` es rechazado y no inserta ninguna fila.
+- [X] `POST /lotes` con un `cliente_id` inexistente o con `isActive = 0` es rechazado.
+- [X] `POST /lotes` con un `producto_id` inexistente o inactivo es rechazado.
+- [X] `POST /lotes` con un `unidad_medida_id` inexistente es rechazado.
+- [X] `POST /lotes` con `peso_minimo > peso_ideal` o `peso_ideal > peso_maximo` es rechazado por el DTO.
+- [X] `POST /lotes` con un `nombre_lote` que ya existe para ese mismo `cliente_id` es rechazado con un mensaje que nombra el lote duplicado.
+- [X] `POST /lotes` con el mismo `nombre_lote` pero un `cliente_id` distinto sí crea el lote.
+- [X] `POST /lotes` omitiendo `variedad_o_talla` crea el lote con ese campo en `null`.
+- [X] `GET /lotes/cliente/:clienteId` devuelve únicamente los lotes cuyo `cliente_id` coincide con el parámetro.
+- [X] `GET /lotes/cliente/:clienteId` incluye `producto` y `unidad_medida` como nombres, no como ids.
+- [X] `GET /lotes/cliente/:clienteId` con un `clienteId` al que el operador autenticado no está vinculado es rechazado.
+- [X] `GET /lotes/cliente/:clienteId` de un cliente vinculado sin lotes devuelve `lotes: []`.
+- [X] La respuesta del listado no incluye `resumen_ia`.
+- [X] `GET /clientes` y `POST /clientes` (SPEC 01) siguen funcionando igual.
 
 ---
 
