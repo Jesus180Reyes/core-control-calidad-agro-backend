@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { ClientesModule } from './modules/clientes/clientes.module';
+import { LotesModule } from './modules/lotes/lotes.module';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -18,6 +19,7 @@ import { JwtModule } from '@nestjs/jwt';
     DatabaseModule,
     AuthModule,
     ClientesModule,
+    LotesModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       global: true,
