@@ -1,6 +1,6 @@
 # SPEC 03 — Guardado de pesajes en la base de datos
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-08-24
 > **Objective:** Implementar el módulo `pesajes` con `POST /pesajes` para guardar un pesaje individual contra un lote abierto, calculando `peso_neto` en el backend y devolviendo si el peso quedó fuera del rango del lote.
@@ -88,29 +88,29 @@ Forma de la respuesta de `POST /pesajes` (201):
 
 ## Acceptance criteria
 
-- [ ] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
-- [ ] `PesajesModule` está registrado en `src/app.module.ts` y la app arranca sin errores (`npm run start:dev`).
-- [ ] `POST /pesajes` sin token JWT válido responde 401.
-- [ ] `POST /pesajes` con `lote_id`, `estado_calidad_id` y `peso_bruto` guarda el pesaje y responde 201.
-- [ ] El pesaje guardado tiene `usuario_id` igual al `userId` del token JWT usado en la petición.
-- [ ] El pesaje guardado tiene `peso_neto = peso_bruto - tara`.
-- [ ] `POST /pesajes` omitiendo `tara` guarda el pesaje con `peso_neto = peso_bruto`.
-- [ ] `POST /pesajes` con `peso_neto` en el body ignora ese campo: el `peso_neto` guardado es el calculado por el backend.
-- [ ] `POST /pesajes` con un `lote_id` inexistente es rechazado y no inserta ninguna fila.
-- [ ] `POST /pesajes` contra un lote cuyo `estado` no es `'abierto'` es rechazado.
+- [X] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
+- [X] `PesajesModule` está registrado en `src/app.module.ts` y la app arranca sin errores (`npm run start:dev`).
+- [X] `POST /pesajes` sin token JWT válido responde 401.
+- [X] `POST /pesajes` con `lote_id`, `estado_calidad_id` y `peso_bruto` guarda el pesaje y responde 201.
+- [X] El pesaje guardado tiene `usuario_id` igual al `userId` del token JWT usado en la petición.
+- [X] El pesaje guardado tiene `peso_neto = peso_bruto - tara`.
+- [X] `POST /pesajes` omitiendo `tara` guarda el pesaje con `peso_neto = peso_bruto`.
+- [X] `POST /pesajes` con `peso_neto` en el body ignora ese campo: el `peso_neto` guardado es el calculado por el backend.
+- [X] `POST /pesajes` con un `lote_id` inexistente es rechazado y no inserta ninguna fila.
+- [X] `POST /pesajes` contra un lote cuyo `estado` no es `'abierto'` es rechazado.
 - [ ] `POST /pesajes` contra un lote con `cerrado_en` distinto de `null` es rechazado.
-- [ ] `POST /pesajes` contra un lote de un cliente al que el operador autenticado **no** está vinculado en `cliente_operador` es rechazado y no inserta ninguna fila.
-- [ ] `POST /pesajes` con un `estado_calidad_id` inexistente es rechazado.
-- [ ] `POST /pesajes` con `peso_bruto` igual a 0 o negativo es rechazado por el DTO.
-- [ ] `POST /pesajes` con `tara` negativa es rechazado por el DTO.
-- [ ] Un pesaje con `peso_neto` entre `peso_minimo` y `peso_maximo` del lote responde `fuera_de_rango: false`.
-- [ ] Un pesaje con `peso_neto` menor al `peso_minimo` del lote se guarda y responde `fuera_de_rango: true`.
-- [ ] Un pesaje con `peso_neto` mayor al `peso_maximo` del lote se guarda y responde `fuera_de_rango: true`.
-- [ ] `POST /pesajes` con `dispositivo_identificador` y `secuencia_dispositivo` los guarda tal cual en la fila.
-- [ ] `POST /pesajes` omitiendo los campos de dispositivo guarda el pesaje con ambos en `null`.
-- [ ] La respuesta de `POST /pesajes` incluye el `id` del pesaje creado como número.
-- [ ] `POST /lotes` y `GET /lotes/cliente/:clienteId` (SPEC 02) siguen funcionando igual.
-- [ ] `GET /clientes` y `POST /clientes` (SPEC 01) siguen funcionando igual.
+- [X] `POST /pesajes` contra un lote de un cliente al que el operador autenticado **no** está vinculado en `cliente_operador` es rechazado y no inserta ninguna fila.
+- [X] `POST /pesajes` con un `estado_calidad_id` inexistente es rechazado.
+- [x] `POST /pesajes` con `peso_bruto` igual a 0 o negativo es rechazado por el DTO.
+- [X] `POST /pesajes` con `tara` negativa es rechazado por el DTO.
+- [X] Un pesaje con `peso_neto` entre `peso_minimo` y `peso_maximo` del lote responde `fuera_de_rango: false`.
+- [X] Un pesaje con `peso_neto` menor al `peso_minimo` del lote se guarda y responde `fuera_de_rango: true`.
+- [X] Un pesaje con `peso_neto` mayor al `peso_maximo` del lote se guarda y responde `fuera_de_rango: true`.
+- [X] `POST /pesajes` con `dispositivo_identificador` y `secuencia_dispositivo` los guarda tal cual en la fila.
+- [X] `POST /pesajes` omitiendo los campos de dispositivo guarda el pesaje con ambos en `null`.
+- [X] La respuesta de `POST /pesajes` incluye el `id` del pesaje creado como número.
+- [X] `POST /lotes` y `GET /lotes/cliente/:clienteId` (SPEC 02) siguen funcionando igual.
+- [X] `GET /clientes` y `POST /clientes` (SPEC 01) siguen funcionando igual.
 
 ---
 
