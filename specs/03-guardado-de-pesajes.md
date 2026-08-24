@@ -1,6 +1,6 @@
 # SPEC 03 — Guardado de pesajes en la base de datos
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-08-24
 > **Objective:** Implementar el módulo `pesajes` con `POST /pesajes` para guardar un pesaje individual contra un lote abierto, calculando `peso_neto` en el backend y devolviendo si el peso quedó fuera del rango del lote.
