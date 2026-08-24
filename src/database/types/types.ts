@@ -47,6 +47,7 @@ export interface PesajesTable {
   dispositivo_identificador: string | null;
   secuencia_dispositivo: number | null;
   created_at: Generated<Date | string | null>;
+  fuera_de_rango: boolean | null;
 }
 export interface ProductosTable {
   id: Generated<number>;

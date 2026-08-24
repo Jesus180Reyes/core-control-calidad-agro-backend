@@ -47,6 +47,7 @@ export class PesajesRepository {
                     tara,
                     dispositivo_identificador,
                     secuencia_dispositivo,
+                    fuera_de_rango,
                 })
                 .executeTakeFirstOrThrow(
                     () => new BadRequestException('Error al guardar el pesaje'),
