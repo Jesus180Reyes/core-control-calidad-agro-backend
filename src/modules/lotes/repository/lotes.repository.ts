@@ -33,7 +33,6 @@ export class LotesRepository {
                 'lotes.peso_ideal',
                 'lotes.peso_maximo',
                 'lotes.estado',
-                'lotes.created_at',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .orderBy('lotes.created_at', 'desc')
