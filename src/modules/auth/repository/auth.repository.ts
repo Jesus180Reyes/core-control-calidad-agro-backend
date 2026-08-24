@@ -36,7 +36,7 @@ export class AuthRepository {
         const accessToken = this.jwtService.sign(payload);
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password: _, ...currentUser } = user;
+        const { password: _, id: __, cedula: ____, username: _____, ...currentUser } = user;
 
         return {
             accessToken,
