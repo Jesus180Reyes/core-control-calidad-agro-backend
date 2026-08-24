@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { Database } from 'src/database/types/types';
+import { CreatePesajeDto } from '../dto/create-pesaje.dto';
 
 @Injectable()
 export class PesajesRepository {
@@ -13,6 +14,50 @@ export class PesajesRepository {
 
     get db() {
         return this.dbService.client;
+    }
+
+    async createPesaje(data: CreatePesajeDto, userId: number) {
+        const {
+            lote_id,
+            estado_calidad_id,
+            peso_bruto,
+            tara,
+            dispositivo_identificador,
+            secuencia_dispositivo,
+        } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            const lote = await this.validateLoteAbierto(lote_id, trx);
+            await this.validateVinculoOperador(lote.cliente_id, userId, trx);
+            await this.validateEstadoCalidad(estado_calidad_id, trx);
+
+            const peso_neto = peso_bruto - tara;
+            const fuera_de_rango =
+                peso_neto < Number(lote.peso_minimo) ||
+                peso_neto > Number(lote.peso_maximo);
+
+            const result = await trx
+                .insertInto('pesajes')
+                .values({
+                    lote_id,
+                    usuario_id: userId,
+                    estado_calidad_id,
+                    peso_bruto,
+                    peso_neto,
+                    tara,
+                    dispositivo_identificador,
+                    secuencia_dispositivo,
+                })
+                .executeTakeFirstOrThrow(
+                    () => new BadRequestException('Error al guardar el pesaje'),
+                );
+
+            return {
+                id: Number(result.insertId),
+                peso_neto,
+                fuera_de_rango,
+            };
+        });
     }
 
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
