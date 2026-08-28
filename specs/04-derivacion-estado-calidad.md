@@ -1,6 +1,6 @@
 # SPEC 04 — Derivación automática del estado de calidad de un pesaje
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02, SPEC 03
 > **Date:** 2026-08-28
 > **Objective:** Que el backend derive el `estado_calidad_id` de cada pesaje a partir del `peso_neto` y del rango del lote, en lugar de recibirlo en el body de `POST /pesajes`.
@@ -111,8 +111,8 @@ La forma de la respuesta de `POST /pesajes` (201) **no cambia**:
 
 ## Acceptance criteria
 
-- [ ] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
 - [ ] `POST /pesajes` sin `estado_calidad_id` en el body responde 201 y guarda el pesaje.
 - [ ] Un pesaje con `peso_neto` entre `peso_minimo` y `peso_maximo` se guarda con el `estado_calidad_id` de la fila `codigo = 'IDEAL'`.
 - [ ] Un pesaje con `peso_neto` menor al `peso_minimo` se guarda con el `estado_calidad_id` de la fila `codigo = 'MINIMO'`.

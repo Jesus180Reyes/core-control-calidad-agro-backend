@@ -19,7 +19,6 @@ export class PesajesRepository {
     async createPesaje(data: CreatePesajeDto, userId: number) {
         const {
             lote_id,
-            estado_calidad_id,
             peso_bruto,
             tara,
             dispositivo_identificador,
@@ -29,19 +28,24 @@ export class PesajesRepository {
         return await this.db.transaction().execute(async (trx) => {
             const lote = await this.validateLoteAbierto(lote_id, trx);
             await this.validateVinculoOperador(lote.cliente_id, userId, trx);
-            await this.validateEstadoCalidad(estado_calidad_id, trx);
 
             const peso_neto = peso_bruto - tara;
             const fuera_de_rango =
                 peso_neto < Number(lote.peso_minimo) ||
                 peso_neto > Number(lote.peso_maximo);
 
+            const estadoCalidad = await this.resolveEstadoCalidad(
+                peso_neto,
+                lote,
+                trx,
+            );
+
             const result = await trx
                 .insertInto('pesajes')
                 .values({
                     lote_id,
                     usuario_id: userId,
-                    estado_calidad_id,
+                    estado_calidad_id: estadoCalidad.id,
                     peso_bruto,
                     peso_neto,
                     tara,
@@ -106,19 +110,45 @@ export class PesajesRepository {
         }
     }
 
-    private async validateEstadoCalidad(
-        estadoCalidadId: number,
+    private async resolveEstadoCalidad(
+        pesoNeto: number,
+        lote: { peso_minimo: string | number; peso_maximo: string | number },
         db: Kysely<Database>,
     ) {
+        const pesoMinimo = Number(lote.peso_minimo);
+        const pesoMaximo = Number(lote.peso_maximo);
+
+        const codigo = this.resolveCodigoEstadoCalidad(
+            pesoNeto,
+            pesoMinimo,
+            pesoMaximo,
+        );
+
         return await db
             .selectFrom('estados_calidad')
-            .select(['id', 'nombre'])
-            .where('id', '=', estadoCalidadId)
+            .select(['id', 'codigo'])
+            .where('codigo', '=', codigo)
             .executeTakeFirstOrThrow(
                 () =>
                     new BadRequestException(
-                        `El estado de calidad con id '${estadoCalidadId}' no existe`,
+                        `El estado de calidad con codigo '${codigo}' no existe`,
                     ),
             );
+    }
+
+    private resolveCodigoEstadoCalidad(
+        pesoNeto: number,
+        pesoMinimo: number,
+        pesoMaximo: number,
+    ) {
+        if (pesoNeto < pesoMinimo) {
+            return 'MINIMO';
+        }
+
+        if (pesoNeto > pesoMaximo) {
+            return 'MAXIMO';
+        }
+
+        return 'IDEAL';
     }
 }
