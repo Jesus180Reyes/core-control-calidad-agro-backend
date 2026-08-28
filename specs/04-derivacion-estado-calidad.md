@@ -1,6 +1,6 @@
 # SPEC 04 — Derivación automática del estado de calidad de un pesaje
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02, SPEC 03
 > **Date:** 2026-08-28
 > **Objective:** Que el backend derive el `estado_calidad_id` de cada pesaje a partir del `peso_neto` y del rango del lote, en lugar de recibirlo en el body de `POST /pesajes`.
