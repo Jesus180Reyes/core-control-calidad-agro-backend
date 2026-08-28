@@ -106,19 +106,45 @@ export class PesajesRepository {
         }
     }
 
-    private async validateEstadoCalidad(
-        estadoCalidadId: number,
+    private async resolveEstadoCalidad(
+        pesoNeto: number,
+        lote: { peso_minimo: string | number; peso_maximo: string | number },
         db: Kysely<Database>,
     ) {
+        const pesoMinimo = Number(lote.peso_minimo);
+        const pesoMaximo = Number(lote.peso_maximo);
+
+        const codigo = this.resolveCodigoEstadoCalidad(
+            pesoNeto,
+            pesoMinimo,
+            pesoMaximo,
+        );
+
         return await db
             .selectFrom('estados_calidad')
-            .select(['id', 'nombre'])
-            .where('id', '=', estadoCalidadId)
+            .select(['id', 'codigo'])
+            .where('codigo', '=', codigo)
             .executeTakeFirstOrThrow(
                 () =>
                     new BadRequestException(
-                        `El estado de calidad con id '${estadoCalidadId}' no existe`,
+                        `El estado de calidad con codigo '${codigo}' no existe`,
                     ),
             );
+    }
+
+    private resolveCodigoEstadoCalidad(
+        pesoNeto: number,
+        pesoMinimo: number,
+        pesoMaximo: number,
+    ) {
+        if (pesoNeto < pesoMinimo) {
+            return 'MINIMO';
+        }
+
+        if (pesoNeto > pesoMaximo) {
+            return 'MAXIMO';
+        }
+
+        return 'IDEAL';
     }
 }
