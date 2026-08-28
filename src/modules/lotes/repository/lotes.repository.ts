@@ -23,6 +23,7 @@ export class LotesRepository {
             .selectFrom('lotes')
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
+            .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -33,6 +34,7 @@ export class LotesRepository {
                 'lotes.peso_ideal',
                 'lotes.peso_maximo',
                 'lotes.estado',
+                'etapas.nombre as etapa',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .orderBy('lotes.created_at', 'desc')
@@ -71,6 +73,7 @@ export class LotesRepository {
                     peso_maximo,
                     variedad_o_talla,
                     estado: 'abierto',
+                    etapa_id: 1,
                     created_by: userId,
                 })
                 .executeTakeFirstOrThrow(

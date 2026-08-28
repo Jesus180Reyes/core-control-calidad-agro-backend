@@ -18,6 +18,7 @@ export interface LotesTable {
   nombre_lote: string;
   producto_id: number;
   unidad_medida_id: number;
+  etapa_id: number | null;
   created_by: number;
   variedad_o_talla: string | null;
   resumen_ia: string | null;
@@ -96,6 +97,13 @@ export interface ClienteOperadorTable {
   created_at: Generated<Date | string | null>;
 }
 
+export interface EtapasTable {
+  id: Generated<number>;
+  codigo: string;
+  nombre: string;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
   usuarios: UsuariosTable;
   lotes: LotesTable;
@@ -106,4 +114,5 @@ export interface Database {
   unidades_medida: UnidadMedidaTable;
   clientes: ClientesTable;
   cliente_operador: ClienteOperadorTable;
+  etapas: EtapasTable;
 }
