@@ -71,7 +71,7 @@ Import path convention: absolute imports from `src/...` are used throughout (e.g
 | `auth` | `POST /auth/login`, `POST /auth/register` (both `@Public()`) |
 | `clientes` | `POST /clientes` (optional `usuario_ids` links operators), `GET /clientes` (only clients linked to the caller via `cliente_operador`) |
 | `lotes` | `POST /lotes` (inserts `estado: 'abierto'`), `GET /lotes/cliente/:clienteId` (product and unit resolved to names by join; never exposes `resumen_ia`) |
-| `pesajes` | `POST /pesajes` (one weigh-in per request; backend computes `peso_neto = peso_bruto - tara` and `fuera_de_rango`) |
+| `pesajes` | `POST /pesajes` (one weigh-in per request; backend computes `peso_neto = peso_bruto - tara`, `fuera_de_rango` and `estado_calidad_id` — the body accepts none of the three) |
 
 No read, update or delete endpoints exist beyond the two `GET`s above — no `GET /clientes/:id`, no `GET /lotes/:id`, no `GET /pesajes/*`, no `PUT`/`PATCH`/`DELETE` anywhere.
 

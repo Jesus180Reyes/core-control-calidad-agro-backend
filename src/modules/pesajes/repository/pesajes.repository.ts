@@ -19,7 +19,6 @@ export class PesajesRepository {
     async createPesaje(data: CreatePesajeDto, userId: number) {
         const {
             lote_id,
-            estado_calidad_id,
             peso_bruto,
             tara,
             dispositivo_identificador,
@@ -29,19 +28,24 @@ export class PesajesRepository {
         return await this.db.transaction().execute(async (trx) => {
             const lote = await this.validateLoteAbierto(lote_id, trx);
             await this.validateVinculoOperador(lote.cliente_id, userId, trx);
-            await this.validateEstadoCalidad(estado_calidad_id, trx);
 
             const peso_neto = peso_bruto - tara;
             const fuera_de_rango =
                 peso_neto < Number(lote.peso_minimo) ||
                 peso_neto > Number(lote.peso_maximo);
 
+            const estadoCalidad = await this.resolveEstadoCalidad(
+                peso_neto,
+                lote,
+                trx,
+            );
+
             const result = await trx
                 .insertInto('pesajes')
                 .values({
                     lote_id,
                     usuario_id: userId,
-                    estado_calidad_id,
+                    estado_calidad_id: estadoCalidad.id,
                     peso_bruto,
                     peso_neto,
                     tara,
