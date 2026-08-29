@@ -52,7 +52,7 @@ NestJS API (Express platform) backed by MySQL via Kysely (no ORM, no migrations 
 - `JwtStrategy` (`src/strategy/jwt.stategy.ts`) validates the bearer token and returns `{ userId, username }`, which becomes `req.user`. Controllers read it as `const { userId } = req.user as { userId: number }`.
 - Global pipes: `ZodValidationPipe` from `nestjs-zod` is registered both as `APP_PIPE` in `AppModule` and again manually in `main.ts` — DTOs are Zod schemas wrapped with `createZodDto()` (see `src/modules/*/dto/*.dto.ts`), not `class-validator`.
 - Roles exist in the DB (`roles`, `usuarios.rol_id`) but **no endpoint discriminates by role yet** — every authenticated user has the same permissions.
-- The `permisos` table (spec 06) declares what each role is *supposed* to be able to do, but **nothing reads it**: there is no `PermissionsGuard` and no `@Permisos()` decorator, `req.user` is still `{ userId, username }`, the JWT payload is unchanged (`sub`, `user_id`, `username`) and `POST /auth/login` does not return permissions. An `OPERADOR` still gets a 201 from `POST /clientes` even though the table says they lack `clientes.crear`. Reading and enforcing it is a future spec.
+- The `permisos` table (spec 06) declares what each role is *supposed* to be able to do. Exactly one thing reads it — `GET /permisos/me` (spec 07), which hands the caller its own role's codes so a client can hide buttons — and **nothing enforces it**: there is no `PermissionsGuard` and no `@Permisos()` decorator, `req.user` is still `{ userId, username }`, the JWT payload is unchanged (`sub`, `user_id`, `username`) and `POST /auth/login` does not return permissions. An `OPERADOR` still gets a 201 from `POST /clientes` even though the table says they lack `clientes.crear`. Enforcing it is a future spec.
 
 **Module layout convention:** each feature module is `*.module.ts` → `*.controller.ts` → `*.service.ts` → `repository/*.repository.ts` → `dto/*.dto.ts` (Zod schemas), with `imports: [DatabaseModule]` in the module and the module registered in `src/app.module.ts`.
 
@@ -73,8 +73,9 @@ Import path convention: absolute imports from `src/...` are used throughout (e.g
 | `clientes` | `POST /clientes` (optional `usuario_ids` links operators), `GET /clientes` (only clients linked to the caller via `cliente_operador`) |
 | `lotes` | `POST /lotes` (inserts `estado: 'abierto'`), `GET /lotes/cliente/:clienteId` (product and unit resolved to names by join; never exposes `resumen_ia`) |
 | `pesajes` | `POST /pesajes` (one weigh-in per request; backend computes `peso_neto = peso_bruto - tara`, `fuera_de_rango` and `estado_calidad_id` — the body accepts none of the three) |
+| `permisos` | `GET /permisos/me` (spec 07; resolves `rol_id` from the JWT's `userId`, returns a flat `string[]` of the role's `permisos.codigo` where `isActive = 1`, unordered; 404 if the user no longer exists, `[]` if the role has none — **informational only, nothing is enforced**) |
 
-No read, update or delete endpoints exist beyond the two `GET`s above — no `GET /clientes/:id`, no `GET /lotes/:id`, no `GET /pesajes/*`, no `PUT`/`PATCH`/`DELETE` anywhere.
+No read, update or delete endpoints exist beyond the three `GET`s above — no `GET /clientes/:id`, no `GET /lotes/:id`, no `GET /pesajes/*`, no `PUT`/`PATCH`/`DELETE` anywhere.
 
 ## Domain
 
@@ -89,6 +90,6 @@ MySQL decimal columns (`peso_*`) come back from the driver as `string | number`,
 ## Caveats
 
 - Any DDL is applied **by hand in MySQL**; there is no migration tooling and no `.sql` files in the repo. When a change needs schema work, document the DDL in the spec and update `src/database/types/types.ts` to match. (Specs 02 and 03 state "no DDL" as a decision — note that `pesajes.fuera_de_rango` was in fact added during spec 03, so that spec's acceptance criterion is inaccurate.)
-- `permisos` is seeded and maintained **by hand in SQL** — there is no CRUD endpoint and nothing validates it at startup. Adding an endpoint means inserting its permission by hand, one row per role that should have it (`INSERT ... SELECT r.id, ... FROM roles r WHERE r.nombre = '<ROL>'`, resolving `rol_id` by name because role ids differ between environments). Nothing will warn you if you forget. Note also that `permisos` is the one place where uniqueness is enforced by real MySQL constraints (`UNIQUE (rol_id, codigo)` and a FK to `roles`), a deliberate exception to the application-code-only rule above, precisely because no application code touches this table.
+- `permisos` is seeded and maintained **by hand in SQL** — there is no CRUD endpoint (`GET /permisos/me` only reads) and nothing validates it at startup. Adding an endpoint means inserting its permission by hand, one row per role that should have it (`INSERT ... SELECT r.id, ... FROM roles r WHERE r.nombre = '<ROL>'`, resolving `rol_id` by name because role ids differ between environments). Nothing will warn you if you forget. Spec 07 is the deliberate exception to that rule: `GET /permisos/me` has no permission row of its own, because requiring a permission to read your own permissions is circular. Note also that `permisos` is the one place where uniqueness is enforced by real MySQL constraints (`UNIQUE (rol_id, codigo)` and a FK to `roles`), a deliberate exception to the application-code-only rule above, precisely because no application code writes to this table.
 - `README.md` is still the stock NestJS boilerplate; there is no Swagger/OpenAPI setup, so `specs/` plus this file are the API documentation.
 - `dist/` is present in the working tree.
