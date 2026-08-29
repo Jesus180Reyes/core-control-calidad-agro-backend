@@ -104,6 +104,16 @@ export interface EtapasTable {
   created_at: Generated<Date>;
 }
 
+export interface PermisosTable {
+  id: Generated<number>;
+  rol_id: number;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  isActive: Generated<number>;
+  created_at: Generated<Date | string | null>;
+}
+
 export interface Database {
   usuarios: UsuariosTable;
   lotes: LotesTable;
@@ -115,4 +125,5 @@ export interface Database {
   clientes: ClientesTable;
   cliente_operador: ClienteOperadorTable;
   etapas: EtapasTable;
+  permisos: PermisosTable;
 }
