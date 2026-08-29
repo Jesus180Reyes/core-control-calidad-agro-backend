@@ -1,6 +1,6 @@
 # SPEC 07 — Consultar los permisos del usuario autenticado
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 06
 > **Date:** 2026-08-29
 > **Objective:** Agregar `GET /permisos/me`, que resuelve el rol del usuario del JWT y devuelve un array plano con los `codigo` de sus permisos activos.
@@ -118,30 +118,30 @@ El array se arma con `rows.map((r) => r.codigo)`, sin `ORDER BY`.
 
 ## Acceptance criteria
 
-- [ ] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
-- [ ] `src/database/types/types.ts` no cambió.
-- [ ] La tabla `permisos` sigue teniendo las mismas 10 filas de SPEC 06: no se sembró ninguna fila nueva.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] Existen los cuatro archivos del módulo bajo `src/modules/permisos/` y no hay carpeta `dto/`.
-- [ ] `PermisosModule` está registrado en `src/app.module.ts`.
-- [ ] `GET /permisos/me` con el token de un `Admin` responde 200 con un array de exactamente seis strings.
-- [ ] Ese array contiene `clientes.crear`, `clientes.listar`, `lotes.crear`, `lotes.listar`, `pesajes.crear` y `usuarios.crear`.
-- [ ] `GET /permisos/me` con el token de un `Operador` responde 200 con un array de exactamente cuatro strings: `clientes.listar`, `lotes.crear`, `lotes.listar` y `pesajes.crear`.
-- [ ] El array del `Operador` **no** contiene `clientes.crear` ni `usuarios.crear`.
-- [ ] Los elementos del array son strings planos, no objetos: `permisos[0]` es `"clientes.listar"` y no `{ codigo: "clientes.listar" }`.
-- [ ] Poner `isActive = 0` en una fila de `permisos` hace que su `codigo` desaparezca de la respuesta del rol correspondiente, y devolverlo a `1` lo hace reaparecer.
-- [ ] Un usuario cuyo rol no tiene ninguna fila activa en `permisos` recibe 200 con `permisos: []`, no un 404.
-- [ ] Un token válido cuyo `user_id` no existe en `usuarios` recibe 404 con el mensaje `Usuario no encontrado`.
-- [ ] `GET /permisos/me` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
-- [ ] `GET /permisos/me` con un token expirado o firmado con otro secreto responde 401.
-- [ ] La respuesta no incluye `nombre`, `descripcion`, `id` ni datos del rol.
-- [ ] El endpoint no acepta un `userId` por ruta, query ni body: `GET /permisos/me?userId=1` devuelve los permisos del usuario del token, ignorando el parámetro.
-- [ ] `POST /clientes` sigue respondiendo 201 para un usuario con rol `Operador`: **este spec no bloquea nada**.
-- [ ] `POST /auth/login` responde exactamente igual que antes de este spec, sin clave `permisos`.
-- [ ] El payload del JWT no cambió: sigue siendo `sub`, `user_id` y `username`.
-- [ ] `req.user` sigue siendo `{ userId, username }`.
-- [ ] `POST /clientes`, `GET /clientes` (SPEC 01), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04) y `POST /auth/refresh` (SPEC 05) siguen funcionando igual.
-- [ ] `CLAUDE.md` lista `GET /permisos/me` en la tabla de endpoints y ya no afirma que nada lee la tabla `permisos`.
+- [X] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
+- [X] `src/database/types/types.ts` no cambió.
+- [X] La tabla `permisos` sigue teniendo las mismas 10 filas de SPEC 06: no se sembró ninguna fila nueva.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] Existen los cuatro archivos del módulo bajo `src/modules/permisos/` y no hay carpeta `dto/`.
+- [X] `PermisosModule` está registrado en `src/app.module.ts`.
+- [X] `GET /permisos/me` con el token de un `Admin` responde 200 con un array de exactamente seis strings.
+- [X] Ese array contiene `clientes.crear`, `clientes.listar`, `lotes.crear`, `lotes.listar`, `pesajes.crear` y `usuarios.crear`.
+- [X] `GET /permisos/me` con el token de un `Operador` responde 200 con un array de exactamente cuatro strings: `clientes.listar`, `lotes.crear`, `lotes.listar` y `pesajes.crear`.
+- [X] El array del `Operador` **no** contiene `clientes.crear` ni `usuarios.crear`.
+- [X] Los elementos del array son strings planos, no objetos: `permisos[0]` es `"clientes.listar"` y no `{ codigo: "clientes.listar" }`.
+- [X] Poner `isActive = 0` en una fila de `permisos` hace que su `codigo` desaparezca de la respuesta del rol correspondiente, y devolverlo a `1` lo hace reaparecer.
+- [X] Un usuario cuyo rol no tiene ninguna fila activa en `permisos` recibe 200 con `permisos: []`, no un 404.
+- [X] Un token válido cuyo `user_id` no existe en `usuarios` recibe 404 con el mensaje `Usuario no encontrado`.
+- [X] `GET /permisos/me` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
+- [X] `GET /permisos/me` con un token expirado o firmado con otro secreto responde 401.
+- [X] La respuesta no incluye `nombre`, `descripcion`, `id` ni datos del rol.
+- [X] El endpoint no acepta un `userId` por ruta, query ni body: `GET /permisos/me?userId=1` devuelve los permisos del usuario del token, ignorando el parámetro.
+- [X] `POST /clientes` sigue respondiendo 201 para un usuario con rol `Operador`: **este spec no bloquea nada**.
+- [X] `POST /auth/login` responde exactamente igual que antes de este spec, sin clave `permisos`.
+- [X] El payload del JWT no cambió: sigue siendo `sub`, `user_id` y `username`.
+- [X] `req.user` sigue siendo `{ userId, username }`.
+- [X] `POST /clientes`, `GET /clientes` (SPEC 01), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04) y `POST /auth/refresh` (SPEC 05) siguen funcionando igual.
+- [X] `CLAUDE.md` lista `GET /permisos/me` en la tabla de endpoints y ya no afirma que nada lee la tabla `permisos`.
 
 ---
 
