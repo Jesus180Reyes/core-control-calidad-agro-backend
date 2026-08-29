@@ -1,6 +1,6 @@
 # SPEC 06 — Tabla de permisos por rol
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** —
 > **Date:** 2026-08-28
 > **Objective:** Crear la tabla `permisos`, relacionada a `roles` por `rol_id`, y sembrarla con los permisos de `Admin` y `Operador` que corresponden a los endpoints actuales.
@@ -152,23 +152,23 @@ permisos: PermisosTable;
 
 ## Acceptance criteria
 
-- [ ] La tabla `permisos` existe en MySQL con las columnas del data model.
-- [ ] `permisos.rol_id` tiene una clave foránea a `roles(id)`: insertar un `rol_id` inexistente falla.
-- [ ] Existe un índice único sobre `(rol_id, codigo)`: insertar dos veces `clientes.crear` para el mismo rol falla.
-- [ ] Insertar `lotes.crear` para `Admin` y también para `Operador` **no** falla: el `codigo` se repite entre roles.
-- [ ] La tabla tiene exactamente 10 filas después de la semilla.
-- [ ] El rol `Admin` tiene seis filas, con los seis `codigo` de la tabla del data model.
-- [ ] El rol `Operador` tiene exactamente cuatro: `clientes.listar`, `lotes.crear`, `lotes.listar` y `pesajes.crear`.
-- [ ] El rol `Operador` **no** tiene filas con `clientes.crear` ni `usuarios.crear`.
-- [ ] Toda fila sembrada tiene `isActive = 1` por defecto.
-- [ ] `src/database/types/types.ts` declara `PermisosTable` y la interfaz `Database` incluye la clave `permisos`.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] No se creó ningún archivo bajo `src/modules/`, y `src/app.module.ts` no cambió.
-- [ ] No existe ninguna ruta nueva: `GET /roles/:rolId/permisos` responde 404 de Nest.
-- [ ] `POST /clientes` sigue respondiendo 201 para un usuario con rol `Operador`: **este spec no bloquea nada**.
-- [ ] `POST /auth/login` responde exactamente igual que antes de este spec, sin clave `permisos`.
-- [ ] El payload del JWT no cambió: sigue siendo `sub`, `user_id` y `username`.
-- [ ] `POST /clientes`, `GET /clientes` (SPEC 01), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04) y `POST /auth/refresh` (SPEC 05) siguen funcionando igual.
+- [X] La tabla `permisos` existe en MySQL con las columnas del data model.
+- [X] `permisos.rol_id` tiene una clave foránea a `roles(id)`: insertar un `rol_id` inexistente falla.
+- [X] Existe un índice único sobre `(rol_id, codigo)`: insertar dos veces `clientes.crear` para el mismo rol falla.
+- [X] Insertar `lotes.crear` para `Admin` y también para `Operador` **no** falla: el `codigo` se repite entre roles.
+- [X] La tabla tiene exactamente 10 filas después de la semilla.
+- [X] El rol `Admin` tiene seis filas, con los seis `codigo` de la tabla del data model.
+- [X] El rol `Operador` tiene exactamente cuatro: `clientes.listar`, `lotes.crear`, `lotes.listar` y `pesajes.crear`.
+- [X] El rol `Operador` **no** tiene filas con `clientes.crear` ni `usuarios.crear`.
+- [X] Toda fila sembrada tiene `isActive = 1` por defecto.
+- [X] `src/database/types/types.ts` declara `PermisosTable` y la interfaz `Database` incluye la clave `permisos`.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] No se creó ningún archivo bajo `src/modules/`, y `src/app.module.ts` no cambió.
+- [X] No existe ninguna ruta nueva: `GET /roles/:rolId/permisos` responde 404 de Nest.
+- [X] `POST /clientes` sigue respondiendo 201 para un usuario con rol `Operador`: **este spec no bloquea nada**.
+- [X] `POST /auth/login` responde exactamente igual que antes de este spec, sin clave `permisos`.
+- [X] El payload del JWT no cambió: sigue siendo `sub`, `user_id` y `username`.
+- [X] `POST /clientes`, `GET /clientes` (SPEC 01), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04) y `POST /auth/refresh` (SPEC 05) siguen funcionando igual.
 
 ---
 
