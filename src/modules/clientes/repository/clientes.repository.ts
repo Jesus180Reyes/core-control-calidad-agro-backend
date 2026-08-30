@@ -49,7 +49,7 @@ export class ClientesRepository {
                 'clientes.direccion_planta',
             ])
             .where('clientes.isActive', '=', 1)
-            .orderBy('clientes.nombre', 'asc')
+            .orderBy('clientes.created_at', 'asc')
             .execute();
         return clientes;
     }

@@ -29,7 +29,7 @@ Eso no es solo "un permiso más que todavía no se aplica", como en SPEC 06 y 07
 - Nuevo endpoint `GET /clientes/all`, protegido únicamente por el `JwtAuthGuard` global (no lleva `@Public()`).
 - El endpoint no acepta parámetros de ruta, query ni body, y no lee `req.user`.
 - Los mismos seis campos que devuelve `GET /clientes`: `id`, `nombre`, `producto`, `codigo_exportacion`, `telefono`, `direccion_planta`.
-- Filtro `clientes.isActive = 1` y `ORDER BY clientes.nombre ASC`, igual que `getAllClientesByOperador`.
+- Filtro `clientes.isActive = 1` y `ORDER BY clientes.created_at ASC`: orden de antigüedad, los clientes registrados primero arriba.
 - Respuesta en la forma `{ ok, msg, clientes }`, con `clientes: []` cuando no hay ninguno activo.
 - Siembra a mano en SQL de una fila en `permisos`: `clientes.listar_todos` para el rol `Admin`.
 - Actualizar `CLAUDE.md`: fila nueva en la tabla de endpoints, la nota de la sección de auth y el conteo de filas de `permisos`.
@@ -82,7 +82,7 @@ Si el nombre real del rol en la base no es exactamente `Admin`, se ajusta el lit
 
 ### Consulta del endpoint
 
-Es la misma que `getAllClientesByOperador` sin el `innerJoin` a `cliente_operador` y sin el filtro por `usuario_id`:
+Es la misma que `getAllClientesByOperador` sin el `innerJoin` a `cliente_operador`, sin el filtro por `usuario_id` y con otro `ORDER BY`:
 
 ```sql
 SELECT c.id,
@@ -94,10 +94,12 @@ SELECT c.id,
 FROM clientes c
 LEFT JOIN productos p ON p.id = c.producto_id
 WHERE c.isActive = 1
-ORDER BY c.nombre ASC;
+ORDER BY c.created_at ASC;
 ```
 
 El `leftJoin` a `productos` se mantiene: un cliente cuyo `producto_id` apunta a un producto inexistente sigue apareciendo, con `producto: null`.
+
+`clientes.created_at` es nullable (`Generated<Date | string | null>` en `types.ts`). MySQL ordena `NULL` primero en `ASC`, así que cualquier fila sin fecha aparece al principio de la lista. Hoy la columna tiene `DEFAULT CURRENT_TIMESTAMP`, así que solo afectaría a filas insertadas antes de que existiera ese default.
 
 ### Respuesta de `GET /clientes/all` (200)
 
@@ -133,7 +135,7 @@ Respuesta (200) cuando no hay clientes activos:
 ## Implementation plan
 
 1. Verificar el nombre real del rol con `SELECT id, nombre FROM roles;` y ajustar el literal `'Admin'` si difiere. Ejecutar a mano el `INSERT` de la semilla y confirmar con `SELECT rol_id, COUNT(*) FROM permisos GROUP BY rol_id;` que `Admin` tiene siete filas y `Operador` sigue con cuatro.
-2. Agregar `getAllClientes()` a `ClientesRepository`. Copiar `getAllClientesByOperador` quitando el `innerJoin` a `cliente_operador` y el `.where('cliente_operador.usuario_id', ...)`. Conservar el `leftJoin` a `productos`, los seis `select`, el `.where('clientes.isActive', '=', 1)` y el `.orderBy('clientes.nombre', 'asc')`. No recibe parámetros.
+2. Agregar `getAllClientes()` a `ClientesRepository`. Copiar `getAllClientesByOperador` quitando el `innerJoin` a `cliente_operador` y el `.where('cliente_operador.usuario_id', ...)`. Conservar el `leftJoin` a `productos`, los seis `select` y el `.where('clientes.isActive', '=', 1)`. Ordenar con `.orderBy('clientes.created_at', 'asc')`, que es donde se aparta del método que copia. No recibe parámetros.
 3. Agregar `findAllGlobal()` a `ClientesService` como pass-through a `getAllClientes()`, sin parámetros, igual en forma a `findAll`.
 4. Agregar el handler `@Get('all')` a `ClientesController` con el método `findAllGlobal()`. No lleva `@Req()` ni lee `req.user`. Responde `{ ok: true, msg: 'Clientes obtenidos correctamente', clientes }`. Sin `@Public()`.
 5. Levantar con `npm run start:dev` y confirmar que compila y que `GET /clientes/all` aparece en el log de rutas de Nest, junto a `GET /clientes` y `POST /clientes`.
@@ -161,7 +163,7 @@ Respuesta (200) cuando no hay clientes activos:
 - [ ] Cada elemento tiene exactamente seis claves: `id`, `nombre`, `producto`, `codigo_exportacion`, `telefono`, `direccion_planta`.
 - [ ] La respuesta no incluye `rtn`, `correo_contacto`, `ubicacionLongitud`, `ubicacionLatitude`, `created_by` ni `isActive`.
 - [ ] Un cliente con `isActive = 0` no aparece en la respuesta; ponerlo en `1` lo hace aparecer.
-- [ ] Los elementos vienen ordenados por `nombre` ascendente.
+- [ ] Los elementos vienen ordenados por `created_at` ascendente: el cliente registrado hace más tiempo aparece primero.
 - [ ] Un cliente cuyo `producto_id` no resuelve a ninguna fila de `productos` aparece igual, con `producto: null`.
 - [ ] Un `Admin` sin ninguna fila en `cliente_operador` recibe igual todos los clientes: el endpoint ignora el vínculo por completo.
 - [ ] Si no hay clientes activos, la respuesta es 200 con `clientes: []`, no un 404.
@@ -201,7 +203,9 @@ Respuesta (200) cuando no hay clientes activos:
 - **No:** devolver los operadores vinculados a cada cliente. Se descarta: cambia la consulta a un agregado y es información de una pantalla que todavía no existe.
 - **Sí:** filtrar por `clientes.isActive = 1`. Es lo que ya hace `getAllClientesByOperador`, y el listado sirve para operar, no para auditar.
 - **No:** incluir los clientes inactivos con su bandera `isActive`. Se descarta: sería el primer endpoint del proyecto en exponer registros dados de baja, y es una decisión que merece su propio spec junto con el resto de la administración de clientes.
-- **Sí:** `ORDER BY clientes.nombre ASC`. Idéntico a `getAllClientesByOperador`. Es una lista que se muestra en pantalla, así que el orden importa y debe ser estable entre ambientes.
+- **Sí:** `ORDER BY clientes.created_at ASC`. Decisión explícita del usuario, tomada durante la implementación. El listado global es una vista de administración, y ahí interesa el orden en que se dieron de alta los clientes más que el alfabético. Se anota la consecuencia: `created_at` es nullable, y MySQL pone los `NULL` primero en `ASC`, así que una fila sin fecha encabezaría la lista.
+- **No:** `ORDER BY clientes.nombre ASC`, que era lo aprobado originalmente en este spec por ser idéntico a `getAllClientesByOperador`. Se descarta al implementar. Consecuencia asumida: los dos listados de clientes ya no comparten orden, así que la misma lista se ve distinta según la ruta que la pida.
+- **No:** `ORDER BY clientes.created_at DESC` (los más nuevos arriba). Se descarta: se planteó al detectar el cambio y el usuario confirmó `ASC`.
 - **No:** dejarlo sin `ORDER BY` como hace `GET /permisos/me`. Se descarta: allí el consumidor usa `includes` y el orden no significa nada; aquí sí.
 - **No:** paginación con `?page` y `?limit`. Se descarta: ningún endpoint del proyecto pagina hoy, y agregarla implicaría un DTO de query con Zod, un conteo total y una forma de respuesta distinta a la de los otros listados. Se anota el riesgo de la respuesta sin límite en Risks.
 - **Sí:** todo va en el módulo `clientes` existente. Es el mismo dominio y la misma tabla; un módulo nuevo no tendría qué contener.
