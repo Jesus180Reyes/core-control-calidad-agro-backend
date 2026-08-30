@@ -147,38 +147,38 @@ Respuesta (200) cuando no hay clientes activos:
 
 ## Acceptance criteria
 
-- [ ] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
-- [ ] `src/database/types/types.ts` no cambió.
-- [ ] La tabla `permisos` tiene exactamente 11 filas: siete de `Admin` y cuatro de `Operador`.
-- [ ] Existe exactamente una fila con `codigo = 'clientes.listar_todos'`, y su `rol_id` es el de `Admin`.
-- [ ] El rol `Operador` **no** tiene ninguna fila con `codigo = 'clientes.listar_todos'`.
-- [ ] La fila sembrada tiene `isActive = 1`.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] No se creó ningún archivo nuevo bajo `src/modules/`: solo se modificaron `clientes.controller.ts`, `clientes.service.ts` y `repository/clientes.repository.ts`.
-- [ ] `src/app.module.ts` no cambió.
-- [ ] No existe ninguna carpeta ni archivo nuevo bajo `src/modules/clientes/dto/`.
-- [ ] `GET /clientes/all` aparece en el log de rutas de Nest al arrancar.
-- [ ] `GET /clientes/all` con el token de un `Admin` responde 200 con la forma `{ ok, msg, clientes }`.
-- [ ] La cantidad de elementos de `clientes` coincide exactamente con `SELECT COUNT(*) FROM clientes WHERE isActive = 1`.
-- [ ] Cada elemento tiene exactamente seis claves: `id`, `nombre`, `producto`, `codigo_exportacion`, `telefono`, `direccion_planta`.
-- [ ] La respuesta no incluye `rtn`, `correo_contacto`, `ubicacionLongitud`, `ubicacionLatitude`, `created_by` ni `isActive`.
-- [ ] Un cliente con `isActive = 0` no aparece en la respuesta; ponerlo en `1` lo hace aparecer.
-- [ ] Los elementos vienen ordenados por `created_at` ascendente: el cliente registrado hace más tiempo aparece primero.
-- [ ] Un cliente cuyo `producto_id` no resuelve a ninguna fila de `productos` aparece igual, con `producto: null`.
-- [ ] Un `Admin` sin ninguna fila en `cliente_operador` recibe igual todos los clientes: el endpoint ignora el vínculo por completo.
-- [ ] Si no hay clientes activos, la respuesta es 200 con `clientes: []`, no un 404.
-- [ ] `GET /clientes/all` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
-- [ ] `GET /clientes/all` con un token expirado o firmado con otro secreto responde 401.
-- [ ] El endpoint ignora cualquier query param: `GET /clientes/all?usuario_id=5` devuelve lo mismo que `GET /clientes/all`.
-- [ ] `GET /clientes/all` con el token de un `Operador` responde **200 con todos los clientes**, no 403: **este spec no aplica el permiso**.
-- [ ] `GET /clientes` sigue devolviendo únicamente los clientes vinculados al usuario del token, sin cambios respecto a SPEC 01.
-- [ ] `GET /permisos/me` con el token de un `Admin` responde 200 con un array de exactamente siete strings, que incluye `clientes.listar_todos`.
-- [ ] `GET /permisos/me` con el token de un `Operador` sigue respondiendo con exactamente cuatro strings y **no** incluye `clientes.listar_todos`.
-- [ ] `POST /auth/login` responde exactamente igual que antes de este spec, sin clave `permisos`.
-- [ ] El payload del JWT no cambió: sigue siendo `sub`, `user_id` y `username`.
-- [ ] `req.user` sigue siendo `{ userId, username }`.
-- [ ] `POST /clientes` (SPEC 01), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04), `POST /auth/refresh` (SPEC 05) y `GET /permisos/me` (SPEC 07) siguen funcionando igual.
-- [ ] `CLAUDE.md` lista `GET /clientes/all` en la tabla de endpoints y anota que el permiso `clientes.listar_todos` está sembrado pero no se aplica.
+- [X] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
+- [X] `src/database/types/types.ts` no cambió.
+- [X] La tabla `permisos` tiene exactamente 11 filas: siete de `Admin` y cuatro de `Operador`.
+- [X] Existe exactamente una fila con `codigo = 'clientes.listar_todos'`, y su `rol_id` es el de `Admin`.
+- [X] El rol `Operador` **no** tiene ninguna fila con `codigo = 'clientes.listar_todos'`.
+- [X] La fila sembrada tiene `isActive = 1`.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] No se creó ningún archivo nuevo bajo `src/modules/`: solo se modificaron `clientes.controller.ts`, `clientes.service.ts` y `repository/clientes.repository.ts`.
+- [X] `src/app.module.ts` no cambió.
+- [X] No existe ninguna carpeta ni archivo nuevo bajo `src/modules/clientes/dto/`.
+- [X] `GET /clientes/all` aparece en el log de rutas de Nest al arrancar.
+- [X] `GET /clientes/all` con el token de un `Admin` responde 200 con la forma `{ ok, msg, clientes }`.
+- [X] La cantidad de elementos de `clientes` coincide exactamente con `SELECT COUNT(*) FROM clientes WHERE isActive = 1`.
+- [X] Cada elemento tiene exactamente seis claves: `id`, `nombre`, `producto`, `codigo_exportacion`, `telefono`, `direccion_planta`.
+- [X] La respuesta no incluye `rtn`, `correo_contacto`, `ubicacionLongitud`, `ubicacionLatitude`, `created_by` ni `isActive`.
+- [X] Un cliente con `isActive = 0` no aparece en la respuesta; ponerlo en `1` lo hace aparecer.
+- [X] Los elementos vienen ordenados por `created_at` ascendente: el cliente registrado hace más tiempo aparece primero.
+- [X] Un cliente cuyo `producto_id` no resuelve a ninguna fila de `productos` aparece igual, con `producto: null`.
+- [X] Un `Admin` sin ninguna fila en `cliente_operador` recibe igual todos los clientes: el endpoint ignora el vínculo por completo.
+- [X] Si no hay clientes activos, la respuesta es 200 con `clientes: []`, no un 404.
+- [X] `GET /clientes/all` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
+- [X] `GET /clientes/all` con un token expirado o firmado con otro secreto responde 401.
+- [X] El endpoint ignora cualquier query param: `GET /clientes/all?usuario_id=5` devuelve lo mismo que `GET /clientes/all`.
+- [X] `GET /clientes/all` con el token de un `Operador` responde **200 con todos los clientes**, no 403: **este spec no aplica el permiso**.
+- [X] `GET /clientes` sigue devolviendo únicamente los clientes vinculados al usuario del token, sin cambios respecto a SPEC 01.
+- [X] `GET /permisos/me` con el token de un `Admin` responde 200 con un array de exactamente siete strings, que incluye `clientes.listar_todos`.
+- [X] `GET /permisos/me` con el token de un `Operador` sigue respondiendo con exactamente cuatro strings y **no** incluye `clientes.listar_todos`.
+- [X] `POST /auth/login` responde exactamente igual que antes de este spec, sin clave `permisos`.
+- [X] El payload del JWT no cambió: sigue siendo `sub`, `user_id` y `username`.
+- [X] `req.user` sigue siendo `{ userId, username }`.
+- [X] `POST /clientes` (SPEC 01), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04), `POST /auth/refresh` (SPEC 05) y `GET /permisos/me` (SPEC 07) siguen funcionando igual.
+- [X] `CLAUDE.md` lista `GET /clientes/all` en la tabla de endpoints y anota que el permiso `clientes.listar_todos` está sembrado pero no se aplica.
 
 ---
 
