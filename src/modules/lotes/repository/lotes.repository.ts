@@ -37,6 +37,7 @@ export class LotesRepository {
                 'etapas.nombre as etapa',
             ])
             .where('lotes.cliente_id', '=', clienteId)
+            .where('lotes.estado', '=', 'abierto')
             .orderBy('lotes.created_at', 'desc')
             .execute();
         return lotes;
@@ -61,6 +62,7 @@ export class LotesRepository {
                 'etapas.nombre as etapa',
             ])
             .where('lotes.cliente_id', '=', clienteId)
+            .where('lotes.estado', '=', 'abierto')
             .orderBy('lotes.created_at', 'desc')
             .execute();
         return lotes;
