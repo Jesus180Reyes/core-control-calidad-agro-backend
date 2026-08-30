@@ -28,12 +28,13 @@ La segunda: `GET /catalogos/usuarios` devuelve **todos** los usuarios activos, s
 - Nuevo módulo `src/modules/catalogos/` con `catalogos.module.ts`, `catalogos.controller.ts`, `catalogos.service.ts` y `repository/catalogos.repository.ts`.
 - Registro de `CatalogosModule` en `src/app.module.ts`.
 - Tres endpoints nuevos, todos `GET`, todos protegidos únicamente por el `JwtAuthGuard` global (ninguno lleva `@Public()`):
-  - `GET /catalogos/productos` → `{ ok, msg, productos }`
-  - `GET /catalogos/usuarios` → `{ ok, msg, usuarios }`
-  - `GET /catalogos/unidades-medida` → `{ ok, msg, unidades_medida }`
+  - `GET /catalogos/productos` → `{ ok, msg, data }`
+  - `GET /catalogos/usuarios` → `{ ok, msg, data }`
+  - `GET /catalogos/unidades-medida` → `{ ok, msg, data }`
+- Los tres endpoints devuelven la misma forma `{ id, nombre }` por elemento y la misma clave de payload `data`.
 - Los tres endpoints no aceptan parámetros de ruta, query ni body, y ninguno lee `req.user`.
 - `productos`: campos `id` y `nombre`, filtro `isActive = 1`, `ORDER BY nombre ASC`.
-- `usuarios`: campos `id` y `complete_name`, filtro `isActive = 1`, `ORDER BY complete_name ASC`. Sin filtro por rol.
+- `usuarios`: campos `id` y `nombre` (alias de la columna `complete_name`), filtro `isActive = 1`, `ORDER BY complete_name ASC`. Sin filtro por rol.
 - `unidades_medida`: campos `id` y `nombre`, sin filtro (la tabla no tiene columna `isActive`), `ORDER BY nombre ASC`.
 - `200` con array vacío cuando la tabla no tiene filas que cumplan el filtro.
 - Actualizar `CLAUDE.md`: fila nueva `catalogos` en la tabla de endpoints y nota de que son los primeros endpoints de lectura de `productos`, `usuarios` y `unidades_medida`.
@@ -81,7 +82,7 @@ WHERE isActive = 1
 ORDER BY nombre ASC;
 
 -- GET /catalogos/usuarios
-SELECT id, complete_name
+SELECT id, complete_name AS nombre
 FROM usuarios
 WHERE isActive = 1
 ORDER BY complete_name ASC;
@@ -92,7 +93,7 @@ FROM unidades_medida
 ORDER BY nombre ASC;
 ```
 
-Ninguna consulta lleva `JOIN`.
+Ninguna consulta lleva `JOIN`. La de usuarios es la única con alias: `complete_name` sale como `nombre` para que los tres catálogos tengan la misma forma. El `ORDER BY` usa el nombre real de la columna, no el alias.
 
 `unidades_medida.nombre` es nullable (`string | null` en `types.ts`). MySQL ordena `NULL` primero en `ASC`, así que una unidad sin nombre encabeza la lista y llega como `nombre: null`. Se acepta: la tabla la mantiene el equipo a mano y son pocas filas.
 
@@ -133,7 +134,7 @@ Ninguna consulta lleva `JOIN`.
 }
 ```
 
-Respuesta (200) cuando no hay filas que cumplan el filtro, con la clave correspondiente a cada endpoint:
+Respuesta (200) cuando no hay filas que cumplan el filtro. La clave es `data` en los tres endpoints; solo cambia el `msg`:
 
 ```json
 {
@@ -148,16 +149,16 @@ Respuesta (200) cuando no hay filas que cumplan el filtro, con la clave correspo
 ## Implementation plan
 
 1. Crear `src/modules/catalogos/repository/catalogos.repository.ts` con `CatalogosRepository`: inyecta `DatabaseService` y expone el getter `db` (`return this.dbService.client`) siguiendo la forma de `ClientesRepository`. Agregar `getProductos()`: `selectFrom('productos')`, `select(['id', 'nombre'])`, `where('isActive', '=', 1)`, `orderBy('nombre', 'asc')`. Sin parámetros.
-2. Agregar `getUsuarios()` al mismo repositorio: `selectFrom('usuarios')`, `select(['id', 'complete_name'])`, `where('isActive', '=', 1)`, `orderBy('complete_name', 'asc')`. Sin parámetros y sin join a `roles`.
+2. Agregar `getUsuarios()` al mismo repositorio: `selectFrom('usuarios')`, `select(['id', 'complete_name as nombre'])`, `where('isActive', '=', 1)`, `orderBy('complete_name', 'asc')`. El `orderBy` usa la columna real, no el alias. Sin parámetros y sin join a `roles`.
 3. Agregar `getUnidadesMedida()` al mismo repositorio: `selectFrom('unidades_medida')` (clave plural), `select(['id', 'nombre'])`, `orderBy('nombre', 'asc')`. Sin `where`.
 4. Crear `src/modules/catalogos/catalogos.service.ts` con `CatalogosService`: tres métodos pass-through al repositorio (`findProductos`, `findUsuarios`, `findUnidadesMedida`), sin parámetros, igual en forma a `ClientesService`.
-5. Crear `src/modules/catalogos/catalogos.controller.ts` con `@Controller('catalogos')` y tres handlers: `@Get('productos')`, `@Get('usuarios')` y `@Get('unidades-medida')`. Ninguno recibe `@Req()`, `@Body()`, `@Param()` ni `@Query()`. Ninguno lleva `@Public()`. Responden `{ ok: true, msg: 'Productos obtenidos correctamente', productos }`, `{ ok: true, msg: 'Usuarios obtenidos correctamente', usuarios }` y `{ ok: true, msg: 'Unidades de medida obtenidas correctamente', unidades_medida }` respectivamente.
+5. Crear `src/modules/catalogos/catalogos.controller.ts` con `@Controller('catalogos')` y tres handlers: `@Get('productos')`, `@Get('usuarios')` y `@Get('unidades-medida')`. Ninguno recibe `@Req()`, `@Body()`, `@Param()` ni `@Query()`. Ninguno lleva `@Public()`. Responden `{ ok: true, msg: 'Productos obtenidos correctamente', data }`, `{ ok: true, msg: 'Usuarios obtenidos correctamente', data }` y `{ ok: true, msg: 'Unidades de medida obtenidas correctamente', data }` respectivamente: la clave es `data` en los tres y solo cambia el `msg`.
 6. Crear `src/modules/catalogos/catalogos.module.ts` con `imports: [DatabaseModule]`, `controllers: [CatalogosController]` y `providers: [CatalogosService, CatalogosRepository]`, siguiendo la forma de `LotesModule`.
 7. Registrar `CatalogosModule` en el array `imports` de `src/app.module.ts`.
 8. Levantar con `npm run start:dev` y confirmar que compila y que las tres rutas aparecen en el log de rutas de Nest.
 9. Verificación manual: login con un `Admin` y llamar los tres endpoints, comparando cada conteo contra su `SELECT COUNT(*)` con el mismo filtro; poner `isActive = 0` en un producto y confirmar que desaparece; llamar los tres sin header `Authorization` y confirmar 401 en cada uno.
 10. Verificación manual del comportamiento no aplicado: login con un `Operador` y confirmar que los tres endpoints responden **200**, no 403; llamar `GET /permisos/me` con ese token y confirmar que sigue devolviendo exactamente cuatro códigos, sin ninguno de catálogos.
-11. Actualizar `CLAUDE.md`: agregar la fila `catalogos` a la tabla de endpoints implementados con los tres `GET` y sus campos; anotar que son los primeros endpoints de lectura de `productos`, `usuarios` y `unidades_medida`; anotar que **no tienen permiso sembrado**, a diferencia de `GET /clientes/all`, y por qué; y anotar que `GET /catalogos/usuarios` expone `id` y `complete_name` de todos los usuarios activos a cualquier autenticado.
+11. Actualizar `CLAUDE.md`: agregar la fila `catalogos` a la tabla de endpoints implementados con los tres `GET` y sus campos; anotar que son los primeros endpoints de lectura de `productos`, `usuarios` y `unidades_medida`; anotar que **no tienen permiso sembrado**, a diferencia de `GET /clientes/all`, y por qué; y anotar que `GET /catalogos/usuarios` expone el `id` y el nombre completo de todos los usuarios activos a cualquier autenticado.
 
 ---
 
@@ -171,27 +172,27 @@ Respuesta (200) cuando no hay filas que cumplan el filtro, con la clave correspo
 - [ ] `CatalogosModule` está registrado en `src/app.module.ts`.
 - [ ] Las tres rutas `GET /catalogos/productos`, `GET /catalogos/usuarios` y `GET /catalogos/unidades-medida` aparecen en el log de rutas de Nest al arrancar.
 - [ ] No se modificó ningún archivo de los módulos `auth`, `clientes`, `lotes`, `pesajes` ni `permisos`.
-- [ ] `GET /catalogos/productos` con un token válido responde 200 con la forma `{ ok, msg, productos }`.
-- [ ] Cada elemento de `productos` tiene exactamente dos claves: `id` y `nombre`.
+- [ ] Los tres endpoints responden con la forma `{ ok, msg, data }`: la clave del payload es exactamente `data` en los tres.
+- [ ] Ninguna respuesta usa una clave nombrada por catálogo: no hay `productos`, `usuarios` ni `unidades_medida` como clave de payload.
+- [ ] Los tres endpoints devuelven elementos con exactamente las mismas dos claves: `id` y `nombre`.
+- [ ] `GET /catalogos/productos` con un token válido responde 200 y su `msg` es `Productos obtenidos correctamente`.
 - [ ] La respuesta de productos no incluye `codigo_upc`, `descripcion`, `isActive` ni `created_at`.
-- [ ] La cantidad de elementos de `productos` coincide con `SELECT COUNT(*) FROM productos WHERE isActive = 1`.
+- [ ] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM productos WHERE isActive = 1`.
 - [ ] Un producto con `isActive = 0` no aparece; ponerlo en `1` lo hace aparecer.
 - [ ] Los productos vienen ordenados por `nombre` ascendente.
-- [ ] `GET /catalogos/usuarios` con un token válido responde 200 con la forma `{ ok, msg, usuarios }`.
-- [ ] Cada elemento de `usuarios` tiene exactamente dos claves: `id` y `complete_name`.
+- [ ] `GET /catalogos/usuarios` con un token válido responde 200 y su `msg` es `Usuarios obtenidos correctamente`.
+- [ ] Cada elemento trae el nombre completo bajo la clave `nombre`, no bajo `complete_name`: es un alias en el `SELECT`.
 - [ ] La respuesta de usuarios **no incluye `password`** en ninguna forma, ni `username`, `cedula`, `rol_id`, `rol`, `isActive`, `created_at`, `updated_at` ni `created_by`.
-- [ ] La cantidad de elementos de `usuarios` coincide con `SELECT COUNT(*) FROM usuarios WHERE isActive = 1`.
+- [ ] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM usuarios WHERE isActive = 1`.
 - [ ] Un usuario con `isActive = 0` no aparece en la respuesta.
 - [ ] La respuesta de usuarios incluye tanto `Admin` como `Operador`: el endpoint no filtra por rol.
 - [ ] Un `Operador` sin ninguna fila en `cliente_operador` recibe igual la lista completa de usuarios activos.
-- [ ] Los usuarios vienen ordenados por `complete_name` ascendente.
-- [ ] `GET /catalogos/unidades-medida` con un token válido responde 200 con la forma `{ ok, msg, unidades_medida }`.
-- [ ] La clave del payload es exactamente `unidades_medida`, no `unidades` ni `unidadesMedida`.
-- [ ] Cada elemento de `unidades_medida` tiene exactamente dos claves: `id` y `nombre`.
+- [ ] Los usuarios vienen ordenados por `complete_name` ascendente, aunque el campo se devuelva como `nombre`.
+- [ ] `GET /catalogos/unidades-medida` con un token válido responde 200 y su `msg` es `Unidades de medida obtenidas correctamente`.
 - [ ] La respuesta de unidades no incluye `codigo` ni `created_at`.
-- [ ] La cantidad de elementos de `unidades_medida` coincide con `SELECT COUNT(*) FROM unidades_medida`: no hay ningún filtro.
+- [ ] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM unidades_medida`: no hay ningún filtro.
 - [ ] Una unidad con `nombre = NULL` aparece en la respuesta con `nombre: null` y va primero en el orden.
-- [ ] Los tres endpoints devuelven 200 con array vacío, no 404, cuando ninguna fila cumple el filtro.
+- [ ] Los tres endpoints devuelven 200 con `data: []`, no 404, cuando ninguna fila cumple el filtro.
 - [ ] Los tres endpoints responden 401 sin header `Authorization`: ninguno es `@Public()`.
 - [ ] Los tres endpoints responden 401 con un token expirado o firmado con otro secreto.
 - [ ] Los tres endpoints ignoran cualquier query param: `GET /catalogos/productos?isActive=0` devuelve lo mismo que sin el parámetro.
@@ -211,11 +212,15 @@ Respuesta (200) cuando no hay filas que cumplan el filtro, con la clave correspo
 - **No:** tres módulos separados (`productos`, `usuarios`, `unidades-medida`) con rutas raíz. Se descarta: serían 12 archivos y tres registros en `app.module.ts` para tres `SELECT` de dos columnas. Se anota la consecuencia asumida: cuando llegue el CRUD real de productos o de usuarios, esos módulos habrá que crearlos y habrá que decidir si el endpoint de catálogo se mueve o se duplica.
 - **No:** un módulo `catalogos` con tres controllers de rutas raíz (`GET /productos`, `GET /usuarios`). Se descarta: daría rutas más cortas, pero ocuparía los nombres de ruta que el CRUD futuro va a querer, y esconde que las tres listas son recortes para selectores y no el recurso completo.
 - **Sí:** el segmento es `unidades-medida`, en kebab-case. Es la forma habitual en una URL y evita el guion bajo de la tabla.
-- **Sí:** la clave del payload es `unidades_medida`, con guion bajo. Decisión explícita del usuario. Coincide con el nombre de la tabla y con la clave de `Database` en `types.ts`, y ningún payload del proyecto usa camelCase.
+- **Sí:** la clave del payload es `data` en los tres endpoints. Decisión explícita del usuario, tomada al editar el spec antes de implementarlo. Los tres catálogos devuelven la misma forma, así que el cliente puede tipar un solo envoltorio genérico y reusar un componente de selector. Consecuencia asumida y registrada: **el proyecto queda con dos estilos de respuesta**, porque los cuatro `GET` anteriores (`clientes`, `clientes/all`, `lotes/cliente/:id`, `permisos/me`) usan una clave nombrada. Nadie debe "corregir" esto más adelante creyendo que fue un descuido.
+- **No:** una clave nombrada por catálogo (`productos`, `usuarios`, `unidades_medida`), que era lo aprobado originalmente en este spec por consistencia con los cuatro `GET` existentes. Se descarta antes de implementar, por la decisión anterior.
+- **No:** `unidades_medida` como clave, con guion bajo, para coincidir con el nombre de la tabla y con la clave de `Database` en `types.ts`. Se descarta por la decisión anterior. Queda anotado que ningún payload del proyecto usa camelCase, por si la clave vuelve a discutirse.
+- **Sí:** el nombre completo del usuario se devuelve bajo la clave `nombre`, como alias de `complete_name` en el `SELECT`. Decisión explícita del usuario, tomada al editar el spec antes de implementarlo. Es lo que hace que los tres catálogos tengan la forma idéntica `{ id, nombre }`. El precedente en el proyecto es `productos.nombre as producto` en `ClientesRepository`.
+- **No:** devolver la columna con su nombre real `complete_name`, que era lo aprobado originalmente. Se descarta antes de implementar. Consecuencia asumida: la clave de la respuesta ya no dice qué columna es, así que el `ORDER BY` sigue siendo por `complete_name` mientras el campo sale como `nombre`, y eso solo se entiende leyendo el repositorio.
 - **Sí:** `GET /catalogos/usuarios` devuelve **todos** los usuarios activos, sin filtrar por rol. Decisión explícita del usuario, tomada después de que se le señalara que el consumidor probable es el selector de `usuario_ids` de `POST /clientes`, que vincula operadores. Deja el endpoint servible para otras pantallas sin cambiar el contrato.
 - **No:** filtrar por el rol `Operador` con un join a `roles`. Se descarta pese a ser lo que `POST /clientes` necesita hoy. Consecuencia asumida: la app tiene que saber por su cuenta cuáles de los usuarios de la lista tiene sentido vincular, porque la respuesta no dice el rol de nadie.
 - **No:** un filtro opcional `?rol_id=` por query. Se descarta: exigiría el primer DTO Zod de query del proyecto, y ningún `GET` existente recibe parámetros.
-- **Sí:** el catálogo de usuarios devuelve solo `id` y `complete_name`. Decisión explícita del usuario. Es lo mínimo para un selector y, en una ruta abierta a cualquier autenticado, es lo mínimo que se expone.
+- **Sí:** el catálogo de usuarios devuelve solo dos campos, `id` y el nombre completo. Decisión explícita del usuario. Es lo mínimo para un selector y, en una ruta abierta a cualquier autenticado, es lo mínimo que se expone.
 - **No:** devolver el rol resuelto por join a `roles`. Se descarta por la decisión anterior. Es la información que más se va a echar de menos, y su ausencia es la contrapartida de no filtrar por rol.
 - **No:** devolver `username`. Se descarta: es nullable en el esquema, así que llegaría `null` en parte de las filas, y no aporta nada a un selector que ya muestra el nombre completo.
 - **No:** devolver `cedula`. Se descarta: es un dato de identificación personal y esta ruta no tiene ningún control de acceso más allá del JWT.
@@ -252,13 +257,14 @@ Respuesta (200) cuando no hay filas que cumplan el filtro, con la clave correspo
 
 | Riesgo | Mitigación |
 | --- | --- |
-| `GET /catalogos/usuarios` expone `id` y `complete_name` de **todos** los usuarios activos a cualquier autenticado. Un `Operador` puede enumerar la plantilla completa, incluidos los `Admin`. | Parcialmente mitigado por diseño: los campos se recortaron a dos y `password`, `username` y `cedula` quedan fuera. Lo que se expone son nombres de personas y sus ids, no credenciales. La mitigación real es el `PermissionsGuard`. Hay criterios de aceptación que verifican los campos exactos de la respuesta. |
+| `GET /catalogos/usuarios` expone el `id` y el nombre completo de **todos** los usuarios activos a cualquier autenticado. Un `Operador` puede enumerar la plantilla completa, incluidos los `Admin`. | Parcialmente mitigado por diseño: los campos se recortaron a dos y `password`, `username` y `cedula` quedan fuera. Lo que se expone son nombres de personas y sus ids, no credenciales. La mitigación real es el `PermissionsGuard`. Hay criterios de aceptación que verifican los campos exactos de la respuesta. |
 | Es el segundo endpoint del proyecto, después de `GET /clientes/all`, que ignora cualquier filtro por vínculo. La superficie abierta a un `Operador` crece spec a spec. | **Sin mitigar por diseño**, por decisión explícita del usuario. Se anota para que quede el registro acumulado: el spec del `PermissionsGuard` ya era urgente después de SPEC 08 y este lo vuelve más urgente. |
 | Al no sembrar filas en `permisos`, el spec del `PermissionsGuard` va a encontrar tres endpoints sin código de permiso y no va a saber si fue decisión o descuido. | Queda registrado aquí, en dos decisiones y en `CLAUDE.md`, con la justificación explícita. El paso 11 del plan lo incluye. |
 | Alguien asume que `GET /catalogos/usuarios` devuelve solo operadores, porque el uso que lo motivó es el selector de `usuario_ids` de `POST /clientes`, y vincula un `Admin` por error. | Sin mitigar en el backend: `POST /clientes` valida que el usuario exista, no su rol. Hay un criterio de aceptación que verifica explícitamente que la respuesta incluye ambos roles. |
 | Sin paginación, las tres respuestas crecen linealmente con sus tablas. `usuarios` es la que más puede crecer. | Sin mitigar. Son dos columnas cortas por fila y hoy son decenas de filas. La paginación se diseña cuando haya un número real que la justifique, igual que decidió SPEC 08. |
 | `unidades_medida.nombre` es nullable: una fila sin nombre llega como `nombre: null` y encabeza la lista, dejando una opción en blanco en el selector. | Sin mitigar en el backend, por decisión de no filtrar. Está en los criterios de aceptación como comportamiento esperado. La tabla se mantiene a mano y son pocas filas. |
 | Se agrega una columna útil a `productos` o a `usuarios` y nadie recuerda que el catálogo la recorta a propósito. | Los campos exactos están en Scope, en Decisions y en criterios de aceptación que cuentan las claves de cada elemento. |
+| La clave `data` de estos tres endpoints no coincide con la clave nombrada de los cuatro `GET` anteriores, así que el proyecto tiene dos estilos de respuesta y alguien "corrige" uno de los dos. | Registrado como decisión explícita, con la consecuencia escrita y dos criterios de aceptación que fijan que la clave es `data` y que **no** hay claves nombradas. Si algún día se unifica, se unifica en un spec propio y en una sola dirección para los siete endpoints. |
 
 ---
 
