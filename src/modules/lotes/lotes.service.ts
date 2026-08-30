@@ -13,4 +13,7 @@ export class LotesService {
     async create(dto: CreateLoteDto, userId: number) {
         return await this.lotesRepository.createLote(dto, userId);
     }
+    async findAllLotesByCliente(clienteId: number) {
+        return await this.lotesRepository.getAllLotesByCliente(clienteId);
+    }
 }

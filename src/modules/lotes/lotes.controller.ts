@@ -29,6 +29,17 @@ export class LotesController {
             lotes,
         };
     }
+    @Get('cliente/:clienteId/all')
+    async findAllLotesByCliente(
+        @Param('clienteId', ParseIntPipe) clienteId: number,
+    ) {
+        const lotes = await this.lotesService.findAllLotesByCliente(clienteId);
+        return {
+            ok: !!lotes,
+            msg: 'Lotes obtenidos correctamente',
+            lotes,
+        };
+    }
 
     @Post()
     @HttpCode(201)
