@@ -7,7 +7,7 @@ const createClienteSchema = z
         rtn: z.string().min(1, 'El RTN es requerido'),
         producto_id: z.number({ error: 'Producto requerido' }).int().positive('El producto_id debe ser un id valido'),
         codigo_exportacion: z.string({ error: 'Codigo de exportacion requerido' }),
-        correo_contacto: z.string().optional(),
+        correo_contacto: z.email().optional(),
         telefono: z.string().optional(),
         direccion_planta: z.string().optional(),
         ubicacionLongitud: z.string().optional(),
