@@ -16,12 +16,12 @@ export class PesajesRepository {
         return this.dbService.client;
     }
 
-    async getPesajesByCliente(clienteId: number, usuarioId: number) {
-        await this.validateVinculoOperador(clienteId, usuarioId, this.db);
+    async getPesajesByLote(loteId: number, usuarioId: number) {
+        const lote = await this.validateLote(loteId, this.db);
+        await this.validateVinculoOperador(lote.cliente_id, usuarioId, this.db);
 
         const pesajes = await this.db
             .selectFrom('pesajes')
-            .innerJoin('lotes', 'lotes.id', 'pesajes.lote_id')
             .leftJoin(
                 'estados_calidad',
                 'estados_calidad.id',
@@ -31,7 +31,6 @@ export class PesajesRepository {
             .select([
                 'pesajes.id',
                 'pesajes.lote_id',
-                'lotes.nombre_lote',
                 'pesajes.peso_bruto',
                 'pesajes.tara',
                 'pesajes.peso_neto',
@@ -43,7 +42,7 @@ export class PesajesRepository {
                 'pesajes.secuencia_dispositivo',
                 'pesajes.created_at',
             ])
-            .where('lotes.cliente_id', '=', clienteId)
+            .where('pesajes.lote_id', '=', loteId)
             .where('pesajes.isActive', '=', 1)
             .orderBy('pesajes.created_at', 'desc')
             .execute();
@@ -98,6 +97,16 @@ export class PesajesRepository {
                 fuera_de_rango,
             };
         });
+    }
+
+    private async validateLote(loteId: number, db: Kysely<Database>) {
+        return await db
+            .selectFrom('lotes')
+            .select(['id', 'nombre_lote', 'cliente_id'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
     }
 
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {

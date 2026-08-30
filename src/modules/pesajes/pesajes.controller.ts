@@ -16,16 +16,13 @@ import { CreatePesajeDto } from './dto/create-pesaje.dto';
 export class PesajesController {
     constructor(private readonly pesajesService: PesajesService) { }
 
-    @Get('byCliente/:clienteId')
-    async findAllByCliente(
-        @Param('clienteId', ParseIntPipe) clienteId: number,
+    @Get('byLote/:loteId')
+    async findAllByLote(
+        @Param('loteId', ParseIntPipe) loteId: number,
         @Req() req: Request,
     ) {
         const { userId } = req.user as { userId: number };
-        const pesajes = await this.pesajesService.findAllByCliente(
-            clienteId,
-            userId,
-        );
+        const pesajes = await this.pesajesService.findAllByLote(loteId, userId);
         return {
             ok: !!pesajes,
             msg: 'Pesajes obtenidos correctamente',
