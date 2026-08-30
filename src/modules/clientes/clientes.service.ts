@@ -10,6 +10,10 @@ export class ClientesService {
         return await this.clientesRepository.getAllClientesByOperador(userId);
     }
 
+    async findAllGlobal() {
+        return await this.clientesRepository.getAllClientes();
+    }
+
 
     async create(dto: CreateClienteDto, userId: number) {
         return await this.clientesRepository.createCliente(dto, userId);

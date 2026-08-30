@@ -41,6 +41,30 @@ export class LotesRepository {
             .execute();
         return lotes;
     }
+    async getAllLotesByCliente(clienteId: number) {
+
+        const lotes = await this.db
+            .selectFrom('lotes')
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
+            .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .select([
+                'lotes.id',
+                'lotes.nombre_lote',
+                'lotes.variedad_o_talla',
+                'productos.nombre as producto',
+                'unidades_medida.nombre as unidad_medida',
+                'lotes.peso_minimo',
+                'lotes.peso_ideal',
+                'lotes.peso_maximo',
+                'lotes.estado',
+                'etapas.nombre as etapa',
+            ])
+            .where('lotes.cliente_id', '=', clienteId)
+            .orderBy('lotes.created_at', 'desc')
+            .execute();
+        return lotes;
+    }
 
     async createLote(data: CreateLoteDto, userId: number) {
         const {
