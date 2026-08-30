@@ -28,4 +28,13 @@ export class CatalogosRepository {
             .execute();
         return usuarios;
     }
+
+    async getUnidadesMedida() {
+        const unidades = await this.db
+            .selectFrom('unidades_medida')
+            .select(['id', 'nombre'])
+            .orderBy('nombre', 'asc')
+            .execute();
+        return unidades;
+    }
 }
