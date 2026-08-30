@@ -36,6 +36,24 @@ export class ClientesRepository {
         return clientes;
     }
 
+    async getAllClientes() {
+        const clientes = await this.db
+            .selectFrom('clientes')
+            .leftJoin('productos', 'productos.id', 'clientes.producto_id')
+            .select([
+                'clientes.id',
+                'clientes.nombre',
+                'productos.nombre as producto',
+                'clientes.codigo_exportacion',
+                'clientes.telefono',
+                'clientes.direccion_planta',
+            ])
+            .where('clientes.isActive', '=', 1)
+            .orderBy('clientes.nombre', 'asc')
+            .execute();
+        return clientes;
+    }
+
     async createCliente(data: CreateClienteDto, userId: number) {
         const {
             nombre,
