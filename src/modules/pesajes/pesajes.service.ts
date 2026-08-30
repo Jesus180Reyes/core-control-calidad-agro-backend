@@ -6,6 +6,10 @@ import { CreatePesajeDto } from './dto/create-pesaje.dto';
 export class PesajesService {
     constructor(private readonly pesajesRepository: PesajesRepository) { }
 
+    async findAllByCliente(clienteId: number, userId: number) {
+        return await this.pesajesRepository.getPesajesByCliente(clienteId, userId);
+    }
+
     async create(dto: CreatePesajeDto, userId: number) {
         return await this.pesajesRepository.createPesaje(dto, userId);
     }

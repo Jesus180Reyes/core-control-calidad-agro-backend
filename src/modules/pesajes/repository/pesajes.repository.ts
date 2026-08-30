@@ -16,6 +16,41 @@ export class PesajesRepository {
         return this.dbService.client;
     }
 
+    async getPesajesByCliente(clienteId: number, usuarioId: number) {
+        await this.validateVinculoOperador(clienteId, usuarioId, this.db);
+
+        const pesajes = await this.db
+            .selectFrom('pesajes')
+            .innerJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
+            .select([
+                'pesajes.id',
+                'pesajes.lote_id',
+                'lotes.nombre_lote',
+                'pesajes.peso_bruto',
+                'pesajes.tara',
+                'pesajes.peso_neto',
+                'pesajes.fuera_de_rango',
+                'estados_calidad.codigo as estado_calidad_codigo',
+                'estados_calidad.nombre as estado_calidad',
+                'usuarios.complete_name as usuario',
+                'pesajes.dispositivo_identificador',
+                'pesajes.secuencia_dispositivo',
+                'pesajes.created_at',
+            ])
+            .where('lotes.cliente_id', '=', clienteId)
+            .where('pesajes.isActive', '=', 1)
+            .orderBy('pesajes.created_at', 'desc')
+            .execute();
+
+        return pesajes;
+    }
+
     async createPesaje(data: CreatePesajeDto, userId: number) {
         const {
             lote_id,
