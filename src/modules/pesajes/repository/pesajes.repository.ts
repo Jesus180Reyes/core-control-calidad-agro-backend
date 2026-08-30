@@ -16,10 +16,7 @@ export class PesajesRepository {
         return this.dbService.client;
     }
 
-    async getPesajesByLote(loteId: number, usuarioId: number) {
-        const lote = await this.validateLote(loteId, this.db);
-        await this.validateVinculoOperador(lote.cliente_id, usuarioId, this.db);
-
+    async getPesajesByLote(loteId: number) {
         const pesajes = await this.db
             .selectFrom('pesajes')
             .leftJoin(

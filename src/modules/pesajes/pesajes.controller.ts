@@ -19,10 +19,8 @@ export class PesajesController {
     @Get('byLote/:loteId')
     async findAllByLote(
         @Param('loteId', ParseIntPipe) loteId: number,
-        @Req() req: Request,
     ) {
-        const { userId } = req.user as { userId: number };
-        const pesajes = await this.pesajesService.findAllByLote(loteId, userId);
+        const pesajes = await this.pesajesService.findAllByLote(loteId);
         return {
             ok: !!pesajes,
             msg: 'Pesajes obtenidos correctamente',
