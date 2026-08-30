@@ -1,6 +1,6 @@
 # SPEC 09 — Endpoints de catálogos
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-08-30
 > **Objective:** Agregar un módulo `catalogos` con tres endpoints de solo lectura (`GET /catalogos/productos`, `GET /catalogos/usuarios`, `GET /catalogos/unidades-medida`) que devuelven listas planas de `id` y nombre para llenar los selectores de los formularios existentes.
@@ -164,45 +164,45 @@ Respuesta (200) cuando no hay filas que cumplan el filtro. La clave es `data` en
 
 ## Acceptance criteria
 
-- [ ] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
-- [ ] `src/database/types/types.ts` no cambió.
-- [ ] La tabla `permisos` sigue teniendo exactamente las 11 filas de SPEC 08: no se sembró ninguna fila nueva.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] Existen los cuatro archivos del módulo bajo `src/modules/catalogos/` y **no** hay carpeta `dto/`.
-- [ ] `CatalogosModule` está registrado en `src/app.module.ts`.
-- [ ] Las tres rutas `GET /catalogos/productos`, `GET /catalogos/usuarios` y `GET /catalogos/unidades-medida` aparecen en el log de rutas de Nest al arrancar.
-- [ ] No se modificó ningún archivo de los módulos `auth`, `clientes`, `lotes`, `pesajes` ni `permisos`.
-- [ ] Los tres endpoints responden con la forma `{ ok, msg, data }`: la clave del payload es exactamente `data` en los tres.
-- [ ] Ninguna respuesta usa una clave nombrada por catálogo: no hay `productos`, `usuarios` ni `unidades_medida` como clave de payload.
-- [ ] Los tres endpoints devuelven elementos con exactamente las mismas dos claves: `id` y `nombre`.
-- [ ] `GET /catalogos/productos` con un token válido responde 200 y su `msg` es `Productos obtenidos correctamente`.
-- [ ] La respuesta de productos no incluye `codigo_upc`, `descripcion`, `isActive` ni `created_at`.
-- [ ] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM productos WHERE isActive = 1`.
-- [ ] Un producto con `isActive = 0` no aparece; ponerlo en `1` lo hace aparecer.
-- [ ] Los productos vienen ordenados por `nombre` ascendente.
-- [ ] `GET /catalogos/usuarios` con un token válido responde 200 y su `msg` es `Usuarios obtenidos correctamente`.
-- [ ] Cada elemento trae el nombre completo bajo la clave `nombre`, no bajo `complete_name`: es un alias en el `SELECT`.
-- [ ] La respuesta de usuarios **no incluye `password`** en ninguna forma, ni `username`, `cedula`, `rol_id`, `rol`, `isActive`, `created_at`, `updated_at` ni `created_by`.
-- [ ] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM usuarios WHERE isActive = 1`.
-- [ ] Un usuario con `isActive = 0` no aparece en la respuesta.
-- [ ] La respuesta de usuarios incluye tanto `Admin` como `Operador`: el endpoint no filtra por rol.
-- [ ] Un `Operador` sin ninguna fila en `cliente_operador` recibe igual la lista completa de usuarios activos.
-- [ ] Los usuarios vienen ordenados por `complete_name` ascendente, aunque el campo se devuelva como `nombre`.
-- [ ] `GET /catalogos/unidades-medida` con un token válido responde 200 y su `msg` es `Unidades de medida obtenidas correctamente`.
-- [ ] La respuesta de unidades no incluye `codigo` ni `created_at`.
-- [ ] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM unidades_medida`: no hay ningún filtro.
-- [ ] Una unidad con `nombre = NULL` aparece en la respuesta con `nombre: null` y va primero en el orden.
-- [ ] Los tres endpoints devuelven 200 con `data: []`, no 404, cuando ninguna fila cumple el filtro.
-- [ ] Los tres endpoints responden 401 sin header `Authorization`: ninguno es `@Public()`.
-- [ ] Los tres endpoints responden 401 con un token expirado o firmado con otro secreto.
-- [ ] Los tres endpoints ignoran cualquier query param: `GET /catalogos/productos?isActive=0` devuelve lo mismo que sin el parámetro.
-- [ ] Los tres endpoints responden **200 con la lista completa** para el token de un `Operador`, no 403: **este spec no aplica permisos**.
-- [ ] `GET /permisos/me` responde exactamente igual que antes de este spec: siete códigos para `Admin` y cuatro para `Operador`, ninguno de catálogos.
-- [ ] No existe la ruta `GET /catalogos` (sin segmento): responde 404.
-- [ ] `POST /auth/login` y `POST /auth/register` responden exactamente igual que antes de este spec.
-- [ ] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
-- [ ] `POST /clientes`, `GET /clientes`, `GET /clientes/all` (SPEC 01, SPEC 08), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04), `POST /auth/refresh` (SPEC 05) y `GET /permisos/me` (SPEC 07) siguen funcionando igual.
-- [ ] `CLAUDE.md` lista los tres endpoints de `catalogos` y anota que no tienen permiso sembrado.
+- [X] El esquema de MySQL no cambió: no se ejecutó ningún DDL en esta implementación.
+- [X] `src/database/types/types.ts` no cambió.
+- [X] La tabla `permisos` sigue teniendo exactamente las 11 filas de SPEC 08: no se sembró ninguna fila nueva.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] Existen los cuatro archivos del módulo bajo `src/modules/catalogos/` y **no** hay carpeta `dto/`.
+- [X] `CatalogosModule` está registrado en `src/app.module.ts`.
+- [X] Las tres rutas `GET /catalogos/productos`, `GET /catalogos/usuarios` y `GET /catalogos/unidades-medida` aparecen en el log de rutas de Nest al arrancar.
+- [X] No se modificó ningún archivo de los módulos `auth`, `clientes`, `lotes`, `pesajes` ni `permisos`.
+- [X] Los tres endpoints responden con la forma `{ ok, msg, data }`: la clave del payload es exactamente `data` en los tres.
+- [X] Ninguna respuesta usa una clave nombrada por catálogo: no hay `productos`, `usuarios` ni `unidades_medida` como clave de payload.
+- [X] Los tres endpoints devuelven elementos con exactamente las mismas dos claves: `id` y `nombre`.
+- [X] `GET /catalogos/productos` con un token válido responde 200 y su `msg` es `Productos obtenidos correctamente`.
+- [X] La respuesta de productos no incluye `codigo_upc`, `descripcion`, `isActive` ni `created_at`.
+- [X] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM productos WHERE isActive = 1`.
+- [X] Un producto con `isActive = 0` no aparece; ponerlo en `1` lo hace aparecer.
+- [X] Los productos vienen ordenados por `nombre` ascendente.
+- [X] `GET /catalogos/usuarios` con un token válido responde 200 y su `msg` es `Usuarios obtenidos correctamente`.
+- [X] Cada elemento trae el nombre completo bajo la clave `nombre`, no bajo `complete_name`: es un alias en el `SELECT`.
+- [X] La respuesta de usuarios **no incluye `password`** en ninguna forma, ni `username`, `cedula`, `rol_id`, `rol`, `isActive`, `created_at`, `updated_at` ni `created_by`.
+- [X] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM usuarios WHERE isActive = 1`.
+- [X] Un usuario con `isActive = 0` no aparece en la respuesta.
+- [X] La respuesta de usuarios incluye tanto `Admin` como `Operador`: el endpoint no filtra por rol.
+- [X] Un `Operador` sin ninguna fila en `cliente_operador` recibe igual la lista completa de usuarios activos.
+- [X] Los usuarios vienen ordenados por `complete_name` ascendente, aunque el campo se devuelva como `nombre`.
+- [X] `GET /catalogos/unidades-medida` con un token válido responde 200 y su `msg` es `Unidades de medida obtenidas correctamente`.
+- [X] La respuesta de unidades no incluye `codigo` ni `created_at`.
+- [X] La cantidad de elementos de `data` coincide con `SELECT COUNT(*) FROM unidades_medida`: no hay ningún filtro.
+- [X] Una unidad con `nombre = NULL` aparece en la respuesta con `nombre: null` y va primero en el orden.
+- [X] Los tres endpoints devuelven 200 con `data: []`, no 404, cuando ninguna fila cumple el filtro.
+- [X] Los tres endpoints responden 401 sin header `Authorization`: ninguno es `@Public()`.
+- [X] Los tres endpoints responden 401 con un token expirado o firmado con otro secreto.
+- [X] Los tres endpoints ignoran cualquier query param: `GET /catalogos/productos?isActive=0` devuelve lo mismo que sin el parámetro.
+- [X] Los tres endpoints responden **200 con la lista completa** para el token de un `Operador`, no 403: **este spec no aplica permisos**.
+- [X] `GET /permisos/me` responde exactamente igual que antes de este spec: siete códigos para `Admin` y cuatro para `Operador`, ninguno de catálogos.
+- [X] No existe la ruta `GET /catalogos` (sin segmento): responde 404.
+- [X] `POST /auth/login` y `POST /auth/register` responden exactamente igual que antes de este spec.
+- [X] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
+- [X] `POST /clientes`, `GET /clientes`, `GET /clientes/all` (SPEC 01, SPEC 08), `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04), `POST /auth/refresh` (SPEC 05) y `GET /permisos/me` (SPEC 07) siguen funcionando igual.
+- [X] `CLAUDE.md` lista los tres endpoints de `catalogos` y anota que no tienen permiso sembrado.
 
 ---
 
