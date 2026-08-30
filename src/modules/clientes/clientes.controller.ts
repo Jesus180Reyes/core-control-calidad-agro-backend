@@ -7,6 +7,16 @@ import { CreateClienteDto } from './dto/create-cliente.dto';
 export class ClientesController {
     constructor(private readonly clientesService: ClientesService) { }
 
+    @Get('all')
+    async findAllGlobal() {
+        const clientes = await this.clientesService.findAllGlobal();
+        return {
+            ok: true,
+            msg: 'Clientes obtenidos correctamente',
+            clientes,
+        };
+    }
+
     @Get()
     async findAll(@Req() req: Request) {
         const { userId } = req.user as { userId: number };
