@@ -19,6 +19,10 @@ const createLoteSchema = z
     .refine((data) => data.peso_ideal <= data.peso_maximo, {
         error: 'El peso ideal no puede ser mayor al peso maximo',
         path: ['peso_ideal'],
+    })
+    .refine((data) => data.peso_maximo >= data.peso_ideal && data.peso_maximo >= data.peso_minimo, {
+        error: 'El peso maximo no puede ser menor al peso ideal o al peso minimo',
+        path: ['peso_maximo'],
     });
 
 export class CreateLoteDto extends createZodDto(createLoteSchema) { }
