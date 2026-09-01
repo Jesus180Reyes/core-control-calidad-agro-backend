@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ClientesRepository } from './repository/clientes.repository';
 import { CreateClienteDto } from './dto/create-cliente.dto';
+import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
 
 @Injectable()
 export class ClientesService {
@@ -17,5 +18,13 @@ export class ClientesService {
 
     async create(dto: CreateClienteDto, userId: number) {
         return await this.clientesRepository.createCliente(dto, userId);
+    }
+
+    async rechazar(clienteId: number, dto: RechazarClienteDto, userId: number) {
+        return await this.clientesRepository.rechazarCliente(
+            clienteId,
+            dto,
+            userId,
+        );
     }
 }
