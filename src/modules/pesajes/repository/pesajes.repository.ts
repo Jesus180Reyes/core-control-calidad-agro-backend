@@ -4,9 +4,10 @@ import {
     ForbiddenException,
     Injectable,
 } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreatePesajeDto } from '../dto/create-pesaje.dto';
+import { RechazarPesajeDto } from '../dto/rechazar-pesaje.dto';
 
 @Injectable()
 export class PesajesRepository {
@@ -96,6 +97,39 @@ export class PesajesRepository {
         });
     }
 
+    async rechazarPesaje(
+        pesajeId: number,
+        data: RechazarPesajeDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            const pesaje = await this.validatePesajeActivo(pesajeId, trx);
+
+            if (pesaje.lote_id === null) {
+                throw new BadRequestException(
+                    `El pesaje con id '${pesajeId}' no tiene un lote asociado`,
+                );
+            }
+
+            await this.validateLoteAbierto(pesaje.lote_id, trx);
+
+            await trx
+                .updateTable('pesajes')
+                .set({
+                    isActive: 0,
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', pesajeId)
+                .execute();
+
+            return true;
+        });
+    }
+
     private async validateLote(loteId: number, db: Kysely<Database>) {
         return await db
             .selectFrom('lotes')
@@ -149,6 +183,27 @@ export class PesajesRepository {
                 `No tiene acceso al cliente con id '${clienteId}'`,
             );
         }
+    }
+
+    private async validatePesajeActivo(pesajeId: number, db: Kysely<Database>) {
+        const pesaje = await db
+            .selectFrom('pesajes')
+            .select(['id', 'lote_id', 'isActive'])
+            .where('id', '=', pesajeId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El pesaje con id '${pesajeId}' no existe`,
+                    ),
+            );
+
+        if (pesaje.isActive === 0) {
+            throw new BadRequestException(
+                `El pesaje con id '${pesajeId}' ya fue rechazado`,
+            );
+        }
+
+        return pesaje;
     }
 
     private async resolveEstadoCalidad(
