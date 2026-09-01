@@ -4,9 +4,10 @@ import {
     ForbiddenException,
     Injectable,
 } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateLoteDto } from '../dto/create-lote.dto';
+import { RechazarLoteDto } from '../dto/rechazar-lote.dto';
 
 @Injectable()
 export class LotesRepository {
@@ -110,6 +111,65 @@ export class LotesRepository {
         });
     }
 
+    async rechazarLote(
+        loteId: number,
+        data: RechazarLoteDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateLoteAbierto(loteId, trx);
+            const etapa = await this.resolveEtapaRechazado(trx);
+
+            await trx
+                .updateTable('lotes')
+                .set({
+                    estado: 'cerrado',
+                    etapa_id: etapa.id,
+                    cerrado_en: sql<Date>`NOW()`,
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', loteId)
+                .execute();
+
+            return true;
+        });
+    }
+
+    private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select(['id', 'nombre_lote', 'cliente_id', 'estado', 'cerrado_en'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
+
+        if (lote.estado !== 'abierto' || lote.cerrado_en !== null) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta abierto`,
+            );
+        }
+
+        return lote;
+    }
+
+    private async resolveEtapaRechazado(db: Kysely<Database>) {
+        return await db
+            .selectFrom('etapas')
+            .select(['id', 'codigo'])
+            .where('codigo', '=', 'RECHAZADO')
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `La etapa con codigo 'RECHAZADO' no existe`,
+                    ),
+            );
+    }
+
     private async validateVinculoOperador(
         clienteId: number,
         usuarioId: number,
@@ -197,6 +257,7 @@ export class LotesRepository {
             .select('id')
             .where('cliente_id', '=', clienteId)
             .where('nombre_lote', '=', nombreLote)
+            .where('motivo_rechazo', 'is', null)
             .executeTakeFirst();
 
         if (existente) {

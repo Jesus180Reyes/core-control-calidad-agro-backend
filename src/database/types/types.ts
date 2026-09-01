@@ -29,6 +29,9 @@ export interface LotesTable {
   estado: Generated<string | null>;
   created_at: Generated<Date | string | null>;
   updated_at: Generated<Date | string | null>;
+  motivo_rechazo: string | null;
+  rechazado_por: number | null;
+  rechazado_en: Date | string | null;
 }
 export interface EstadosCalidadTable {
   id: Generated<number>;

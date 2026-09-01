@@ -5,12 +5,14 @@ import {
     HttpCode,
     Param,
     ParseIntPipe,
+    Patch,
     Post,
     Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { LotesService } from './lotes.service';
 import { CreateLoteDto } from './dto/create-lote.dto';
+import { RechazarLoteDto } from './dto/rechazar-lote.dto';
 
 @Controller('lotes')
 export class LotesController {
@@ -49,6 +51,20 @@ export class LotesController {
         return {
             ok: !!lote,
             msg: 'Lote creado correctamente',
+        };
+    }
+
+    @Patch(':id/rechazar')
+    async rechazar(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: RechazarLoteDto,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const rechazado = await this.lotesService.rechazar(id, dto, userId);
+        return {
+            ok: rechazado,
+            msg: 'Lote rechazado correctamente',
         };
     }
 }

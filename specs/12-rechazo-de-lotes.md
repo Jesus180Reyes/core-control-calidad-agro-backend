@@ -1,6 +1,6 @@
 # SPEC 12 — Rechazo de lotes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02, SPEC 03, SPEC 10, SPEC 11
 > **Date:** 2026-09-01
 > **Objective:** Agregar `PATCH /lotes/:id/rechazar`, que anula un lote poniendo `estado = 'cerrado'`, su `etapa_id` en la etapa `RECHAZADO` y `cerrado_en = NOW()`, y guardando el motivo, el usuario y la fecha del rechazo en tres columnas nuevas de `lotes`.
@@ -276,59 +276,59 @@ Nótese que escribir `etapa_id` **no tiene ningún efecto observable por API hoy
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE lotes;` muestra `motivo_rechazo VARCHAR(255)`, `rechazado_por INT` y `rechazado_en DATETIME`, las tres nullables.
-- [ ] `SHOW CREATE TABLE lotes;` muestra la FK de `rechazado_por` a `usuarios(id)`, y muestra `estado` como `VARCHAR`, sin cambios: `'cerrado'` no exigió DDL.
-- [ ] Las filas de `lotes` anteriores al DDL tienen las tres columnas en `NULL`, y su `estado` y su `cerrado_en` sin cambios.
-- [ ] `LotesTable` en `src/database/types/types.ts` declara las tres columnas nuevas, ninguna como `Generated<>`.
-- [ ] `EtapasTable` y la tabla `etapas` no se modificaron, y no se sembró ninguna fila nueva en ella.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] La tabla `permisos` sigue teniendo exactamente las 11 filas de SPEC 08: no se sembró ninguna fila nueva.
-- [ ] Existe `src/modules/lotes/dto/rechazar-lote.dto.ts` y su schema tiene exactamente un campo, `motivo`.
-- [ ] `PATCH /lotes/:id/rechazar` aparece en el log de rutas de Nest al arrancar.
-- [ ] `src/app.module.ts` no cambió: `LotesModule` ya estaba registrado.
-- [ ] No se creó ningún módulo, controller ni service nuevo: solo se modificaron `lotes.controller.ts`, `lotes.service.ts` y `repository/lotes.repository.ts`, y se agregó un DTO.
-- [ ] Rechazar un lote abierto con un motivo válido responde 200 con exactamente `{ ok: true, msg: 'Lote rechazado correctamente' }`.
-- [ ] La respuesta **no** incluye ninguna clave de recurso: no hay `lote`, ni `data`, ni el motivo devuelto.
-- [ ] Después del rechazo, la fila tiene `estado = 'cerrado'`, y no `'rechazado'` ni `'anulado'`.
-- [ ] Después del rechazo, `etapa_id` es el `id` de la fila de `etapas` con `codigo = 'RECHAZADO'`, resuelto por `codigo` y no por un id clavado en el código.
-- [ ] Después del rechazo, `cerrado_en` tiene la fecha y hora del rechazo, no `NULL`.
-- [ ] Después del rechazo, `motivo_rechazo` contiene exactamente el texto enviado en el body.
-- [ ] Después del rechazo, `rechazado_por` es el `userId` del token que llamó, no el `created_by` del lote.
-- [ ] Después del rechazo, `rechazado_en` tiene la fecha y hora del rechazo, no `NULL`, y coincide con `cerrado_en`.
-- [ ] El rechazo **no** modifica `cliente_id`, `nombre_lote`, `producto_id`, `unidad_medida_id`, `variedad_o_talla`, `peso_minimo`, `peso_ideal`, `peso_maximo`, `resumen_ia`, `created_by` ni `created_at` de la fila.
-- [ ] Un lote rechazado desaparece de `GET /lotes/cliente/:clienteId`, y el resto de los lotes del cliente sigue apareciendo igual.
-- [ ] Un lote rechazado desaparece de `GET /lotes/cliente/:clienteId/all`.
-- [ ] `POST /lotes` acepta un lote nuevo con el mismo `nombre_lote` y el mismo `cliente_id` que un lote rechazado, y responde 201.
-- [ ] `POST /lotes` sigue respondiendo 400 `El lote 'X' ya esta registrado para este cliente` cuando el nombre lo usa un lote **abierto** del mismo cliente.
-- [ ] `POST /lotes` sigue rechazando el nombre duplicado cuando el lote existente tiene `estado = 'cerrado'` pero `motivo_rechazo = NULL`: el filtro mira `motivo_rechazo`, no el `estado`, así que un cierre futuro con resultado bueno no liberará el nombre.
-- [ ] `POST /lotes` sigue rechazando el nombre duplicado cuando el lote existente tiene `estado = NULL`: `motivo_rechazo IS NULL` no depende del valor del `estado`.
-- [ ] `POST /pesajes` contra un lote rechazado responde 400 con `El lote 'X' no esta abierto`.
-- [ ] `PATCH /pesajes/:id/rechazar` sobre un pesaje de un lote rechazado responde 400 con `El lote 'X' no esta abierto`. **Es el comportamiento esperado y este spec no lo cambia.**
-- [ ] `GET /pesajes/byLote/:loteId` de un lote rechazado **sigue devolviendo** sus pesajes activos, con los mismos campos y el mismo orden. **Es el comportamiento esperado.**
-- [ ] Los pesajes del lote rechazado no cambian: ninguno queda con `isActive = 0` por efecto de este rechazo.
-- [ ] Rechazar un `id` que no existe responde 400 con `El lote con id 'X' no existe`, no 404 y no 500.
-- [ ] Rechazar un lote que ya fue rechazado responde 400 con `El lote 'X' no esta abierto`.
-- [ ] Tras ese 400, el `motivo_rechazo`, el `rechazado_por`, el `rechazado_en` y el `cerrado_en` del primer rechazo quedan intactos: el segundo intento no sobrescribe nada.
-- [ ] Un `motivo` de menos de 5 caracteres responde 400 por validación de Zod y no modifica la fila.
-- [ ] Un `motivo` de más de 255 caracteres responde 400 por validación de Zod y no modifica la fila.
-- [ ] Un body sin `motivo` responde 400 por validación de Zod.
-- [ ] Un `id` de ruta no numérico (`PATCH /lotes/abc/rechazar`) responde 400 por `ParseIntPipe`.
-- [ ] `PATCH /lotes/:id/rechazar` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
-- [ ] `PATCH /lotes/:id/rechazar` con un token expirado o firmado con otro secreto responde 401.
-- [ ] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote lo rechaza igual: responde **200, no 403**. **Este spec no valida el vínculo.**
-- [ ] Un usuario que no creó el lote puede rechazarlo: no se compara contra `lotes.created_by`.
-- [ ] Cuando cualquier validación falla, ninguna columna de la fila cambia: la transacción no deja escrituras parciales.
-- [ ] `GET /lotes/cliente/:clienteId` y `GET /lotes/cliente/:clienteId/all` no cambiaron: mismos campos, mismo filtro `estado = 'abierto'`, mismo orden, mismos joins.
-- [ ] `GET /lotes/cliente/:clienteId` sigue validando el vínculo `cliente_operador` y sigue respondiendo 403 sin él.
-- [ ] `createLote` sigue escribiendo `etapa_id: 1` y `estado: 'abierto'`: este spec no toca ese literal.
-- [ ] No existe ningún endpoint para deshacer un rechazo, para cerrar un lote con resultado bueno ni para listar lotes rechazados: `estado = 'cerrado'` lo escribe **solo** `rechazarLote`.
-- [ ] Ningún código del proyecto identifica un lote rechazado por `estado = 'cerrado'`: la única señal que se usa es `motivo_rechazo`.
-- [ ] No se agregó `GET /catalogos/etapas` ni ningún otro endpoint sobre `etapas`.
-- [ ] `GET /permisos/me` responde exactamente igual que antes de este spec: siete códigos para `Admin` y cuatro para `Operador`, ninguno de rechazo de lotes.
-- [ ] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
-- [ ] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id/rechazar` (SPEC 01, 08, 11), `POST /pesajes` (SPEC 03, SPEC 04), `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` (SPEC 05), `GET /permisos/me` (SPEC 07) y los tres `GET /catalogos/*` (SPEC 09) siguen funcionando igual.
-- [ ] `CLAUDE.md` lista `PATCH /lotes/:id/rechazar` y `GET /lotes/cliente/:clienteId/all` en la tabla de endpoints, documenta la tabla `etapas`, y ya no afirma que el concepto de *Etapa* no está en el esquema ni que nada puede escribir `lotes.cerrado_en` o cambiar `lotes.estado`.
-- [ ] `CLAUDE.md` advierte que `estado = 'cerrado'` no implica que el cierre de lote exista, y que un lote rechazado se identifica por `motivo_rechazo IS NOT NULL`.
+- [X] `DESCRIBE lotes;` muestra `motivo_rechazo VARCHAR(255)`, `rechazado_por INT` y `rechazado_en DATETIME`, las tres nullables.
+- [X] `SHOW CREATE TABLE lotes;` muestra la FK de `rechazado_por` a `usuarios(id)`, y muestra `estado` como `VARCHAR`, sin cambios: `'cerrado'` no exigió DDL.
+- [X] Las filas de `lotes` anteriores al DDL tienen las tres columnas en `NULL`, y su `estado` y su `cerrado_en` sin cambios.
+- [X] `LotesTable` en `src/database/types/types.ts` declara las tres columnas nuevas, ninguna como `Generated<>`.
+- [X] `EtapasTable` y la tabla `etapas` no se modificaron, y no se sembró ninguna fila nueva en ella.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] La tabla `permisos` sigue teniendo exactamente las 11 filas de SPEC 08: no se sembró ninguna fila nueva.
+- [X] Existe `src/modules/lotes/dto/rechazar-lote.dto.ts` y su schema tiene exactamente un campo, `motivo`.
+- [X] `PATCH /lotes/:id/rechazar` aparece en el log de rutas de Nest al arrancar.
+- [X] `src/app.module.ts` no cambió: `LotesModule` ya estaba registrado.
+- [X] No se creó ningún módulo, controller ni service nuevo: solo se modificaron `lotes.controller.ts`, `lotes.service.ts` y `repository/lotes.repository.ts`, y se agregó un DTO.
+- [X] Rechazar un lote abierto con un motivo válido responde 200 con exactamente `{ ok: true, msg: 'Lote rechazado correctamente' }`.
+- [X] La respuesta **no** incluye ninguna clave de recurso: no hay `lote`, ni `data`, ni el motivo devuelto.
+- [X] Después del rechazo, la fila tiene `estado = 'cerrado'`, y no `'rechazado'` ni `'anulado'`.
+- [X] Después del rechazo, `etapa_id` es el `id` de la fila de `etapas` con `codigo = 'RECHAZADO'`, resuelto por `codigo` y no por un id clavado en el código.
+- [X] Después del rechazo, `cerrado_en` tiene la fecha y hora del rechazo, no `NULL`.
+- [X] Después del rechazo, `motivo_rechazo` contiene exactamente el texto enviado en el body.
+- [X] Después del rechazo, `rechazado_por` es el `userId` del token que llamó, no el `created_by` del lote.
+- [X] Después del rechazo, `rechazado_en` tiene la fecha y hora del rechazo, no `NULL`, y coincide con `cerrado_en`.
+- [X] El rechazo **no** modifica `cliente_id`, `nombre_lote`, `producto_id`, `unidad_medida_id`, `variedad_o_talla`, `peso_minimo`, `peso_ideal`, `peso_maximo`, `resumen_ia`, `created_by` ni `created_at` de la fila.
+- [X] Un lote rechazado desaparece de `GET /lotes/cliente/:clienteId`, y el resto de los lotes del cliente sigue apareciendo igual.
+- [X] Un lote rechazado desaparece de `GET /lotes/cliente/:clienteId/all`.
+- [X] `POST /lotes` acepta un lote nuevo con el mismo `nombre_lote` y el mismo `cliente_id` que un lote rechazado, y responde 201.
+- [X] `POST /lotes` sigue respondiendo 400 `El lote 'X' ya esta registrado para este cliente` cuando el nombre lo usa un lote **abierto** del mismo cliente.
+- [X] `POST /lotes` sigue rechazando el nombre duplicado cuando el lote existente tiene `estado = 'cerrado'` pero `motivo_rechazo = NULL`: el filtro mira `motivo_rechazo`, no el `estado`, así que un cierre futuro con resultado bueno no liberará el nombre.
+- [X] `POST /lotes` sigue rechazando el nombre duplicado cuando el lote existente tiene `estado = NULL`: `motivo_rechazo IS NULL` no depende del valor del `estado`.
+- [X] `POST /pesajes` contra un lote rechazado responde 400 con `El lote 'X' no esta abierto`.
+- [X] `PATCH /pesajes/:id/rechazar` sobre un pesaje de un lote rechazado responde 400 con `El lote 'X' no esta abierto`. **Es el comportamiento esperado y este spec no lo cambia.**
+- [X] `GET /pesajes/byLote/:loteId` de un lote rechazado **sigue devolviendo** sus pesajes activos, con los mismos campos y el mismo orden. **Es el comportamiento esperado.**
+- [X] Los pesajes del lote rechazado no cambian: ninguno queda con `isActive = 0` por efecto de este rechazo.
+- [X] Rechazar un `id` que no existe responde 400 con `El lote con id 'X' no existe`, no 404 y no 500.
+- [X] Rechazar un lote que ya fue rechazado responde 400 con `El lote 'X' no esta abierto`.
+- [X] Tras ese 400, el `motivo_rechazo`, el `rechazado_por`, el `rechazado_en` y el `cerrado_en` del primer rechazo quedan intactos: el segundo intento no sobrescribe nada.
+- [X] Un `motivo` de menos de 5 caracteres responde 400 por validación de Zod y no modifica la fila.
+- [X] Un `motivo` de más de 255 caracteres responde 400 por validación de Zod y no modifica la fila.
+- [X] Un body sin `motivo` responde 400 por validación de Zod.
+- [X] Un `id` de ruta no numérico (`PATCH /lotes/abc/rechazar`) responde 400 por `ParseIntPipe`.
+- [X] `PATCH /lotes/:id/rechazar` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
+- [X] `PATCH /lotes/:id/rechazar` con un token expirado o firmado con otro secreto responde 401.
+- [X] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote lo rechaza igual: responde **200, no 403**. **Este spec no valida el vínculo.**
+- [X] Un usuario que no creó el lote puede rechazarlo: no se compara contra `lotes.created_by`.
+- [X] Cuando cualquier validación falla, ninguna columna de la fila cambia: la transacción no deja escrituras parciales.
+- [X] `GET /lotes/cliente/:clienteId` y `GET /lotes/cliente/:clienteId/all` no cambiaron: mismos campos, mismo filtro `estado = 'abierto'`, mismo orden, mismos joins.
+- [X] `GET /lotes/cliente/:clienteId` sigue validando el vínculo `cliente_operador` y sigue respondiendo 403 sin él.
+- [X] `createLote` sigue escribiendo `etapa_id: 1` y `estado: 'abierto'`: este spec no toca ese literal.
+- [X] No existe ningún endpoint para deshacer un rechazo, para cerrar un lote con resultado bueno ni para listar lotes rechazados: `estado = 'cerrado'` lo escribe **solo** `rechazarLote`.
+- [X] Ningún código del proyecto identifica un lote rechazado por `estado = 'cerrado'`: la única señal que se usa es `motivo_rechazo`.
+- [X] No se agregó `GET /catalogos/etapas` ni ningún otro endpoint sobre `etapas`.
+- [X] `GET /permisos/me` responde exactamente igual que antes de este spec: siete códigos para `Admin` y cuatro para `Operador`, ninguno de rechazo de lotes.
+- [X] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
+- [X] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id/rechazar` (SPEC 01, 08, 11), `POST /pesajes` (SPEC 03, SPEC 04), `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` (SPEC 05), `GET /permisos/me` (SPEC 07) y los tres `GET /catalogos/*` (SPEC 09) siguen funcionando igual.
+- [X] `CLAUDE.md` lista `PATCH /lotes/:id/rechazar` y `GET /lotes/cliente/:clienteId/all` en la tabla de endpoints, documenta la tabla `etapas`, y ya no afirma que el concepto de *Etapa* no está en el esquema ni que nada puede escribir `lotes.cerrado_en` o cambiar `lotes.estado`.
+- [X] `CLAUDE.md` advierte que `estado = 'cerrado'` no implica que el cierre de lote exista, y que un lote rechazado se identifica por `motivo_rechazo IS NOT NULL`.
 
 ---
 

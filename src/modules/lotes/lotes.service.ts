@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { LotesRepository } from './repository/lotes.repository';
 import { CreateLoteDto } from './dto/create-lote.dto';
+import { RechazarLoteDto } from './dto/rechazar-lote.dto';
 
 @Injectable()
 export class LotesService {
@@ -15,5 +16,9 @@ export class LotesService {
     }
     async findAllLotesByCliente(clienteId: number) {
         return await this.lotesRepository.getAllLotesByCliente(clienteId);
+    }
+
+    async rechazar(loteId: number, dto: RechazarLoteDto, userId: number) {
+        return await this.lotesRepository.rechazarLote(loteId, dto, userId);
     }
 }
