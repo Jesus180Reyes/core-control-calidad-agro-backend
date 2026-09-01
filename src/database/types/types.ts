@@ -49,6 +49,9 @@ export interface PesajesTable {
   secuencia_dispositivo: number | null;
   created_at: Generated<Date | string | null>;
   fuera_de_rango: boolean | null;
+  motivo_rechazo: string | null;
+  rechazado_por: number | null;
+  rechazado_en: Date | string | null;
 }
 export interface ProductosTable {
   id: Generated<number>;
