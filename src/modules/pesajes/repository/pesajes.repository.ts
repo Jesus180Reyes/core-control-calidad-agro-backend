@@ -151,6 +151,27 @@ export class PesajesRepository {
         }
     }
 
+    private async validatePesajeActivo(pesajeId: number, db: Kysely<Database>) {
+        const pesaje = await db
+            .selectFrom('pesajes')
+            .select(['id', 'lote_id', 'isActive'])
+            .where('id', '=', pesajeId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El pesaje con id '${pesajeId}' no existe`,
+                    ),
+            );
+
+        if (pesaje.isActive === 0) {
+            throw new BadRequestException(
+                `El pesaje con id '${pesajeId}' ya fue rechazado`,
+            );
+        }
+
+        return pesaje;
+    }
+
     private async resolveEstadoCalidad(
         pesoNeto: number,
         lote: { peso_minimo: string | number; peso_maximo: string | number },
