@@ -163,4 +163,25 @@ export class ClientesRepository {
             );
         }
     }
+
+    private async validateClienteActivo(clienteId: number, db: Kysely<Database>) {
+        const cliente = await db
+            .selectFrom('clientes')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', clienteId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El cliente con id '${clienteId}' no existe`,
+                    ),
+            );
+
+        if (cliente.isActive === 0) {
+            throw new BadRequestException(
+                `El cliente con id '${clienteId}' ya fue rechazado`,
+            );
+        }
+
+        return cliente;
+    }
 }
