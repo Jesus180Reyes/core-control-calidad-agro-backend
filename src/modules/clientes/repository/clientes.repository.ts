@@ -1,7 +1,8 @@
 import { DatabaseService } from 'src/database/database.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateClienteDto } from '../dto/create-cliente.dto';
-import { Kysely } from 'kysely';
+import { RechazarClienteDto } from '../dto/rechazar-cliente.dto';
+import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 
 @Injectable()
@@ -97,6 +98,31 @@ export class ClientesRepository {
         });
     }
 
+    async rechazarCliente(
+        clienteId: number,
+        data: RechazarClienteDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateClienteActivo(clienteId, trx);
+
+            await trx
+                .updateTable('clientes')
+                .set({
+                    isActive: 0,
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', clienteId)
+                .execute();
+
+            return true;
+        });
+    }
+
     private async linkOperadores(
         clienteId: number,
         usuarioIds: number[],
@@ -162,5 +188,26 @@ export class ClientesRepository {
                 `El codigo de exportacion '${codigoExportacion}' ya esta registrado`,
             );
         }
+    }
+
+    private async validateClienteActivo(clienteId: number, db: Kysely<Database>) {
+        const cliente = await db
+            .selectFrom('clientes')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', clienteId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El cliente con id '${clienteId}' no existe`,
+                    ),
+            );
+
+        if (cliente.isActive === 0) {
+            throw new BadRequestException(
+                `El cliente con id '${clienteId}' ya fue rechazado`,
+            );
+        }
+
+        return cliente;
     }
 }

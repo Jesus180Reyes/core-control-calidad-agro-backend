@@ -1,6 +1,6 @@
 # SPEC 11 — Rechazo de clientes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01, SPEC 08, SPEC 10
 > **Date:** 2026-09-01
 > **Objective:** Agregar `PATCH /clientes/:id/rechazar`, que da de baja lógica a un cliente poniendo `isActive = 0` y guardando el motivo, el usuario y la fecha del rechazo en tres columnas nuevas de `clientes`.
@@ -203,48 +203,48 @@ Las tres últimas filas son las incoherencias asumidas por este spec y están en
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE clientes;` muestra `motivo_rechazo VARCHAR(255)`, `rechazado_por INT` y `rechazado_en DATETIME`, las tres nullables.
-- [ ] `SHOW CREATE TABLE clientes;` muestra la FK de `rechazado_por` a `usuarios(id)`.
-- [ ] Las filas de `clientes` anteriores al DDL tienen las tres columnas en `NULL` y su `isActive` sin cambios.
-- [ ] `ClientesTable` en `src/database/types/types.ts` declara las tres columnas nuevas, ninguna como `Generated<>`.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] La tabla `permisos` sigue teniendo exactamente las 11 filas de SPEC 08: no se sembró ninguna fila nueva.
-- [ ] Existe `src/modules/clientes/dto/rechazar-cliente.dto.ts` y su schema tiene exactamente un campo, `motivo`.
-- [ ] `PATCH /clientes/:id/rechazar` aparece en el log de rutas de Nest al arrancar.
-- [ ] `src/app.module.ts` no cambió: `ClientesModule` ya estaba registrado.
-- [ ] No se creó ningún módulo, controller ni service nuevo: solo se modificaron `clientes.controller.ts`, `clientes.service.ts` y `repository/clientes.repository.ts`, y se agregó un DTO.
-- [ ] Rechazar un cliente activo con un motivo válido responde 200 con exactamente `{ ok: true, msg: 'Cliente rechazado correctamente' }`.
-- [ ] La respuesta **no** incluye ninguna clave de recurso: no hay `cliente`, ni `data`, ni el motivo devuelto.
-- [ ] Después del rechazo, la fila tiene `isActive = 0`.
-- [ ] Después del rechazo, `motivo_rechazo` contiene exactamente el texto enviado en el body.
-- [ ] Después del rechazo, `rechazado_por` es el `userId` del token que llamó, no el `created_by` del cliente.
-- [ ] Después del rechazo, `rechazado_en` tiene la fecha y hora del rechazo, no `NULL`.
-- [ ] El rechazo **no** modifica `nombre`, `rtn`, `producto_id`, `codigo_exportacion`, `correo_contacto`, `telefono`, `direccion_planta`, `ubicacionLongitud`, `ubicacionLatitude`, `created_by` ni `created_at` de la fila.
-- [ ] Un cliente rechazado desaparece de `GET /clientes/all`, y el resto de los clientes sigue apareciendo igual.
-- [ ] Un cliente rechazado desaparece de `GET /clientes` para todos los usuarios vinculados a él.
-- [ ] `POST /lotes` con el `cliente_id` de un cliente rechazado responde 400 con `El cliente 'X' no esta activo`.
-- [ ] Rechazar un `id` que no existe responde 400 con `El cliente con id 'X' no existe`, no 404 y no 500.
-- [ ] Rechazar un cliente que ya tiene `isActive = 0` responde 400 con `El cliente con id 'X' ya fue rechazado`.
-- [ ] Tras ese 400, el `motivo_rechazo`, el `rechazado_por` y el `rechazado_en` del primer rechazo quedan intactos: el segundo intento no sobrescribe nada.
-- [ ] Un `motivo` de menos de 5 caracteres responde 400 por validación de Zod y no modifica la fila.
-- [ ] Un `motivo` de más de 255 caracteres responde 400 por validación de Zod y no modifica la fila.
-- [ ] Un body sin `motivo` responde 400 por validación de Zod.
+- [X] `DESCRIBE clientes;` muestra `motivo_rechazo VARCHAR(255)`, `rechazado_por INT` y `rechazado_en DATETIME`, las tres nullables.
+- [X] `SHOW CREATE TABLE clientes;` muestra la FK de `rechazado_por` a `usuarios(id)`.
+- [X] Las filas de `clientes` anteriores al DDL tienen las tres columnas en `NULL` y su `isActive` sin cambios.
+- [X] `ClientesTable` en `src/database/types/types.ts` declara las tres columnas nuevas, ninguna como `Generated<>`.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] La tabla `permisos` sigue teniendo exactamente las 11 filas de SPEC 08: no se sembró ninguna fila nueva.
+- [X] Existe `src/modules/clientes/dto/rechazar-cliente.dto.ts` y su schema tiene exactamente un campo, `motivo`.
+- [X] `PATCH /clientes/:id/rechazar` aparece en el log de rutas de Nest al arrancar.
+- [X] `src/app.module.ts` no cambió: `ClientesModule` ya estaba registrado.
+- [X] No se creó ningún módulo, controller ni service nuevo: solo se modificaron `clientes.controller.ts`, `clientes.service.ts` y `repository/clientes.repository.ts`, y se agregó un DTO.
+- [X] Rechazar un cliente activo con un motivo válido responde 200 con exactamente `{ ok: true, msg: 'Cliente rechazado correctamente' }`.
+- [X] La respuesta **no** incluye ninguna clave de recurso: no hay `cliente`, ni `data`, ni el motivo devuelto.
+- [X] Después del rechazo, la fila tiene `isActive = 0`.
+- [X] Después del rechazo, `motivo_rechazo` contiene exactamente el texto enviado en el body.
+- [X] Después del rechazo, `rechazado_por` es el `userId` del token que llamó, no el `created_by` del cliente.
+- [X] Después del rechazo, `rechazado_en` tiene la fecha y hora del rechazo, no `NULL`.
+- [X] El rechazo **no** modifica `nombre`, `rtn`, `producto_id`, `codigo_exportacion`, `correo_contacto`, `telefono`, `direccion_planta`, `ubicacionLongitud`, `ubicacionLatitude`, `created_by` ni `created_at` de la fila.
+- [X] Un cliente rechazado desaparece de `GET /clientes/all`, y el resto de los clientes sigue apareciendo igual.
+- [X] Un cliente rechazado desaparece de `GET /clientes` para todos los usuarios vinculados a él.
+- [X] `POST /lotes` con el `cliente_id` de un cliente rechazado responde 400 con `El cliente 'X' no esta activo`.
+- [X] Rechazar un `id` que no existe responde 400 con `El cliente con id 'X' no existe`, no 404 y no 500.
+- [X] Rechazar un cliente que ya tiene `isActive = 0` responde 400 con `El cliente con id 'X' ya fue rechazado`.
+- [X] Tras ese 400, el `motivo_rechazo`, el `rechazado_por` y el `rechazado_en` del primer rechazo quedan intactos: el segundo intento no sobrescribe nada.
+- [X] Un `motivo` de menos de 5 caracteres responde 400 por validación de Zod y no modifica la fila.
+- [X] Un `motivo` de más de 255 caracteres responde 400 por validación de Zod y no modifica la fila.
+- [X] Un body sin `motivo` responde 400 por validación de Zod.
 - [ ] Un `id` de ruta no numérico (`PATCH /clientes/abc/rechazar`) responde 400 por `ParseIntPipe`.
-- [ ] `PATCH /clientes/:id/rechazar` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
-- [ ] `PATCH /clientes/:id/rechazar` con un token expirado o firmado con otro secreto responde 401.
-- [ ] Un `Operador` **sin** fila en `cliente_operador` para ese cliente lo rechaza igual: responde **200, no 403**. **Este spec no valida el vínculo.**
-- [ ] Un usuario que no creó el cliente puede rechazarlo: no se compara contra `clientes.created_by`.
-- [ ] Cuando cualquier validación falla, ninguna columna de la fila cambia: la transacción no deja escrituras parciales.
-- [ ] Las filas de `cliente_operador` del cliente rechazado siguen existiendo, con el mismo conteo que antes del rechazo.
-- [ ] Los lotes del cliente rechazado no cambian: mismo `estado`, mismo `cerrado_en`, y siguen apareciendo en `GET /lotes/cliente/:clienteId`.
-- [ ] Los pesajes de esos lotes no cambian: ninguno queda con `isActive = 0` por efecto de este rechazo.
-- [ ] Después de rechazar un cliente, `POST /clientes` acepta un cliente nuevo con el mismo `rtn` y el mismo `codigo_exportacion`. **Es el comportamiento esperado y este spec no lo cambia.**
-- [ ] `GET /clientes`, `GET /clientes/all` y `POST /clientes` no cambiaron: mismos campos, mismos filtros, mismo orden, misma forma de respuesta.
-- [ ] `GET /permisos/me` responde exactamente igual que antes de este spec: siete códigos para `Admin` y cuatro para `Operador`, ninguno de rechazo de clientes.
-- [ ] No existe ningún endpoint para deshacer un rechazo ni para listar clientes rechazados.
-- [ ] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
-- [ ] `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04), `PATCH /pesajes/:id/rechazar`, `GET /pesajes/byLote/:loteId` (SPEC 10), `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` (SPEC 05), `GET /permisos/me` (SPEC 07) y los tres `GET /catalogos/*` (SPEC 09) siguen funcionando igual.
-- [ ] `CLAUDE.md` lista `PATCH /clientes/:id/rechazar` en la tabla de endpoints y ya no afirma que `PATCH /pesajes/:id/rechazar` es el único `PATCH`, el único `UPDATE` ni el único `:id` del proyecto.
+- [X] `PATCH /clientes/:id/rechazar` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
+- [X] `PATCH /clientes/:id/rechazar` con un token expirado o firmado con otro secreto responde 401.
+- [X] Un `Operador` **sin** fila en `cliente_operador` para ese cliente lo rechaza igual: responde **200, no 403**. **Este spec no valida el vínculo.**
+- [X] Un usuario que no creó el cliente puede rechazarlo: no se compara contra `clientes.created_by`.
+- [X] Cuando cualquier validación falla, ninguna columna de la fila cambia: la transacción no deja escrituras parciales.
+- [X] Las filas de `cliente_operador` del cliente rechazado siguen existiendo, con el mismo conteo que antes del rechazo.
+- [X] Los lotes del cliente rechazado no cambian: mismo `estado`, mismo `cerrado_en`, y siguen apareciendo en `GET /lotes/cliente/:clienteId`.
+- [X] Los pesajes de esos lotes no cambian: ninguno queda con `isActive = 0` por efecto de este rechazo.
+- [X] Después de rechazar un cliente, `POST /clientes` acepta un cliente nuevo con el mismo `rtn` y el mismo `codigo_exportacion`. **Es el comportamiento esperado y este spec no lo cambia.**
+- [X] `GET /clientes`, `GET /clientes/all` y `POST /clientes` no cambiaron: mismos campos, mismos filtros, mismo orden, misma forma de respuesta.
+- [X] `GET /permisos/me` responde exactamente igual que antes de este spec: siete códigos para `Admin` y cuatro para `Operador`, ninguno de rechazo de clientes.
+- [X] No existe ningún endpoint para deshacer un rechazo ni para listar clientes rechazados.
+- [X] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
+- [X] `POST /lotes`, `GET /lotes/cliente/:clienteId` (SPEC 02), `POST /pesajes` (SPEC 03, SPEC 04), `PATCH /pesajes/:id/rechazar`, `GET /pesajes/byLote/:loteId` (SPEC 10), `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` (SPEC 05), `GET /permisos/me` (SPEC 07) y los tres `GET /catalogos/*` (SPEC 09) siguen funcionando igual.
+- [X] `CLAUDE.md` lista `PATCH /clientes/:id/rechazar` en la tabla de endpoints y ya no afirma que `PATCH /pesajes/:id/rechazar` es el único `PATCH`, el único `UPDATE` ni el único `:id` del proyecto.
 
 ---
 
