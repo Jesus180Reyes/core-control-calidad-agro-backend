@@ -1,6 +1,6 @@
 # SPEC 10 — Rechazo de pesajes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02, SPEC 03
 > **Date:** 2026-09-01
 > **Objective:** Agregar `PATCH /pesajes/:id/rechazar`, que anula un pesaje mal capturado poniendo `isActive = 0` y guardando el motivo, el usuario y la fecha del rechazo en tres columnas nuevas de `pesajes`.
