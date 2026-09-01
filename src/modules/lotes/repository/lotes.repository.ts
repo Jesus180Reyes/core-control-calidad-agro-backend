@@ -4,9 +4,10 @@ import {
     ForbiddenException,
     Injectable,
 } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateLoteDto } from '../dto/create-lote.dto';
+import { RechazarLoteDto } from '../dto/rechazar-lote.dto';
 
 @Injectable()
 export class LotesRepository {
@@ -107,6 +108,34 @@ export class LotesRepository {
                 );
 
             return Number(result.insertId);
+        });
+    }
+
+    async rechazarLote(
+        loteId: number,
+        data: RechazarLoteDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateLoteAbierto(loteId, trx);
+            const etapa = await this.resolveEtapaRechazado(trx);
+
+            await trx
+                .updateTable('lotes')
+                .set({
+                    estado: 'cerrado',
+                    etapa_id: etapa.id,
+                    cerrado_en: sql<Date>`NOW()`,
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', loteId)
+                .execute();
+
+            return true;
         });
     }
 
@@ -228,6 +257,7 @@ export class LotesRepository {
             .select('id')
             .where('cliente_id', '=', clienteId)
             .where('nombre_lote', '=', nombreLote)
+            .where('motivo_rechazo', 'is', null)
             .executeTakeFirst();
 
         if (existente) {
