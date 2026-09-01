@@ -110,6 +110,37 @@ export class LotesRepository {
         });
     }
 
+    private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select(['id', 'nombre_lote', 'cliente_id', 'estado', 'cerrado_en'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
+
+        if (lote.estado !== 'abierto' || lote.cerrado_en !== null) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta abierto`,
+            );
+        }
+
+        return lote;
+    }
+
+    private async resolveEtapaRechazado(db: Kysely<Database>) {
+        return await db
+            .selectFrom('etapas')
+            .select(['id', 'codigo'])
+            .where('codigo', '=', 'RECHAZADO')
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `La etapa con codigo 'RECHAZADO' no existe`,
+                    ),
+            );
+    }
+
     private async validateVinculoOperador(
         clienteId: number,
         usuarioId: number,
