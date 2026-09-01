@@ -1,7 +1,8 @@
 import { DatabaseService } from 'src/database/database.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateClienteDto } from '../dto/create-cliente.dto';
-import { Kysely } from 'kysely';
+import { RechazarClienteDto } from '../dto/rechazar-cliente.dto';
+import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 
 @Injectable()
@@ -94,6 +95,31 @@ export class ClientesRepository {
             const clienteId = Number(result.insertId);
             await this.linkOperadores(clienteId, usuario_ids, trx);
             return clienteId;
+        });
+    }
+
+    async rechazarCliente(
+        clienteId: number,
+        data: RechazarClienteDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateClienteActivo(clienteId, trx);
+
+            await trx
+                .updateTable('clientes')
+                .set({
+                    isActive: 0,
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', clienteId)
+                .execute();
+
+            return true;
         });
     }
 
