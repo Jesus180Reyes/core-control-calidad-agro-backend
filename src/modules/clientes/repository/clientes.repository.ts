@@ -138,6 +138,7 @@ export class ClientesRepository {
             .selectFrom('clientes')
             .select('id')
             .where('rtn', '=', rtn)
+            .where('isActive', '=', 1)
             .executeTakeFirst();
 
         if (existente) {
@@ -153,6 +154,7 @@ export class ClientesRepository {
             .selectFrom('clientes')
             .select('id')
             .where('codigo_exportacion', '=', codigoExportacion)
+            .where('isActive', '=', 1)
             .executeTakeFirst();
 
         if (existente) {
