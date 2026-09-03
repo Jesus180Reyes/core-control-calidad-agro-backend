@@ -32,6 +32,8 @@ export interface LotesTable {
   motivo_rechazo: string | null;
   rechazado_por: number | null;
   rechazado_en: Date | string | null;
+  aprobado_por: number | null;
+  aprobado_en: Date | string | null;
 }
 export interface EstadosCalidadTable {
   id: Generated<number>;

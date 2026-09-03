@@ -67,4 +67,17 @@ export class LotesController {
             msg: 'Lote rechazado correctamente',
         };
     }
+
+    @Patch(':id/aprobar')
+    async aprobar(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const aprobado = await this.lotesService.aprobar(id, userId);
+        return {
+            ok: aprobado,
+            msg: 'Lote aprobado correctamente',
+        };
+    }
 }
