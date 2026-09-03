@@ -128,9 +128,6 @@ export interface PermisosTable {
   id: Generated<number>;
   rol_id: number;
   permiso_id: number;
-  codigo: string;
-  nombre: string;
-  descripcion: string | null;
   isActive: Generated<number>;
   created_at: Generated<Date | string | null>;
 }

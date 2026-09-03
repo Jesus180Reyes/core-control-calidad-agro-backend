@@ -181,6 +181,11 @@ La columna nace nullable para poder rellenarla, y pasa a `NOT NULL` una vez conf
 **Este bloque se ejecuta después de cambiar el repositorio**, no antes:
 
 ```sql
+-- 1. El indice nuevo va PRIMERO. Ver la nota de abajo: no es cosmetico.
+ALTER TABLE permisos
+  ADD UNIQUE KEY uq_permisos_rol_permiso (rol_id, permiso_id);
+
+-- 2. Recien ahora se puede soltar el viejo.
 ALTER TABLE permisos
   DROP INDEX uq_permisos_rol_codigo;
 
@@ -190,14 +195,17 @@ ALTER TABLE permisos
   DROP COLUMN descripcion;
 
 ALTER TABLE permisos
-  ADD UNIQUE KEY uq_permisos_rol_permiso (rol_id, permiso_id);
-
-ALTER TABLE permisos
   ADD CONSTRAINT fk_permisos_permiso
   FOREIGN KEY (permiso_id) REFERENCES catalogo_permisos(id);
 ```
 
-El `DROP INDEX` va primero y explícito: el índice único incluye `codigo`, así que borrar la columna sin quitarlo antes deja el resultado a criterio del motor.
+**El orden de las dos primeras sentencias es obligatorio, no una preferencia.** `uq_permisos_rol_codigo` es `(rol_id, codigo)`, con `rol_id` como columna más a la izquierda, así que es el índice que sostiene la FK `fk_permisos_rol`. InnoDB no permite borrar un índice que cubre una clave foránea si ningún otro la cubre: intentarlo devuelve `Cannot drop index 'uq_permisos_rol_codigo': needed in a foreign key constraint` y deja el paso a medias. Creando antes `uq_permisos_rol_permiso`, que también empieza por `rol_id`, la FK queda cubierta y el `DROP INDEX` pasa sin ruido.
+
+El `DROP INDEX` es explícito y va antes del `DROP COLUMN`: el índice viejo incluye `codigo`, así que borrar la columna sin quitarlo antes deja el resultado a criterio del motor.
+
+El `UNIQUE` nuevo no puede fallar por datos duplicados: `(rol_id, codigo)` era único y la relación entre `codigo` y `permiso_id` es uno a uno, así que `(rol_id, permiso_id)` hereda esa unicidad.
+
+Al crear `fk_permisos_permiso`, MySQL agrega por su cuenta un `KEY fk_permisos_permiso (permiso_id)` para sostenerla. Aparece en el `SHOW CREATE TABLE` sin que nadie lo haya pedido y es lo esperado, no un resto de la migración.
 
 La FK a `roles(id)` **no se toca**: `fk_permisos_rol` sigue en su lugar. `permisos` queda con dos FK.
 
@@ -342,7 +350,7 @@ Nota práctica del `UPDATE`: conviene escribirlo con un `WHERE p.id > 0` redunda
 5. Agregar `CatalogoPermisosTable` a `src/database/types/types.ts`, agregar la clave `catalogo_permisos` a la interfaz `Database`, y agregar `permiso_id: number` a `PermisosTable` **sin quitarle todavía** `codigo`, `nombre` ni `descripcion`. Confirmar que compila (`npm run build`).
 6. Cambiar el segundo `SELECT` de `getPermisosByUsuarioId` por la versión con `INNER JOIN` y los dos filtros de `isActive`. No se cambia la firma del método, ni la primera consulta, ni el `NotFoundException`, ni el `map` final. Confirmar que compila.
 7. Levantar con `npm run start:dev` y verificar con los dos tokens del paso 2 que `GET /permisos/me` devuelve **exactamente** la misma respuesta que antes, código por código, contra la referencia anotada en ese paso. En este punto ninguna línea del proyecto lee `permisos.codigo`.
-8. Ejecutar el DDL destructivo: el `DROP INDEX uq_permisos_rol_codigo`, los tres `DROP COLUMN`, el `ADD UNIQUE KEY uq_permisos_rol_permiso (rol_id, permiso_id)` y el `ADD CONSTRAINT fk_permisos_permiso`. Confirmar con `DESCRIBE permisos;` que quedan cinco columnas (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) y con `SHOW CREATE TABLE permisos;` que están las dos FK (`fk_permisos_rol` y `fk_permisos_permiso`), el `UNIQUE` nuevo, y que el viejo `uq_permisos_rol_codigo` ya no está.
+8. Ejecutar el DDL destructivo **en el orden del modelo de datos**: primero el `ADD UNIQUE KEY uq_permisos_rol_permiso (rol_id, permiso_id)`, después el `DROP INDEX uq_permisos_rol_codigo`, después los tres `DROP COLUMN`, y por último el `ADD CONSTRAINT fk_permisos_permiso`. Invertir las dos primeras hace fallar el `DROP INDEX`, porque ese índice es el que cubre la FK `fk_permisos_rol`. Confirmar con `DESCRIBE permisos;` que quedan cinco columnas (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`), con `SELECT COUNT(*) FROM permisos;` que siguen siendo 14, y con `SHOW CREATE TABLE permisos;` que están las dos FK (`fk_permisos_rol` y `fk_permisos_permiso`), el `UNIQUE` nuevo, y que el viejo `uq_permisos_rol_codigo` ya no está.
 9. Quitar `codigo`, `nombre` y `descripcion` de `PermisosTable` en `src/database/types/types.ts`. Confirmar que compila: si algún archivo todavía las usaba, el compilador lo dice aquí.
 10. Volver a levantar y verificar que `GET /permisos/me` sigue devolviendo lo mismo con los dos tokens, ahora contra la tabla ya reducida.
 11. Verificación manual de los dos `isActive`, usando `RECHAZAR-LOTE` porque es uno de los cinco códigos que tienen dos filas: poner `permisos.isActive = 0` en la fila de `RECHAZAR-LOTE` de **uno** de sus dos roles y confirmar que ese código desaparece solo de la respuesta de ese rol y sigue en la del otro; devolverla a `1`. Después poner `catalogo_permisos.isActive = 0` en la fila de `RECHAZAR-LOTE` y confirmar que desaparece de **los dos** roles con una sola edición; devolverla a `1`.
