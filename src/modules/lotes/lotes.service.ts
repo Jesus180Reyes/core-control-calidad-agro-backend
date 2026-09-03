@@ -21,4 +21,8 @@ export class LotesService {
     async rechazar(loteId: number, dto: RechazarLoteDto, userId: number) {
         return await this.lotesRepository.rechazarLote(loteId, dto, userId);
     }
+
+    async aprobar(loteId: number, userId: number) {
+        return await this.lotesRepository.aprobarLote(loteId, userId);
+    }
 }
