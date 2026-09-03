@@ -20,9 +20,15 @@ export class PermisosRepository {
 
         const permisos = await this.db
             .selectFrom('permisos')
-            .select('codigo')
-            .where('rol_id', '=', usuario.rol_id)
-            .where('isActive', '=', 1)
+            .innerJoin(
+                'catalogo_permisos',
+                'catalogo_permisos.id',
+                'permisos.permiso_id',
+            )
+            .select('catalogo_permisos.codigo')
+            .where('permisos.rol_id', '=', usuario.rol_id)
+            .where('permisos.isActive', '=', 1)
+            .where('catalogo_permisos.isActive', '=', 1)
             .execute();
 
         return permisos.map((permiso) => permiso.codigo);
