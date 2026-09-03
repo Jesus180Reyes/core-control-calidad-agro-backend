@@ -1,6 +1,6 @@
 # SPEC 13 — Aprobación de lotes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02, SPEC 03, SPEC 12
 > **Date:** 2026-09-02
 > **Objective:** Agregar `PATCH /lotes/:id/aprobar`, que aprueba un lote abierto en etapa `EN_PROCESO`, lo pasa a la etapa `CLIENTE_FINAL`, lo cierra (`estado = 'cerrado'`, `cerrado_en = NOW()`) y guarda quién lo aprobó y cuándo en dos columnas nuevas de `lotes`.
