@@ -177,6 +177,19 @@ export class LotesRepository {
             );
     }
 
+    private async resolveEtapa(codigo: string, db: Kysely<Database>) {
+        return await db
+            .selectFrom('etapas')
+            .select(['id', 'codigo'])
+            .where('codigo', '=', codigo)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `La etapa con codigo '${codigo}' no existe`,
+                    ),
+            );
+    }
+
     private async validateVinculoOperador(
         clienteId: number,
         usuarioId: number,
