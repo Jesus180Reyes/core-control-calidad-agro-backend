@@ -142,7 +142,14 @@ export class LotesRepository {
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
         const lote = await db
             .selectFrom('lotes')
-            .select(['id', 'nombre_lote', 'cliente_id', 'estado', 'cerrado_en'])
+            .select([
+                'id',
+                'nombre_lote',
+                'cliente_id',
+                'estado',
+                'cerrado_en',
+                'etapa_id',
+            ])
             .where('id', '=', loteId)
             .executeTakeFirstOrThrow(
                 () => new BadRequestException(`El lote con id '${loteId}' no existe`),
