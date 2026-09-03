@@ -1,6 +1,6 @@
 # SPEC 14 — Catálogo de permisos
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 06, SPEC 07, SPEC 08
 > **Date:** 2026-09-03
 > **Objective:** Extraer `codigo`, `nombre` y `descripcion` de `permisos` a una tabla nueva `catalogo_permisos`, y dejar `permisos` como puente `(rol_id, permiso_id)`, para que renombrar un permiso sea editar una sola fila.
@@ -364,61 +364,61 @@ Nota práctica del `UPDATE`: conviene escribirlo con un `WHERE p.id > 0` redunda
 
 ## Acceptance criteria
 
-- [ ] `SELECT codigo, COUNT(DISTINCT nombre) FROM permisos GROUP BY codigo;` se corrió **antes** de crear el catálogo y devolvió 1 para los 9 códigos.
-- [ ] La tabla `catalogo_permisos` existe en MySQL con las columnas `id`, `codigo`, `nombre`, `descripcion`, `isActive` y `created_at`.
-- [ ] `catalogo_permisos` tiene exactamente **9 filas**.
-- [ ] Los 9 `codigo` son `APROBAR-LOTE`, `CREAR-CLIENTE-LOTE-NUEVO`, `CREAR-CLIENTE-NUEVO`, `MODULO-CLIENTES`, `MODULO-CONTROL-CALIDAD`, `RECHAZAR-CLIENTE`, `RECHAZAR-LOTE`, `RECHAZAR-PESAJE-LOTE` y `VER-CLIENTE-LOTES`.
-- [ ] Los 9 `codigo` están escritos **exactamente** como estaban en `permisos`, en mayúsculas con guiones: este spec no los normalizó a `modulo.accion`.
-- [ ] El `nombre` y la `descripcion` de cada fila del catálogo son **los mismos textos** que tenía `permisos` antes del refactor: se copiaron con un `SELECT`, no se teclearon.
-- [ ] `catalogo_permisos` tiene un índice único sobre `codigo`: insertar `RECHAZAR-LOTE` una segunda vez falla.
-- [ ] Toda fila del catálogo tiene `isActive = 1`.
-- [ ] `DESCRIBE permisos;` muestra exactamente cinco columnas: `id`, `rol_id`, `permiso_id`, `isActive` y `created_at`.
-- [ ] `permisos` **ya no tiene** las columnas `codigo`, `nombre` ni `descripcion`.
-- [ ] `permisos.permiso_id` es `INT NOT NULL`.
-- [ ] `permisos` sigue teniendo exactamente **14 filas**, con el mismo reparto por rol que anotó el paso 2. Ninguna se perdió ni se duplicó en la migración.
-- [ ] Cada fila de `permisos` apunta al `id` del catálogo cuyo `codigo` era el suyo antes del refactor: el `JOIN` reproduce los **14** pares rol-código originales, idénticos a la referencia del paso 2.
-- [ ] `SHOW CREATE TABLE permisos;` muestra la FK `fk_permisos_permiso` hacia `catalogo_permisos(id)`.
-- [ ] `SHOW CREATE TABLE permisos;` sigue mostrando la FK `fk_permisos_rol` hacia `roles(id)`: no se tocó.
-- [ ] `SHOW CREATE TABLE permisos;` muestra el índice único `(rol_id, permiso_id)` y **ya no** muestra `uq_permisos_rol_codigo`.
-- [ ] Insertar en `permisos` un `permiso_id` que no existe en el catálogo falla por la FK.
-- [ ] Insertar dos veces el mismo par `(rol_id, permiso_id)` falla por el `UNIQUE`.
-- [ ] Insertar el mismo `permiso_id` para dos `rol_id` distintos **no** falla: es el caso normal, los 5 códigos compartidos.
-- [ ] `src/database/types/types.ts` declara `CatalogoPermisosTable` y la interfaz `Database` incluye la clave `catalogo_permisos`, escrita igual que el nombre real de la tabla.
-- [ ] `PermisosTable` declara `permiso_id: number` y **no** declara `codigo`, `nombre` ni `descripcion`.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] `GET /permisos/me` devuelve para cada rol **exactamente los mismos códigos, y la misma cantidad**, que la referencia anotada en el paso 2 antes de tocar la base. Es el criterio central del spec.
-- [ ] Con el token de un `ADMIN`, la respuesta tiene 7 strings: `APROBAR-LOTE`, `MODULO-CLIENTES`, `MODULO-CONTROL-CALIDAD`, `RECHAZAR-CLIENTE`, `RECHAZAR-LOTE`, `RECHAZAR-PESAJE-LOTE` y `VER-CLIENTE-LOTES`.
-- [ ] Con el token de un `OPERADOR`, la respuesta tiene 7 strings: `APROBAR-LOTE`, `CREAR-CLIENTE-LOTE-NUEVO`, `CREAR-CLIENTE-NUEVO`, `MODULO-CLIENTES`, `MODULO-CONTROL-CALIDAD`, `RECHAZAR-LOTE` y `VER-CLIENTE-LOTES`.
-- [ ] Las dos comparaciones se hacen por contenido y cantidad, **no por posición**: el `INNER JOIN` puede reordenar y eso no es una regresión.
-- [ ] Ningún código aparece o desaparece de la respuesta de ningún rol como efecto de la migración.
-- [ ] Los elementos del array siguen siendo strings planos, no objetos: `permisos[0]` es `"MODULO-CLIENTES"` y no `{ codigo: "MODULO-CLIENTES" }`.
-- [ ] La respuesta sigue siendo exactamente `{ ok, msg, permisos }` con `msg = 'Permisos obtenidos correctamente'`, y **no** incluye `nombre`, `descripcion`, `id` ni datos del rol.
-- [ ] Un token válido cuyo `user_id` no existe en `usuarios` sigue recibiendo 404 con `Usuario no encontrado`.
-- [ ] Un usuario cuyo rol no tiene ninguna asignación activa recibe 200 con `permisos: []`, no un 404.
-- [ ] `GET /permisos/me` sin header `Authorization` responde 401, y con un token expirado o de otro secreto también.
-- [ ] Poner `permisos.isActive = 0` en la fila de `RECHAZAR-LOTE` de uno de sus dos roles hace desaparecer ese código de la respuesta de ese rol y **no** de la del otro.
-- [ ] Poner `catalogo_permisos.isActive = 0` en la fila de `RECHAZAR-LOTE` hace desaparecer ese código de la respuesta de **los dos** roles, con una sola fila editada.
-- [ ] Devolver cualquiera de esos dos `isActive` a `1` hace reaparecer el código.
-- [ ] `UPDATE catalogo_permisos SET nombre = ... WHERE codigo = 'RECHAZAR-LOTE';` afecta **exactamente una fila**, donde antes de este spec habría afectado dos. Es el objetivo del spec.
-- [ ] Después de ese renombre, `GET /permisos/me` devuelve el mismo array de códigos para los dos roles: el endpoint no expone el `nombre`.
-- [ ] La consulta del repositorio usa `INNER JOIN`, no `LEFT JOIN`, y filtra los dos `isActive` con el prefijo de tabla.
-- [ ] `getPermisosByUsuarioId` sigue haciendo **dos** consultas: `usuarios` primero y `permisos` después. No se unificaron en una.
-- [ ] La consulta sigue **sin** `ORDER BY`: la decisión de SPEC 07 no cambió.
-- [ ] No se creó ningún archivo nuevo bajo `src/modules/`: solo se modificaron `src/modules/permisos/repository/permisos.repository.ts` y `src/database/types/types.ts`.
-- [ ] `permisos.controller.ts` y `permisos.service.ts` no cambiaron.
-- [ ] `src/app.module.ts` no cambió.
-- [ ] No existe ninguna ruta nueva: `GET /permisos/catalogo` y `GET /catalogos/permisos` responden 404 de Nest.
-- [ ] El log de rutas de Nest al arrancar es idéntico al de antes de este spec.
-- [ ] El catálogo tiene exactamente los 9 códigos que ya estaban en `permisos` y **ni uno más**: este spec no sembró ningún código nuevo.
-- [ ] `POST /clientes` sigue respondiendo 201 para un usuario con rol `Operador`: **este spec no bloquea nada** y no hay `PermissionsGuard`.
-- [ ] `PATCH /lotes/:id/aprobar` y los tres `rechazar` siguen respondiendo 200 a cualquier usuario autenticado.
-- [ ] `POST /auth/login` responde exactamente igual que antes, sin clave `permisos`.
-- [ ] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
-- [ ] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id/rechazar`, `POST /lotes`, los dos `GET /lotes/cliente/:clienteId*`, `PATCH /lotes/:id/rechazar`, `PATCH /lotes/:id/aprobar`, `POST /pesajes`, `GET /pesajes/byLote/:loteId`, `PATCH /pesajes/:id/rechazar`, `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` y los tres `GET /catalogos/*` siguen funcionando igual.
-- [ ] `CLAUDE.md` documenta `catalogo_permisos`, describe `permisos` como una fila por `(rol_id, permiso_id)` sin texto propio, y ya no dice que el `codigo` viva en `permisos`.
-- [ ] `CLAUDE.md` sigue advirtiendo que los permisos **no se aplican en ningún endpoint**.
-- [ ] `CLAUDE.md` ya **no** afirma que `permisos` tenga 11 filas ni que sus códigos sean los 7 `modulo.accion` de SPEC 06 y SPEC 08: dice 14 filas y 9 códigos en `MAYÚSCULAS-CON-GUIONES`.
-- [ ] `CLAUDE.md` ya **no** afirma que los tres `rechazar` y `PATCH /lotes/:id/aprobar` no tengan fila sembrada: deja escrito que `APROBAR-LOTE`, `RECHAZAR-LOTE`, `RECHAZAR-CLIENTE` y `RECHAZAR-PESAJE-LOTE` existen, y que ningún spec registra quién las insertó.
+- [X] `SELECT codigo, COUNT(DISTINCT nombre) FROM permisos GROUP BY codigo;` se corrió **antes** de crear el catálogo y devolvió 1 para los 9 códigos.
+- [X] La tabla `catalogo_permisos` existe en MySQL con las columnas `id`, `codigo`, `nombre`, `descripcion`, `isActive` y `created_at`.
+- [X] `catalogo_permisos` tiene exactamente **9 filas**.
+- [X] Los 9 `codigo` son `APROBAR-LOTE`, `CREAR-CLIENTE-LOTE-NUEVO`, `CREAR-CLIENTE-NUEVO`, `MODULO-CLIENTES`, `MODULO-CONTROL-CALIDAD`, `RECHAZAR-CLIENTE`, `RECHAZAR-LOTE`, `RECHAZAR-PESAJE-LOTE` y `VER-CLIENTE-LOTES`.
+- [X] Los 9 `codigo` están escritos **exactamente** como estaban en `permisos`, en mayúsculas con guiones: este spec no los normalizó a `modulo.accion`.
+- [X] El `nombre` y la `descripcion` de cada fila del catálogo son **los mismos textos** que tenía `permisos` antes del refactor: se copiaron con un `SELECT`, no se teclearon.
+- [X] `catalogo_permisos` tiene un índice único sobre `codigo`: insertar `RECHAZAR-LOTE` una segunda vez falla.
+- [X] Toda fila del catálogo tiene `isActive = 1`.
+- [X] `DESCRIBE permisos;` muestra exactamente cinco columnas: `id`, `rol_id`, `permiso_id`, `isActive` y `created_at`.
+- [X] `permisos` **ya no tiene** las columnas `codigo`, `nombre` ni `descripcion`.
+- [X] `permisos.permiso_id` es `INT NOT NULL`.
+- [X] `permisos` sigue teniendo exactamente **14 filas**, con el mismo reparto por rol que anotó el paso 2. Ninguna se perdió ni se duplicó en la migración.
+- [X] Cada fila de `permisos` apunta al `id` del catálogo cuyo `codigo` era el suyo antes del refactor: el `JOIN` reproduce los **14** pares rol-código originales, idénticos a la referencia del paso 2.
+- [X] `SHOW CREATE TABLE permisos;` muestra la FK `fk_permisos_permiso` hacia `catalogo_permisos(id)`.
+- [X] `SHOW CREATE TABLE permisos;` sigue mostrando la FK `fk_permisos_rol` hacia `roles(id)`: no se tocó.
+- [X] `SHOW CREATE TABLE permisos;` muestra el índice único `(rol_id, permiso_id)` y **ya no** muestra `uq_permisos_rol_codigo`.
+- [X] Insertar en `permisos` un `permiso_id` que no existe en el catálogo falla por la FK.
+- [X] Insertar dos veces el mismo par `(rol_id, permiso_id)` falla por el `UNIQUE`.
+- [X] Insertar el mismo `permiso_id` para dos `rol_id` distintos **no** falla: es el caso normal, los 5 códigos compartidos.
+- [X] `src/database/types/types.ts` declara `CatalogoPermisosTable` y la interfaz `Database` incluye la clave `catalogo_permisos`, escrita igual que el nombre real de la tabla.
+- [X] `PermisosTable` declara `permiso_id: number` y **no** declara `codigo`, `nombre` ni `descripcion`.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] `GET /permisos/me` devuelve para cada rol **exactamente los mismos códigos, y la misma cantidad**, que la referencia anotada en el paso 2 antes de tocar la base. Es el criterio central del spec.
+- [X] Con el token de un `ADMIN`, la respuesta tiene 7 strings: `APROBAR-LOTE`, `MODULO-CLIENTES`, `MODULO-CONTROL-CALIDAD`, `RECHAZAR-CLIENTE`, `RECHAZAR-LOTE`, `RECHAZAR-PESAJE-LOTE` y `VER-CLIENTE-LOTES`.
+- [X] Con el token de un `OPERADOR`, la respuesta tiene 7 strings: `APROBAR-LOTE`, `CREAR-CLIENTE-LOTE-NUEVO`, `CREAR-CLIENTE-NUEVO`, `MODULO-CLIENTES`, `MODULO-CONTROL-CALIDAD`, `RECHAZAR-LOTE` y `VER-CLIENTE-LOTES`.
+- [X] Las dos comparaciones se hacen por contenido y cantidad, **no por posición**: el `INNER JOIN` puede reordenar y eso no es una regresión.
+- [X] Ningún código aparece o desaparece de la respuesta de ningún rol como efecto de la migración.
+- [X] Los elementos del array siguen siendo strings planos, no objetos: `permisos[0]` es `"MODULO-CLIENTES"` y no `{ codigo: "MODULO-CLIENTES" }`.
+- [X] La respuesta sigue siendo exactamente `{ ok, msg, permisos }` con `msg = 'Permisos obtenidos correctamente'`, y **no** incluye `nombre`, `descripcion`, `id` ni datos del rol.
+- [X] Un token válido cuyo `user_id` no existe en `usuarios` sigue recibiendo 404 con `Usuario no encontrado`.
+- [X] Un usuario cuyo rol no tiene ninguna asignación activa recibe 200 con `permisos: []`, no un 404.
+- [X] `GET /permisos/me` sin header `Authorization` responde 401, y con un token expirado o de otro secreto también.
+- [X] Poner `permisos.isActive = 0` en la fila de `RECHAZAR-LOTE` de uno de sus dos roles hace desaparecer ese código de la respuesta de ese rol y **no** de la del otro.
+- [X] Poner `catalogo_permisos.isActive = 0` en la fila de `RECHAZAR-LOTE` hace desaparecer ese código de la respuesta de **los dos** roles, con una sola fila editada.
+- [X] Devolver cualquiera de esos dos `isActive` a `1` hace reaparecer el código.
+- [X] `UPDATE catalogo_permisos SET nombre = ... WHERE codigo = 'RECHAZAR-LOTE';` afecta **exactamente una fila**, donde antes de este spec habría afectado dos. Es el objetivo del spec.
+- [X] Después de ese renombre, `GET /permisos/me` devuelve el mismo array de códigos para los dos roles: el endpoint no expone el `nombre`.
+- [X] La consulta del repositorio usa `INNER JOIN`, no `LEFT JOIN`, y filtra los dos `isActive` con el prefijo de tabla.
+- [X] `getPermisosByUsuarioId` sigue haciendo **dos** consultas: `usuarios` primero y `permisos` después. No se unificaron en una.
+- [X] La consulta sigue **sin** `ORDER BY`: la decisión de SPEC 07 no cambió.
+- [X] No se creó ningún archivo nuevo bajo `src/modules/`: solo se modificaron `src/modules/permisos/repository/permisos.repository.ts` y `src/database/types/types.ts`.
+- [X] `permisos.controller.ts` y `permisos.service.ts` no cambiaron.
+- [X] `src/app.module.ts` no cambió.
+- [X] No existe ninguna ruta nueva: `GET /permisos/catalogo` y `GET /catalogos/permisos` responden 404 de Nest.
+- [X] El log de rutas de Nest al arrancar es idéntico al de antes de este spec.
+- [X] El catálogo tiene exactamente los 9 códigos que ya estaban en `permisos` y **ni uno más**: este spec no sembró ningún código nuevo.
+- [X] `POST /clientes` sigue respondiendo 201 para un usuario con rol `Operador`: **este spec no bloquea nada** y no hay `PermissionsGuard`.
+- [X] `PATCH /lotes/:id/aprobar` y los tres `rechazar` siguen respondiendo 200 a cualquier usuario autenticado.
+- [X] `POST /auth/login` responde exactamente igual que antes, sin clave `permisos`.
+- [X] El payload del JWT no cambió y `req.user` sigue siendo `{ userId, username }`.
+- [X] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id/rechazar`, `POST /lotes`, los dos `GET /lotes/cliente/:clienteId*`, `PATCH /lotes/:id/rechazar`, `PATCH /lotes/:id/aprobar`, `POST /pesajes`, `GET /pesajes/byLote/:loteId`, `PATCH /pesajes/:id/rechazar`, `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh` y los tres `GET /catalogos/*` siguen funcionando igual.
+- [X] `CLAUDE.md` documenta `catalogo_permisos`, describe `permisos` como una fila por `(rol_id, permiso_id)` sin texto propio, y ya no dice que el `codigo` viva en `permisos`.
+- [X] `CLAUDE.md` sigue advirtiendo que los permisos **no se aplican en ningún endpoint**.
+- [X] `CLAUDE.md` ya **no** afirma que `permisos` tenga 11 filas ni que sus códigos sean los 7 `modulo.accion` de SPEC 06 y SPEC 08: dice 14 filas y 9 códigos en `MAYÚSCULAS-CON-GUIONES`.
+- [X] `CLAUDE.md` ya **no** afirma que los tres `rechazar` y `PATCH /lotes/:id/aprobar` no tengan fila sembrada: deja escrito que `APROBAR-LOTE`, `RECHAZAR-LOTE`, `RECHAZAR-CLIENTE` y `RECHAZAR-PESAJE-LOTE` existen, y que ningún spec registra quién las insertó.
 
 ---
 
