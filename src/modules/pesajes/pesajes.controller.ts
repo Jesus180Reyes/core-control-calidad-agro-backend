@@ -18,6 +18,17 @@ import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
 export class PesajesController {
     constructor(private readonly pesajesService: PesajesService) { }
 
+    @Get('historial')
+    async findHistorial(@Req() req: Request) {
+        const { userId } = req.user as { userId: number };
+        const pesajes = await this.pesajesService.findHistorial(userId);
+        return {
+            ok: !!pesajes,
+            msg: 'Historial de pesajes obtenido correctamente',
+            pesajes,
+        };
+    }
+
     @Get('byLote/:loteId')
     async findAllByLote(
         @Param('loteId', ParseIntPipe) loteId: number,
