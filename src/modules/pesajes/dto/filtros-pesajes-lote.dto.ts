@@ -8,9 +8,8 @@ const filtrosPesajesLoteSchema = z.object({
         z.enum(['true', 'false']).transform((v) => (v === 'true' ? 1 : 0)),
         z.union([z.literal(0), z.literal(1)]),
     ]).optional().catch(undefined),
-    nombre: z.string().trim().min(1).optional().catch(undefined),
-    desde: z.coerce.date().optional().catch(undefined),
-    hasta: z.coerce.date().optional().catch(undefined),
+    desde: z.coerce.date().optional(),
+    hasta: z.coerce.date().optional(),
 });
 
 export class FiltrosPesajesLoteDto extends createZodDto(filtrosPesajesLoteSchema) { }

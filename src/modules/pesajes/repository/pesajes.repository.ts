@@ -65,13 +65,6 @@ export class PesajesRepository {
             );
         }
 
-        if (filtros.nombre !== undefined) {
-            query = query.where(
-                'usuarios.complete_name',
-                'like',
-                `%${filtros.nombre}%`,
-            );
-        }
 
         if (filtros.desde !== undefined) {
             query = query.where('pesajes.created_at', '>=', filtros.desde);
