@@ -58,10 +58,12 @@ export class PesajesRepository {
             )
             .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
             .leftJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .select([
                 'pesajes.id',
                 'pesajes.lote_id',
                 'lotes.nombre_lote as nombre_lote',
+                'unidades_medida.nombre as unidad_medida',
                 'clientes.nombre as cliente',
                 'pesajes.peso_bruto',
                 'pesajes.tara',
