@@ -11,6 +11,10 @@ export class PesajesService {
         return await this.pesajesRepository.getPesajesByLote(loteId);
     }
 
+    async findHistorial(userId: number) {
+        return await this.pesajesRepository.getHistorialByUsuario(userId);
+    }
+
     async create(dto: CreatePesajeDto, userId: number) {
         return await this.pesajesRepository.createPesaje(dto, userId);
     }
