@@ -1,0 +1,14 @@
+import { createZodDto } from "nestjs-zod";
+import z from "zod";
+
+const filtrosHistorialSchema = z.object({
+    lote_id: z.coerce.number().int().positive().optional().catch(undefined),
+    cliente_id: z.coerce.number().int().positive().optional().catch(undefined),
+    estado_calidad_id: z.coerce.number().int().positive().optional().catch(undefined),
+    fuera_de_rango: z.enum(['true', 'false']).transform((v) => (v === 'true' ? 1 : 0)).optional().catch(undefined),
+    nombre: z.string().trim().min(1).optional().catch(undefined),
+    desde: z.iso.date().optional().catch(undefined),
+    hasta: z.iso.date().optional().catch(undefined),
+});
+
+export class FiltrosHistorialDto extends createZodDto(filtrosHistorialSchema) { }
