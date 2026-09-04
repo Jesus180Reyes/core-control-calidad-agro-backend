@@ -10,8 +10,8 @@ const filtrosHistorialSchema = z.object({
         z.union([z.literal(0), z.literal(1)]),
     ]).optional().catch(undefined),
     nombre: z.string().trim().min(1).optional().catch(undefined),
-    desde: z.iso.date().optional().catch(undefined),
-    hasta: z.iso.date().optional().catch(undefined),
+    desde: z.coerce.date().optional(),
+    hasta: z.coerce.date().optional(),
 });
 
 export class FiltrosHistorialDto extends createZodDto(filtrosHistorialSchema) { }
