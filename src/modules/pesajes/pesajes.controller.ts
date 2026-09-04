@@ -7,21 +7,27 @@ import {
     ParseIntPipe,
     Patch,
     Post,
+    Query,
     Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { PesajesService } from './pesajes.service';
 import { CreatePesajeDto } from './dto/create-pesaje.dto';
 import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
+import { FiltrosPesajesLoteDto } from './dto/filtros-pesajes-lote.dto';
+import { FiltrosHistorialDto } from './dto/filtros-historial.dto';
 
 @Controller('pesajes')
 export class PesajesController {
     constructor(private readonly pesajesService: PesajesService) { }
 
     @Get('historial')
-    async findHistorial(@Req() req: Request) {
+    async findHistorial(
+        @Query() filtros: FiltrosHistorialDto,
+        @Req() req: Request,
+    ) {
         const { userId } = req.user as { userId: number };
-        const pesajes = await this.pesajesService.findHistorial(userId);
+        const pesajes = await this.pesajesService.findHistorial(userId, filtros);
         return {
             ok: !!pesajes,
             msg: 'Historial de pesajes obtenido correctamente',
@@ -32,8 +38,9 @@ export class PesajesController {
     @Get('byLote/:loteId')
     async findAllByLote(
         @Param('loteId', ParseIntPipe) loteId: number,
+        @Query() filtros: FiltrosPesajesLoteDto,
     ) {
-        const pesajes = await this.pesajesService.findAllByLote(loteId);
+        const pesajes = await this.pesajesService.findAllByLote(loteId, filtros);
         return {
             ok: !!pesajes,
             msg: 'Pesajes obtenidos correctamente',
