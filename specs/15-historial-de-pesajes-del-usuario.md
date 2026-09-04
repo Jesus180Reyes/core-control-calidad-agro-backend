@@ -261,49 +261,49 @@ Los `peso_*` vuelven del driver de MySQL como `string`, igual que en `GET /pesaj
 
 ## Acceptance criteria
 
-- [ ] No se ejecutó ningún DDL: `DESCRIBE pesajes;`, `DESCRIBE lotes;` y `DESCRIBE clientes;` muestran exactamente las mismas columnas que antes de este spec.
-- [ ] `src/database/types/types.ts` **no cambió**: ninguna interfaz nueva y ninguna clave nueva en `Database`.
-- [ ] No se creó ningún DTO: `src/modules/pesajes/dto/` sigue con exactamente dos archivos, `create-pesaje.dto.ts` y `rechazar-pesaje.dto.ts`.
-- [ ] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `pesajes.controller.ts`, `pesajes.service.ts` y `repository/pesajes.repository.ts`.
-- [ ] `src/app.module.ts` no cambió: `PesajesModule` ya estaba registrado.
-- [ ] La app arranca sin errores de compilación (`npm run start:dev`).
-- [ ] `GET /pesajes/historial` aparece en el log de rutas de Nest, y `GET /pesajes/byLote/:loteId`, `POST /pesajes` y `PATCH /pesajes/:id/rechazar` siguen apareciendo.
-- [ ] El handler `@Get('historial')` está declarado **antes** que `@Get('byLote/:loteId')` en el controlador.
-- [ ] El handler no tiene `@Param()`, ni `@Body()`, ni `@Query()`: su único decorador de parámetro es `@Req()`.
-- [ ] La respuesta es exactamente `{ ok, msg, pesajes }`, con `msg = 'Historial de pesajes obtenido correctamente'` y la clave nombrada `pesajes`, **no** `data`.
-- [ ] Cada elemento del array trae exactamente trece campos: `id`, `lote_id`, `lote`, `cliente`, `peso_bruto`, `tara`, `peso_neto`, `fuera_de_rango`, `estado_calidad_codigo`, `estado_calidad`, `dispositivo_identificador`, `secuencia_dispositivo` y `created_at`.
-- [ ] La respuesta **no** incluye `usuario`, ni `usuario_id`, ni `isActive`, ni `motivo_rechazo`, ni `rechazado_por`, ni `rechazado_en`, ni `estado_calidad_id`, ni `cliente_id`, ni el estado del lote.
-- [ ] `lote` es el `nombre_lote` del lote y `cliente` es el `nombre` del cliente: los dos son texto, no ids.
-- [ ] La consulta filtra `pesajes.usuario_id` con el `userId` del token y con nada más.
-- [ ] La consulta filtra `pesajes.isActive = 1`.
-- [ ] Las filas vienen ordenadas por `pesajes.created_at` descendente, de la más reciente a la más antigua.
-- [ ] Con el token de un usuario A, la respuesta contiene **todos** sus pesajes activos y **ninguno** de otro usuario.
-- [ ] Con el token de un usuario B, la respuesta es distinta de la de A y no comparte ninguna fila con ella.
-- [ ] No existe ninguna forma de pedir el historial de otro usuario: la ruta no acepta parámetro de ruta ni query param, y `GET /pesajes/historial/3` responde 404 de Nest.
-- [ ] Un pesaje rechazado con `PATCH /pesajes/:id/rechazar` **desaparece** del historial de quien lo registró.
-- [ ] Un pesaje cuyo lote fue **aprobado** con `PATCH /lotes/:id/aprobar` **sigue apareciendo** en el historial, con su `lote` y su `cliente` llenos, pese a que el lote ya no aparece en `GET /lotes/cliente/:clienteId`. **Es el comportamiento esperado de este spec.**
-- [ ] Un pesaje cuyo lote fue **rechazado** con `PATCH /lotes/:id/rechazar` **sigue apareciendo** en el historial. **Es el comportamiento esperado.**
-- [ ] Un pesaje cuyo cliente fue **rechazado** con `PATCH /clientes/:id/rechazar` **sigue apareciendo**, con el `nombre` del cliente rechazado. **Es el comportamiento esperado**, y es el único endpoint del proyecto que devuelve ese nombre.
-- [ ] Borrar la fila de `cliente_operador` entre el usuario y el cliente **no** cambia su historial: la consulta no toca esa tabla.
-- [ ] Un usuario sin ningún pesaje recibe 200 con `pesajes: []` y `ok: true`, **no** un 404 y **no** un 500.
-- [ ] Un usuario cuyos pesajes fueron todos rechazados recibe 200 con `pesajes: []`.
-- [ ] Un token válido cuyo `user_id` no existe en `usuarios` recibe **200 con `pesajes: []`**, no 404: este endpoint no consulta `usuarios`, a diferencia de `GET /permisos/me`.
-- [ ] `GET /pesajes/historial` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
-- [ ] `GET /pesajes/historial` con un token expirado o firmado con otro secreto responde 401.
-- [ ] El endpoint no responde 400 en ningún caso: no hay nada que validar.
-- [ ] Un pesaje con `lote_id` en `NULL`, si existiera, aparece en el historial con `lote: null` y `cliente: null`, y no rompe la respuesta: los joins son `LEFT`, no `INNER`.
-- [ ] El método del repositorio **no** abre transacción y **no** llama a ningún validador: es un único `SELECT`.
-- [ ] `getHistorialByUsuario` **no** llama a `validateVinculoOperador`, y los seis validadores privados de `PesajesRepository` no se modificaron.
-- [ ] `getPesajesByLote` no cambió: sigue devolviendo sus **doce** campos, incluido `usuarios.complete_name as usuario`, con su join a `usuarios`, su filtro `isActive = 1` y su orden.
-- [ ] No se factorizó ningún select común entre los dos métodos: siguen siendo dos consultas independientes.
-- [ ] `createPesaje` y `rechazarPesaje` no cambiaron.
-- [ ] `permisos` sigue teniendo exactamente **14 filas** y `catalogo_permisos` exactamente **9**: no se sembró ninguna fila.
-- [ ] `GET /permisos/me` devuelve exactamente los mismos códigos que antes de este spec para los dos roles.
-- [ ] Cualquier usuario autenticado puede llamar al endpoint, sin importar su rol: no hay `PermissionsGuard` y `req.user` sigue siendo `{ userId, username }`.
-- [ ] El payload del JWT no cambió.
-- [ ] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id/rechazar`, `POST /lotes`, los dos `GET /lotes/cliente/:clienteId*`, `PATCH /lotes/:id/rechazar`, `PATCH /lotes/:id/aprobar`, `POST /pesajes`, `GET /pesajes/byLote/:loteId`, `PATCH /pesajes/:id/rechazar`, `POST /auth/login`, `POST /auth/register`, `GET /permisos/me` y los tres `GET /catalogos/*` siguen funcionando igual.
-- [ ] `CLAUDE.md` lista `GET /pesajes/historial` en la tabla de endpoints, con sus trece campos y sus dos filtros.
-- [ ] `CLAUDE.md` anota que es el primer endpoint que devuelve el nombre de lotes cerrados y de clientes rechazados, y que se resuelve solo con el token.
+- [X] No se ejecutó ningún DDL: `DESCRIBE pesajes;`, `DESCRIBE lotes;` y `DESCRIBE clientes;` muestran exactamente las mismas columnas que antes de este spec.
+- [X] `src/database/types/types.ts` **no cambió**: ninguna interfaz nueva y ninguna clave nueva en `Database`.
+- [X] No se creó ningún DTO: `src/modules/pesajes/dto/` sigue con exactamente dos archivos, `create-pesaje.dto.ts` y `rechazar-pesaje.dto.ts`.
+- [X] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `pesajes.controller.ts`, `pesajes.service.ts` y `repository/pesajes.repository.ts`.
+- [X] `src/app.module.ts` no cambió: `PesajesModule` ya estaba registrado.
+- [X] La app arranca sin errores de compilación (`npm run start:dev`).
+- [X] `GET /pesajes/historial` aparece en el log de rutas de Nest, y `GET /pesajes/byLote/:loteId`, `POST /pesajes` y `PATCH /pesajes/:id/rechazar` siguen apareciendo.
+- [X] El handler `@Get('historial')` está declarado **antes** que `@Get('byLote/:loteId')` en el controlador.
+- [X] El handler no tiene `@Param()`, ni `@Body()`, ni `@Query()`: su único decorador de parámetro es `@Req()`.
+- [X] La respuesta es exactamente `{ ok, msg, pesajes }`, con `msg = 'Historial de pesajes obtenido correctamente'` y la clave nombrada `pesajes`, **no** `data`.
+- [X] Cada elemento del array trae exactamente trece campos: `id`, `lote_id`, `lote`, `cliente`, `peso_bruto`, `tara`, `peso_neto`, `fuera_de_rango`, `estado_calidad_codigo`, `estado_calidad`, `dispositivo_identificador`, `secuencia_dispositivo` y `created_at`.
+- [X] La respuesta **no** incluye `usuario`, ni `usuario_id`, ni `isActive`, ni `motivo_rechazo`, ni `rechazado_por`, ni `rechazado_en`, ni `estado_calidad_id`, ni `cliente_id`, ni el estado del lote.
+- [X] `lote` es el `nombre_lote` del lote y `cliente` es el `nombre` del cliente: los dos son texto, no ids.
+- [X] La consulta filtra `pesajes.usuario_id` con el `userId` del token y con nada más.
+- [X] La consulta filtra `pesajes.isActive = 1`.
+- [X] Las filas vienen ordenadas por `pesajes.created_at` descendente, de la más reciente a la más antigua.
+- [X] Con el token de un usuario A, la respuesta contiene **todos** sus pesajes activos y **ninguno** de otro usuario.
+- [X] Con el token de un usuario B, la respuesta es distinta de la de A y no comparte ninguna fila con ella.
+- [X] No existe ninguna forma de pedir el historial de otro usuario: la ruta no acepta parámetro de ruta ni query param, y `GET /pesajes/historial/3` responde 404 de Nest.
+- [X] Un pesaje rechazado con `PATCH /pesajes/:id/rechazar` **desaparece** del historial de quien lo registró.
+- [X] Un pesaje cuyo lote fue **aprobado** con `PATCH /lotes/:id/aprobar` **sigue apareciendo** en el historial, con su `lote` y su `cliente` llenos, pese a que el lote ya no aparece en `GET /lotes/cliente/:clienteId`. **Es el comportamiento esperado de este spec.**
+- [X] Un pesaje cuyo lote fue **rechazado** con `PATCH /lotes/:id/rechazar` **sigue apareciendo** en el historial. **Es el comportamiento esperado.**
+- [X] Un pesaje cuyo cliente fue **rechazado** con `PATCH /clientes/:id/rechazar` **sigue apareciendo**, con el `nombre` del cliente rechazado. **Es el comportamiento esperado**, y es el único endpoint del proyecto que devuelve ese nombre.
+- [X] Borrar la fila de `cliente_operador` entre el usuario y el cliente **no** cambia su historial: la consulta no toca esa tabla.
+- [X] Un usuario sin ningún pesaje recibe 200 con `pesajes: []` y `ok: true`, **no** un 404 y **no** un 500.
+- [X] Un usuario cuyos pesajes fueron todos rechazados recibe 200 con `pesajes: []`.
+- [X] Un token válido cuyo `user_id` no existe en `usuarios` recibe **200 con `pesajes: []`**, no 404: este endpoint no consulta `usuarios`, a diferencia de `GET /permisos/me`.
+- [X] `GET /pesajes/historial` sin header `Authorization` responde 401: el endpoint no es `@Public()`.
+- [X] `GET /pesajes/historial` con un token expirado o firmado con otro secreto responde 401.
+- [X] El endpoint no responde 400 en ningún caso: no hay nada que validar.
+- [X] Un pesaje con `lote_id` en `NULL`, si existiera, aparece en el historial con `lote: null` y `cliente: null`, y no rompe la respuesta: los joins son `LEFT`, no `INNER`.
+- [X] El método del repositorio **no** abre transacción y **no** llama a ningún validador: es un único `SELECT`.
+- [X] `getHistorialByUsuario` **no** llama a `validateVinculoOperador`, y los seis validadores privados de `PesajesRepository` no se modificaron.
+- [X] `getPesajesByLote` no cambió: sigue devolviendo sus **doce** campos, incluido `usuarios.complete_name as usuario`, con su join a `usuarios`, su filtro `isActive = 1` y su orden.
+- [X] No se factorizó ningún select común entre los dos métodos: siguen siendo dos consultas independientes.
+- [X] `createPesaje` y `rechazarPesaje` no cambiaron.
+- [X] `permisos` sigue teniendo exactamente **14 filas** y `catalogo_permisos` exactamente **9**: no se sembró ninguna fila.
+- [X] `GET /permisos/me` devuelve exactamente los mismos códigos que antes de este spec para los dos roles.
+- [X] Cualquier usuario autenticado puede llamar al endpoint, sin importar su rol: no hay `PermissionsGuard` y `req.user` sigue siendo `{ userId, username }`.
+- [X] El payload del JWT no cambió.
+- [X] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id/rechazar`, `POST /lotes`, los dos `GET /lotes/cliente/:clienteId*`, `PATCH /lotes/:id/rechazar`, `PATCH /lotes/:id/aprobar`, `POST /pesajes`, `GET /pesajes/byLote/:loteId`, `PATCH /pesajes/:id/rechazar`, `POST /auth/login`, `POST /auth/register`, `GET /permisos/me` y los tres `GET /catalogos/*` siguen funcionando igual.
+- [X] `CLAUDE.md` lista `GET /pesajes/historial` en la tabla de endpoints, con sus trece campos y sus dos filtros.
+- [X] `CLAUDE.md` anota que es el primer endpoint que devuelve el nombre de lotes cerrados y de clientes rechazados, y que se resuelve solo con el token.
 
 ---
 
