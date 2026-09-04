@@ -48,6 +48,39 @@ export class PesajesRepository {
         return pesajes;
     }
 
+    async getHistorialByUsuario(userId: number) {
+        const pesajes = await this.db
+            .selectFrom('pesajes')
+            .leftJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .select([
+                'pesajes.id',
+                'pesajes.lote_id',
+                'lotes.nombre_lote as lote',
+                'clientes.nombre as cliente',
+                'pesajes.peso_bruto',
+                'pesajes.tara',
+                'pesajes.peso_neto',
+                'pesajes.fuera_de_rango',
+                'estados_calidad.codigo as estado_calidad_codigo',
+                'estados_calidad.nombre as estado_calidad',
+                'pesajes.dispositivo_identificador',
+                'pesajes.secuencia_dispositivo',
+                'pesajes.created_at',
+            ])
+            .where('pesajes.usuario_id', '=', userId)
+            .where('pesajes.isActive', '=', 1)
+            .orderBy('pesajes.created_at', 'desc')
+            .execute();
+
+        return pesajes;
+    }
+
     async createPesaje(data: CreatePesajeDto, userId: number) {
         const {
             lote_id,
