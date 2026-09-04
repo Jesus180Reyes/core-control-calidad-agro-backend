@@ -8,6 +8,7 @@ import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreatePesajeDto } from '../dto/create-pesaje.dto';
 import { RechazarPesajeDto } from '../dto/rechazar-pesaje.dto';
+import { FiltrosPesajesLoteDto } from '../dto/filtros-pesajes-lote.dto';
 
 @Injectable()
 export class PesajesRepository {
@@ -17,8 +18,8 @@ export class PesajesRepository {
         return this.dbService.client;
     }
 
-    async getPesajesByLote(loteId: number) {
-        const pesajes = await this.db
+    async getPesajesByLote(loteId: number, filtros: FiltrosPesajesLoteDto) {
+        let query = this.db
             .selectFrom('pesajes')
             .leftJoin(
                 'estados_calidad',
@@ -41,7 +42,49 @@ export class PesajesRepository {
                 'pesajes.created_at',
             ])
             .where('pesajes.lote_id', '=', loteId)
-            .where('pesajes.isActive', '=', 1)
+            .where('pesajes.isActive', '=', 1);
+
+        if (filtros.usuario_id !== undefined) {
+            query = query.where('pesajes.usuario_id', '=', filtros.usuario_id);
+        }
+
+        if (filtros.estado_calidad_id !== undefined) {
+            query = query.where(
+                'pesajes.estado_calidad_id',
+                '=',
+                filtros.estado_calidad_id,
+            );
+        }
+
+        if (filtros.fuera_de_rango !== undefined) {
+            query = query.where(
+                'pesajes.fuera_de_rango',
+                '=',
+                sql<boolean>`${filtros.fuera_de_rango}`,
+            );
+        }
+
+        if (filtros.nombre !== undefined) {
+            query = query.where(
+                'usuarios.complete_name',
+                'like',
+                `%${filtros.nombre}%`,
+            );
+        }
+
+        if (filtros.desde !== undefined) {
+            query = query.where('pesajes.created_at', '>=', filtros.desde);
+        }
+
+        if (filtros.hasta !== undefined) {
+            query = query.where(
+                'pesajes.created_at',
+                '<',
+                sql<Date>`DATE_ADD(${filtros.hasta}, INTERVAL 1 DAY)`,
+            );
+        }
+
+        const pesajes = await query
             .orderBy('pesajes.created_at', 'desc')
             .execute();
 
