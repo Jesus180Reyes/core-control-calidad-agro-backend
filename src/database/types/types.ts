@@ -132,6 +132,20 @@ export interface PermisosTable {
   created_at: Generated<Date | string | null>;
 }
 
+export interface BitacoraView {
+  entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
+  entidad_id: string | number;
+  entidad_nombre: string | null;
+  accion: 'CREAR' | 'RECHAZAR' | 'APROBAR';
+  motivo: string | null;
+  cliente_id: number | null;
+  cliente: string | null;
+  usuario_id: number | null;
+  usuario: string | null;
+  usuario_rol: string | null;
+  ocurrio_en: Date | string | null;
+}
+
 export interface Database {
   usuarios: UsuariosTable;
   lotes: LotesTable;
@@ -145,4 +159,5 @@ export interface Database {
   etapas: EtapasTable;
   catalogo_permisos: CatalogoPermisosTable;
   permisos: PermisosTable;
+  bitacora: BitacoraView;
 }
