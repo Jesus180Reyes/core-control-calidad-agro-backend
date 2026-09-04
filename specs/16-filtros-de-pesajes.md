@@ -1,6 +1,6 @@
 # SPEC 16 — Filtros de consulta en los GET de pesajes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 03, SPEC 10, SPEC 15
 > **Date:** 2026-09-04
 > **Objective:** Agregar query params opcionales a `GET /pesajes/byLote/:loteId` y `GET /pesajes/historial`, y con ellos establecer la convención de filtros de consulta del proyecto, que SPEC 17 y SPEC 18 replicarán en `clientes` y `lotes`.
