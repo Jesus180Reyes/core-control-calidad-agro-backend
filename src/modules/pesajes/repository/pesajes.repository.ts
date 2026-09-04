@@ -61,7 +61,7 @@ export class PesajesRepository {
             .select([
                 'pesajes.id',
                 'pesajes.lote_id',
-                'lotes.nombre_lote as lote',
+                'lotes.nombre_lote as nombre_lote',
                 'clientes.nombre as cliente',
                 'pesajes.peso_bruto',
                 'pesajes.tara',
