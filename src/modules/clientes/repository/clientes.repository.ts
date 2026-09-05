@@ -2,6 +2,7 @@ import { DatabaseService } from 'src/database/database.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateClienteDto } from '../dto/create-cliente.dto';
 import { RechazarClienteDto } from '../dto/rechazar-cliente.dto';
+import { FiltrosClientesDto } from '../dto/filtros-clientes.dto';
 import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 
@@ -37,8 +38,8 @@ export class ClientesRepository {
         return clientes;
     }
 
-    async getAllClientes() {
-        const clientes = await this.db
+    async getAllClientes(filtros: FiltrosClientesDto) {
+        let query = this.db
             .selectFrom('clientes')
             .leftJoin('productos', 'productos.id', 'clientes.producto_id')
             .select([
@@ -49,9 +50,32 @@ export class ClientesRepository {
                 'clientes.telefono',
                 'clientes.direccion_planta',
             ])
-            .where('clientes.isActive', '=', 1)
+            .where('clientes.isActive', '=', 1);
+
+        if (filtros.nombre !== undefined) {
+            query = query.where('clientes.nombre', 'like', `%${filtros.nombre}%`);
+        }
+
+        if (filtros.producto_id !== undefined) {
+            query = query.where('clientes.producto_id', '=', filtros.producto_id);
+        }
+
+        if (filtros.codigo_exportacion !== undefined) {
+            query = query.where(
+                'clientes.codigo_exportacion',
+                '=',
+                filtros.codigo_exportacion,
+            );
+        }
+
+        if (filtros.rtn !== undefined) {
+            query = query.where('clientes.rtn', '=', filtros.rtn);
+        }
+
+        const clientes = await query
             .orderBy('clientes.created_at', 'asc')
             .execute();
+
         return clientes;
     }
 
