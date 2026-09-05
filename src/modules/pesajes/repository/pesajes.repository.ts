@@ -67,7 +67,11 @@ export class PesajesRepository {
 
 
         if (filtros.desde !== undefined) {
-            query = query.where('pesajes.created_at', '>=', filtros.desde);
+            query = query.where(
+                'pesajes.created_at',
+                '>=',
+                sql<Date>`${filtros.desde}`,
+            );
         }
 
         if (filtros.hasta !== undefined) {
@@ -147,8 +151,14 @@ export class PesajesRepository {
             );
         }
 
+        // Las fechas viajan como texto 'YYYY-MM-DD' y MySQL las interpreta en su
+        // propia zona horaria, la misma con la que NOW() escribe created_at.
         if (filtros.desde !== undefined) {
-            query = query.where('pesajes.created_at', '>=', filtros.desde);
+            query = query.where(
+                'pesajes.created_at',
+                '>=',
+                sql<Date>`${filtros.desde}`,
+            );
         }
 
         if (filtros.hasta !== undefined) {
