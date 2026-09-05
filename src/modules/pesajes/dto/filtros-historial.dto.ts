@@ -1,9 +1,6 @@
 import { createZodDto } from "nestjs-zod";
 import z from "zod";
 
-// Fecha como texto 'YYYY-MM-DD': convertirla a Date la desplazaria a UTC y
-// mysql2 la reserializaria en la zona local del proceso, corriendo el filtro
-// varias horas respecto de created_at.
 const fechaSchema = z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
