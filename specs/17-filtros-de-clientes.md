@@ -1,6 +1,6 @@
 # SPEC 17 — Filtros de consulta en `GET /clientes/all`
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 01, SPEC 08, SPEC 11, SPEC 16
 > **Date:** 2026-09-04
 > **Objective:** Agregar cuatro query params opcionales — `nombre`, `producto_id`, `codigo_exportacion` y `rtn` — a `GET /clientes/all`, siguiendo la convención de filtros que define SPEC 16. **`GET /clientes` no se toca: sigue sin aceptar ningún query param.**
