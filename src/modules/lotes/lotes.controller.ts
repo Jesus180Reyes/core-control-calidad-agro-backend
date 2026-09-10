@@ -42,6 +42,17 @@ export class LotesController {
             lotes,
         };
     }
+    @Get('cliente/:clienteId/all/approver')
+    async findAllLotesByClienteForApprover(
+        @Param('clienteId', ParseIntPipe) clienteId: number,
+    ) {
+        const lotes = await this.lotesService.findAllLotesByClienteForApprover(clienteId);
+        return {
+            ok: !!lotes,
+            msg: 'Lotes obtenidos correctamente',
+            lotes,
+        };
+    }
 
     @Post()
     @HttpCode(201)

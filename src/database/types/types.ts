@@ -26,7 +26,7 @@ export interface LotesTable {
   peso_minimo: string | number;
   peso_ideal: string | number;
   peso_maximo: string | number;
-  estado: Generated<string | null>;
+  estado: Generated<'abierto' | 'cerrado' | null>;
   created_at: Generated<Date | string | null>;
   updated_at: Generated<Date | string | null>;
   motivo_rechazo: string | null;
