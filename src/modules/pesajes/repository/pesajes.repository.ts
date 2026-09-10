@@ -270,13 +270,19 @@ export class PesajesRepository {
         return await this.db.transaction().execute(async (trx) => {
             const pesaje = await this.validatePesajeActivo(pesajeId, trx);
 
+            if (pesaje.motivo_rechazo !== null) {
+                throw new BadRequestException(
+                    `El pesaje con id '${pesajeId}' ya fue rechazado por el aprobador`,
+                );
+            }
+
             if (pesaje.lote_id === null) {
                 throw new BadRequestException(
                     `El pesaje con id '${pesajeId}' no tiene un lote asociado`,
                 );
             }
 
-            await this.validateLoteAbierto(pesaje.lote_id, trx);
+            await this.validateLoteEnClienteFinal(pesaje.lote_id, trx);
 
             await trx
                 .updateTable('pesajes')
@@ -329,6 +335,62 @@ export class PesajesRepository {
         return lote;
     }
 
+    private async validateLoteEnClienteFinal(
+        loteId: number,
+        db: Kysely<Database>,
+    ) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select([
+                'id',
+                'nombre_lote',
+                'cliente_id',
+                'estado',
+                'cerrado_en',
+                'etapa_id',
+                'motivo_rechazo',
+            ])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
+
+        if (lote.motivo_rechazo !== null) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' ya fue rechazado`,
+            );
+        }
+
+        if (lote.estado !== 'cerrado') {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta cerrado`,
+            );
+        }
+
+        const clienteFinal = await this.resolveEtapa('CLIENTE_FINAL', db);
+
+        if (lote.etapa_id !== clienteFinal.id) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta en la etapa CLIENTE_FINAL`,
+            );
+        }
+
+        return lote;
+    }
+
+    private async resolveEtapa(codigo: string, db: Kysely<Database>) {
+        return await db
+            .selectFrom('etapas')
+            .select(['id', 'codigo'])
+            .where('codigo', '=', codigo)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `La etapa con codigo '${codigo}' no existe`,
+                    ),
+            );
+    }
+
     private async validateVinculoOperador(
         clienteId: number,
         usuarioId: number,
@@ -351,7 +413,7 @@ export class PesajesRepository {
     private async validatePesajeActivo(pesajeId: number, db: Kysely<Database>) {
         const pesaje = await db
             .selectFrom('pesajes')
-            .select(['id', 'lote_id', 'isActive'])
+            .select(['id', 'lote_id', 'isActive', 'motivo_rechazo'])
             .where('id', '=', pesajeId)
             .executeTakeFirstOrThrow(
                 () =>
