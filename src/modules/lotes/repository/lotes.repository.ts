@@ -164,6 +164,31 @@ export class LotesRepository {
         });
     }
 
+    async rechazarLoteForApprover(
+        loteId: number,
+        data: RechazarLoteDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateLoteEnClienteFinal(loteId, trx);
+            const etapa = await this.resolveEtapaRechazado(trx);
+            await trx
+                .updateTable('lotes')
+                .set({
+                    etapa_id: etapa.id,
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', loteId)
+                .execute();
+
+            return true;
+        });
+    }
+
     async aprobarLote(loteId: number, userId: number) {
         return await this.db.transaction().execute(async (trx) => {
             const lote = await this.validateLoteAbierto(loteId, trx);
@@ -206,6 +231,49 @@ export class LotesRepository {
         if (lote.estado !== 'abierto' || lote.cerrado_en !== null) {
             throw new BadRequestException(
                 `El lote '${lote.nombre_lote}' no esta abierto`,
+            );
+        }
+
+        return lote;
+    }
+
+    private async validateLoteEnClienteFinal(
+        loteId: number,
+        db: Kysely<Database>,
+    ) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select([
+                'id',
+                'nombre_lote',
+                'cliente_id',
+                'estado',
+                'cerrado_en',
+                'etapa_id',
+                'motivo_rechazo',
+            ])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
+
+        if (lote.motivo_rechazo !== null) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' ya fue rechazado`,
+            );
+        }
+
+        if (lote.estado !== 'cerrado') {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta cerrado`,
+            );
+        }
+
+        const clienteFinal = await this.resolveEtapa('CLIENTE_FINAL', db);
+
+        if (lote.etapa_id !== clienteFinal.id) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta en la etapa CLIENTE_FINAL`,
             );
         }
 
