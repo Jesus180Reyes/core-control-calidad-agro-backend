@@ -73,4 +73,17 @@ export class PesajesController {
             msg: 'Pesaje rechazado correctamente',
         };
     }
+    @Patch(':id/rechazar/byApprover')
+    async rechazarByAp(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: RechazarPesajeDto,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const rechazado = await this.pesajesService.rechazarByApprover(id, dto, userId);
+        return {
+            ok: rechazado,
+            msg: 'Pesaje rechazado correctamente',
+        };
+    }
 }

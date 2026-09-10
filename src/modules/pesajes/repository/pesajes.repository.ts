@@ -41,6 +41,7 @@ export class PesajesRepository {
                 'pesajes.dispositivo_identificador',
                 'pesajes.secuencia_dispositivo',
                 'pesajes.created_at',
+                'pesajes.aprobado',
             ])
             .where('pesajes.lote_id', '=', loteId)
             .where('pesajes.isActive', '=', 1);
@@ -86,7 +87,7 @@ export class PesajesRepository {
             .orderBy('pesajes.created_at', 'desc')
             .execute();
 
-        return pesajes;
+        return pesajes.map((p) => ({ ...p, aprobado: p.aprobado === null ? null : !!p.aprobado, fuera_de_rango: !!p.fuera_de_rango }));
     }
 
     async getHistorialByUsuario(userId: number, filtros: FiltrosHistorialDto) {
@@ -115,6 +116,7 @@ export class PesajesRepository {
                 'pesajes.dispositivo_identificador',
                 'pesajes.secuencia_dispositivo',
                 'pesajes.created_at',
+                'pesajes.aprobado',
             ])
             .where('pesajes.usuario_id', '=', userId)
             .where('pesajes.isActive', '=', 1);
@@ -173,7 +175,7 @@ export class PesajesRepository {
             .orderBy('pesajes.created_at', 'desc')
             .execute();
 
-        return pesajes;
+        return pesajes.map((p) => ({ ...p, aprobado: p.aprobado === null ? null : !!p.aprobado, fuera_de_rango: !!p.fuera_de_rango }));
     }
 
     async createPesaje(data: CreatePesajeDto, userId: number) {
@@ -250,6 +252,39 @@ export class PesajesRepository {
                     motivo_rechazo: motivo,
                     rechazado_por: userId,
                     rechazado_en: sql<Date>`NOW()`,
+                    // aprobado: false,
+                })
+                .where('id', '=', pesajeId)
+                .execute();
+
+            return true;
+        });
+    }
+    async rechazarPesajeApprover(
+        pesajeId: number,
+        data: RechazarPesajeDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            const pesaje = await this.validatePesajeActivo(pesajeId, trx);
+
+            if (pesaje.lote_id === null) {
+                throw new BadRequestException(
+                    `El pesaje con id '${pesajeId}' no tiene un lote asociado`,
+                );
+            }
+
+            await this.validateLoteAbierto(pesaje.lote_id, trx);
+
+            await trx
+                .updateTable('pesajes')
+                .set({
+                    motivo_rechazo: motivo,
+                    rechazado_por: userId,
+                    rechazado_en: sql<Date>`NOW()`,
+                    aprobado: false,
                 })
                 .where('id', '=', pesajeId)
                 .execute();

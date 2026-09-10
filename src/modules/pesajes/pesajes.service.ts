@@ -31,4 +31,11 @@ export class PesajesService {
             userId,
         );
     }
+    async rechazarByApprover(pesajeId: number, dto: RechazarPesajeDto, userId: number) {
+        return await this.pesajesRepository.rechazarPesajeApprover(
+            pesajeId,
+            dto,
+            userId,
+        );
+    }
 }
