@@ -12,9 +12,6 @@ async function bootstrap() {
 
   app.enableCors();
 
-  // La UI de Swagger no es una ruta de Nest, asi que el JwtAuthGuard global no la
-  // cubre: queda abierta a cualquiera que alcance el puerto. Por eso no se monta
-  // en produccion. Ver specs/22-documentacion-swagger.md.
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Core Control Calidad Agro API')
@@ -33,18 +30,15 @@ async function bootstrap() {
       .addTag('permisos', 'Permisos del rol del usuario autenticado')
       .build();
 
-    // cleanupOpenApiDoc viene de nestjs-zod, no de @nestjs/swagger:
-    // en nestjs-zod v5 reemplaza al patchNestJsSwagger de versiones anteriores.
     const document = cleanupOpenApiDoc(
       SwaggerModule.createDocument(app, config),
     );
 
     SwaggerModule.setup('docs', app, document, {
-      jsonDocumentUrl: 'docs-json',
       swaggerOptions: { persistAuthorization: true },
     });
 
-    logger.log('📚 Swagger disponible en /docs y /docs-json');
+    logger.log('📚 Swagger disponible en /docs');
   }
 
   app.useGlobalPipes(new ZodValidationPipe());
