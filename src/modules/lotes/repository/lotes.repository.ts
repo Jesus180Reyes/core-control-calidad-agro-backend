@@ -314,6 +314,26 @@ export class LotesRepository {
         }
     }
 
+    private async validatePesajesRevisados(
+        lote: { id: number; nombre_lote: string },
+        db: Kysely<Database>,
+    ) {
+        const pesaje = await db
+            .selectFrom('pesajes')
+            .select('id')
+            .where('lote_id', '=', lote.id)
+            .where('isActive', '=', 1)
+            .where('aprobado', 'is', null)
+            .limit(1)
+            .executeTakeFirst();
+
+        if (pesaje) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' tiene pesajes sin revisar por el aprobador`,
+            );
+        }
+    }
+
     private async resolveEtapaRechazado(db: Kysely<Database>) {
         return await db
             .selectFrom('etapas')
