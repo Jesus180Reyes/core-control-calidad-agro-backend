@@ -270,11 +270,7 @@ export class PesajesRepository {
         return await this.db.transaction().execute(async (trx) => {
             const pesaje = await this.validatePesajeActivo(pesajeId, trx);
 
-            if (pesaje.motivo_rechazo !== null) {
-                throw new BadRequestException(
-                    `El pesaje con id '${pesajeId}' ya fue rechazado por el aprobador`,
-                );
-            }
+            this.validatePesajeSinRevisar(pesaje);
 
             if (pesaje.lote_id === null) {
                 throw new BadRequestException(
@@ -429,6 +425,23 @@ export class PesajesRepository {
         }
 
         return pesaje;
+    }
+
+    // `aprobado` es de tres estados: null = sin revisar, 1 = aprobado, 0 = rechazado.
+    // Se compara por truthiness porque MySQL devuelve el TINYINT como 0 / 1.
+    private validatePesajeSinRevisar(pesaje: {
+        id: string | number;
+        aprobado: boolean | null;
+    }) {
+        if (pesaje.aprobado === null) {
+            return;
+        }
+
+        const revision = pesaje.aprobado ? 'aprobado' : 'rechazado';
+
+        throw new BadRequestException(
+            `El pesaje con id '${Number(pesaje.id)}' ya fue ${revision} por el aprobador`,
+        );
     }
 
     private async resolveEstadoCalidad(
