@@ -295,6 +295,34 @@ export class PesajesRepository {
         });
     }
 
+    async approvePesajeForApprover(pesajeId: number, userId: number) {
+        return await this.db.transaction().execute(async (trx) => {
+            const pesaje = await this.validatePesajeActivo(pesajeId, trx);
+
+            this.validatePesajeSinRevisar(pesaje);
+
+            if (pesaje.lote_id === null) {
+                throw new BadRequestException(
+                    `El pesaje con id '${pesajeId}' no tiene un lote asociado`,
+                );
+            }
+
+            await this.validateLoteEnClienteFinal(pesaje.lote_id, trx);
+
+            await trx
+                .updateTable('pesajes')
+                .set({
+                    aprobado: true,
+                    aprobado_por: userId,
+                    aprobado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', pesajeId)
+                .execute();
+
+            return true;
+        });
+    }
+
     private async validateLote(loteId: number, db: Kysely<Database>) {
         return await db
             .selectFrom('lotes')
