@@ -243,7 +243,20 @@ export class PesajesRepository {
                     ),
             );
 
-        return pesaje;
+        const { isActive, motivo_rechazo, ...resto } = pesaje;
+        if (isActive === 0) {
+            throw new BadRequestException(
+                motivo_rechazo
+                    ? `Este pesaje no esta activo. Motivo: ${motivo_rechazo}`
+                    : 'Este pesaje no esta activo',
+            );
+        }
+
+        return {
+            ...resto,
+            fuera_de_rango: !!resto.fuera_de_rango,
+            aprobado: resto.aprobado === null ? null : !!resto.aprobado,
+        };
     }
 
     async createPesaje(data: CreatePesajeDto, userId: number) {
