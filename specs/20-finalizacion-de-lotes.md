@@ -1,6 +1,6 @@
 # SPEC 20 — Finalización de lotes por el aprobador
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02, SPEC 13, SPEC 19
 > **Date:** 2026-09-11
 > **Objective:** Agregar `PATCH /lotes/:id/finalizar/byApprover`, que mueve un lote cerrado en `CLIENTE_FINAL` —con todos sus pesajes activos ya revisados— a la etapa `FINALIZADO` y registra quién lo finalizó y cuándo.
@@ -250,53 +250,53 @@ Después de este spec, las cuatro filas de `etapas` tienen código que las escri
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE lotes;` muestra `finalizado_por INT NULL` y `finalizado_en DATETIME NULL`, y `SHOW CREATE TABLE lotes;` la FK de `finalizado_por` a `usuarios(id)`.
-- [ ] El DDL no modificó ninguna fila existente: todos los lotes anteriores quedan con `finalizado_por` y `finalizado_en` en `NULL`.
-- [ ] `LotesTable` en `src/database/types/types.ts` declara las dos columnas nuevas, y ninguna otra interfaz del archivo cambió.
-- [ ] No se creó ningún DTO: `src/modules/lotes/dto/` sigue con exactamente dos archivos (`create-lote.dto.ts`, `rechazar-lote.dto.ts`).
-- [ ] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `lotes.controller.ts`, `lotes.service.ts`, `repository/lotes.repository.ts` y `types.ts`.
-- [ ] `src/app.module.ts` no cambió y la app arranca sin errores de compilación.
-- [ ] `PATCH /lotes/:id/finalizar/byApprover` aparece en el log de rutas de Nest, y las otras seis rutas de `lotes` siguen apareciendo.
-- [ ] El handler no tiene `@Body()` y el endpoint funciona con una petición sin body.
-- [ ] Finalizar un lote cerrado en `CLIENTE_FINAL`, con al menos un pesaje activo y **todos** sus pesajes activos revisados, responde 200 con exactamente `{ ok: true, msg: 'Lote finalizado correctamente' }`.
-- [ ] La respuesta **no** incluye ninguna clave de recurso: no hay `lote`, ni `data`.
-- [ ] Después de finalizar, la fila tiene `etapa_id` igual al de la fila `codigo = 'FINALIZADO'` de `etapas`, `finalizado_por` con el `userId` del token y `finalizado_en` con la hora de la finalización.
-- [ ] Después de finalizar, `estado` sigue en `'cerrado'` y `cerrado_en` conserva **la hora de la aprobación**, no la de la finalización.
-- [ ] Después de finalizar, `aprobado_por` y `aprobado_en` **conservan** los valores que escribió `PATCH /lotes/:id/aprobar`: la finalización no los sobrescribe ni los borra.
-- [ ] Después de finalizar, `motivo_rechazo`, `rechazado_por` y `rechazado_en` siguen en `NULL`.
-- [ ] La finalización **no** modifica `cliente_id`, `nombre_lote`, `producto_id`, `unidad_medida_id`, `peso_minimo`, `peso_ideal`, `peso_maximo`, `variedad_o_talla`, `resumen_ia`, `created_by` ni `created_at`.
-- [ ] La finalización **no** modifica ninguna fila de `pesajes`: los `aprobado`, `aprobado_por`, `aprobado_en` e `isActive` de sus pesajes quedan idénticos.
-- [ ] El número `4` **no aparece** en ninguna línea del código nuevo: la etapa se resuelve por `codigo`.
-- [ ] Finalizar un lote con **algún** pesaje activo en `aprobado IS NULL` responde 400 con `El lote 'X' tiene pesajes sin revisar por el aprobador`, y ninguna columna cambia.
-- [ ] Un lote cuyos pesajes activos están **todos rechazados** por el aprobador (`aprobado = 0`) se finaliza igual: responde 200.
-- [ ] Un pesaje anulado por el operador (`isActive = 0`) con `aprobado IS NULL` **no** bloquea la finalización.
-- [ ] Finalizar un lote **sin ningún** pesaje activo responde 400 con `El lote 'X' no tiene pesajes registrados`, no 200.
-- [ ] Finalizar un lote **ya finalizado** responde 400 con `El lote 'X' ya fue finalizado`, y `finalizado_por` y `finalizado_en` quedan intactos.
-- [ ] Finalizar un lote **abierto** responde 400 con `El lote 'X' no esta cerrado`.
-- [ ] Finalizar un lote **rechazado**, por cualquiera de los dos endpoints de rechazo, responde 400 con `El lote 'X' ya fue rechazado`.
-- [ ] Finalizar un lote cerrado que no está en `CLIENTE_FINAL` responde 400 con `no esta en la etapa CLIENTE_FINAL`.
-- [ ] Finalizar un `id` que no existe responde 400 con `El lote con id 'X' no existe`, no 404 y no 500.
-- [ ] Si falta la fila `codigo = 'FINALIZADO'` en `etapas`, responde 400 `La etapa con codigo 'FINALIZADO' no existe`.
-- [ ] Un `id` de ruta no numérico responde 400 por `ParseIntPipe`.
-- [ ] Sin header `Authorization`, o con un token inválido, responde 401: el endpoint no es `@Public()`.
-- [ ] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote finaliza igual: responde **200, no 403**. **Este spec no valida el vínculo.**
-- [ ] No se exige ningún rol, y `req.user` sigue siendo `{ userId, username }`.
-- [ ] Quien finaliza puede ser el mismo usuario que aprobó el lote: no se compara contra `aprobado_por`.
-- [ ] Cuando cualquier validación falla, ninguna columna cambia: la transacción no deja escrituras parciales.
-- [ ] Sobre un lote ya finalizado, `PATCH /lotes/:id/rechazar/byApprover` responde 400 `no esta en la etapa CLIENTE_FINAL`.
-- [ ] Sobre los pesajes de un lote ya finalizado, `PATCH /pesajes/:id/aprobar/byApprover` y `PATCH /pesajes/:id/rechazar/byApprover` responden 400 `no esta en la etapa CLIENTE_FINAL`.
-- [ ] El lote finalizado **no** aparece en `GET /lotes/cliente/:clienteId/all/approver`, ni en `GET /lotes/cliente/:clienteId`, ni en `GET /lotes/cliente/:clienteId/all`.
-- [ ] Los pesajes del lote finalizado **siguen** apareciendo en `GET /pesajes/byLote/:loteId` y en `GET /pesajes/historial`, con exactamente los mismos campos que antes.
-- [ ] Ninguna respuesta de la API devuelve `finalizado_por` ni `finalizado_en`.
-- [ ] `validateLoteEnClienteFinal`, `validateLoteTienePesajes`, `validateLoteAbierto`, `validateEtapaEnProceso`, `resolveEtapa`, `resolveEtapaRechazado` y `validateVinculoOperador` **no se modificaron**: ni firma, ni condición, ni mensajes, ni `select`.
-- [ ] `POST /lotes`, `PATCH /lotes/:id/rechazar`, `PATCH /lotes/:id/aprobar` y `PATCH /lotes/:id/rechazar/byApprover` funcionan exactamente igual que antes.
-- [ ] Los cinco endpoints de `pesajes`, los cuatro de `clientes`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual.
-- [ ] `permisos` sigue con exactamente **14 filas** y `catalogo_permisos` con **9**: no se sembró ninguna fila.
-- [ ] No existe ningún endpoint para deshacer una finalización, para reabrir un lote, para finalizar varios lotes en una llamada, ni para listar lotes finalizados.
-- [ ] Aprobar el último pesaje sin revisar de un lote **no** lo finaliza: la finalización solo ocurre por llamada explícita a este endpoint.
-- [ ] `CLAUDE.md` documenta `PATCH /lotes/:id/finalizar/byApprover`, el DDL como octava excepción, y ya **no** dice que `FINALIZADO` no lo escribe nada.
-- [ ] `CLAUDE.md` tiene la tabla de discriminación actualizada a tres estados de `'cerrado'`, con `finalizado_por IS NOT NULL` como señal canónica.
-- [ ] Los conteos de `CLAUDE.md` quedan en **ocho** `PATCH`es, **ocho** `UPDATE`s, **ocho** escrituras abiertas a cualquier autenticado, **trece** rutas que se saltan `validateVinculoOperador` deliberadamente y **tres** endpoints de escritura sin body ni DTO.
+- [X] `DESCRIBE lotes;` muestra `finalizado_por INT NULL` y `finalizado_en DATETIME NULL`, y `SHOW CREATE TABLE lotes;` la FK de `finalizado_por` a `usuarios(id)`.
+- [X] El DDL no modificó ninguna fila existente: todos los lotes anteriores quedan con `finalizado_por` y `finalizado_en` en `NULL`.
+- [X] `LotesTable` en `src/database/types/types.ts` declara las dos columnas nuevas, y ninguna otra interfaz del archivo cambió.
+- [X] No se creó ningún DTO: `src/modules/lotes/dto/` sigue con exactamente dos archivos (`create-lote.dto.ts`, `rechazar-lote.dto.ts`).
+- [X] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `lotes.controller.ts`, `lotes.service.ts`, `repository/lotes.repository.ts` y `types.ts`.
+- [X] `src/app.module.ts` no cambió y la app arranca sin errores de compilación.
+- [X] `PATCH /lotes/:id/finalizar/byApprover` aparece en el log de rutas de Nest, y las otras seis rutas de `lotes` siguen apareciendo.
+- [X] El handler no tiene `@Body()` y el endpoint funciona con una petición sin body.
+- [X] Finalizar un lote cerrado en `CLIENTE_FINAL`, con al menos un pesaje activo y **todos** sus pesajes activos revisados, responde 200 con exactamente `{ ok: true, msg: 'Lote finalizado correctamente' }`.
+- [X] La respuesta **no** incluye ninguna clave de recurso: no hay `lote`, ni `data`.
+- [X] Después de finalizar, la fila tiene `etapa_id` igual al de la fila `codigo = 'FINALIZADO'` de `etapas`, `finalizado_por` con el `userId` del token y `finalizado_en` con la hora de la finalización.
+- [X] Después de finalizar, `estado` sigue en `'cerrado'` y `cerrado_en` conserva **la hora de la aprobación**, no la de la finalización.
+- [X] Después de finalizar, `aprobado_por` y `aprobado_en` **conservan** los valores que escribió `PATCH /lotes/:id/aprobar`: la finalización no los sobrescribe ni los borra.
+- [X] Después de finalizar, `motivo_rechazo`, `rechazado_por` y `rechazado_en` siguen en `NULL`.
+- [X] La finalización **no** modifica `cliente_id`, `nombre_lote`, `producto_id`, `unidad_medida_id`, `peso_minimo`, `peso_ideal`, `peso_maximo`, `variedad_o_talla`, `resumen_ia`, `created_by` ni `created_at`.
+- [X] La finalización **no** modifica ninguna fila de `pesajes`: los `aprobado`, `aprobado_por`, `aprobado_en` e `isActive` de sus pesajes quedan idénticos.
+- [X] El número `4` **no aparece** en ninguna línea del código nuevo: la etapa se resuelve por `codigo`.
+- [X] Finalizar un lote con **algún** pesaje activo en `aprobado IS NULL` responde 400 con `El lote 'X' tiene pesajes sin revisar por el aprobador`, y ninguna columna cambia.
+- [X] Un lote cuyos pesajes activos están **todos rechazados** por el aprobador (`aprobado = 0`) se finaliza igual: responde 200.
+- [X] Un pesaje anulado por el operador (`isActive = 0`) con `aprobado IS NULL` **no** bloquea la finalización.
+- [X] Finalizar un lote **sin ningún** pesaje activo responde 400 con `El lote 'X' no tiene pesajes registrados`, no 200.
+- [X] Finalizar un lote **ya finalizado** responde 400 con `El lote 'X' ya fue finalizado`, y `finalizado_por` y `finalizado_en` quedan intactos.
+- [X] Finalizar un lote **abierto** responde 400 con `El lote 'X' no esta cerrado`.
+- [X] Finalizar un lote **rechazado**, por cualquiera de los dos endpoints de rechazo, responde 400 con `El lote 'X' ya fue rechazado`.
+- [X] Finalizar un lote cerrado que no está en `CLIENTE_FINAL` responde 400 con `no esta en la etapa CLIENTE_FINAL`.
+- [X] Finalizar un `id` que no existe responde 400 con `El lote con id 'X' no existe`, no 404 y no 500.
+- [X] Si falta la fila `codigo = 'FINALIZADO'` en `etapas`, responde 400 `La etapa con codigo 'FINALIZADO' no existe`.
+- [X] Un `id` de ruta no numérico responde 400 por `ParseIntPipe`.
+- [X] Sin header `Authorization`, o con un token inválido, responde 401: el endpoint no es `@Public()`.
+- [X] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote finaliza igual: responde **200, no 403**. **Este spec no valida el vínculo.**
+- [X] No se exige ningún rol, y `req.user` sigue siendo `{ userId, username }`.
+- [X] Quien finaliza puede ser el mismo usuario que aprobó el lote: no se compara contra `aprobado_por`.
+- [X] Cuando cualquier validación falla, ninguna columna cambia: la transacción no deja escrituras parciales.
+- [X] Sobre un lote ya finalizado, `PATCH /lotes/:id/rechazar/byApprover` responde 400 `no esta en la etapa CLIENTE_FINAL`.
+- [X] Sobre los pesajes de un lote ya finalizado, `PATCH /pesajes/:id/aprobar/byApprover` y `PATCH /pesajes/:id/rechazar/byApprover` responden 400 `no esta en la etapa CLIENTE_FINAL`.
+- [X] El lote finalizado **no** aparece en `GET /lotes/cliente/:clienteId/all/approver`, ni en `GET /lotes/cliente/:clienteId`, ni en `GET /lotes/cliente/:clienteId/all`.
+- [X] Los pesajes del lote finalizado **siguen** apareciendo en `GET /pesajes/byLote/:loteId` y en `GET /pesajes/historial`, con exactamente los mismos campos que antes.
+- [X] Ninguna respuesta de la API devuelve `finalizado_por` ni `finalizado_en`.
+- [X] `validateLoteEnClienteFinal`, `validateLoteTienePesajes`, `validateLoteAbierto`, `validateEtapaEnProceso`, `resolveEtapa`, `resolveEtapaRechazado` y `validateVinculoOperador` **no se modificaron**: ni firma, ni condición, ni mensajes, ni `select`.
+- [X] `POST /lotes`, `PATCH /lotes/:id/rechazar`, `PATCH /lotes/:id/aprobar` y `PATCH /lotes/:id/rechazar/byApprover` funcionan exactamente igual que antes.
+- [X] Los cinco endpoints de `pesajes`, los cuatro de `clientes`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual.
+- [X] `permisos` sigue con exactamente **14 filas** y `catalogo_permisos` con **9**: no se sembró ninguna fila.
+- [X] No existe ningún endpoint para deshacer una finalización, para reabrir un lote, para finalizar varios lotes en una llamada, ni para listar lotes finalizados.
+- [X] Aprobar el último pesaje sin revisar de un lote **no** lo finaliza: la finalización solo ocurre por llamada explícita a este endpoint.
+- [X] `CLAUDE.md` documenta `PATCH /lotes/:id/finalizar/byApprover`, el DDL como octava excepción, y ya **no** dice que `FINALIZADO` no lo escribe nada.
+- [X] `CLAUDE.md` tiene la tabla de discriminación actualizada a tres estados de `'cerrado'`, con `finalizado_por IS NOT NULL` como señal canónica.
+- [X] Los conteos de `CLAUDE.md` quedan en **ocho** `PATCH`es, **ocho** `UPDATE`s, **ocho** escrituras abiertas a cualquier autenticado, **trece** rutas que se saltan `validateVinculoOperador` deliberadamente y **tres** endpoints de escritura sin body ni DTO.
 
 ---
 
