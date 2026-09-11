@@ -212,6 +212,28 @@ export class LotesRepository {
         });
     }
 
+    async finalizarLote(loteId: number, userId: number) {
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateLoteNoFinalizado(loteId, trx);
+            const lote = await this.validateLoteEnClienteFinal(loteId, trx);
+            await this.validateLoteTienePesajes(lote, trx);
+            await this.validatePesajesRevisados(lote, trx);
+            const etapa = await this.resolveEtapa('FINALIZADO', trx);
+
+            await trx
+                .updateTable('lotes')
+                .set({
+                    etapa_id: etapa.id,
+                    finalizado_por: userId,
+                    finalizado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', loteId)
+                .execute();
+
+            return true;
+        });
+    }
+
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
         const lote = await db
             .selectFrom('lotes')
@@ -280,6 +302,29 @@ export class LotesRepository {
         return lote;
     }
 
+    private async validateLoteNoFinalizado(
+        loteId: number,
+        db: Kysely<Database>,
+    ) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select(['id', 'nombre_lote', 'etapa_id'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
+
+        const finalizado = await this.resolveEtapa('FINALIZADO', db);
+
+        if (lote.etapa_id === finalizado.id) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' ya fue finalizado`,
+            );
+        }
+
+        return lote;
+    }
+
     private async validateEtapaEnProceso(
         lote: { nombre_lote: string; etapa_id: number | null },
         db: Kysely<Database>,
@@ -310,6 +355,26 @@ export class LotesRepository {
         if (!pesaje) {
             throw new BadRequestException(
                 `El lote '${lote.nombre_lote}' no tiene pesajes registrados`,
+            );
+        }
+    }
+
+    private async validatePesajesRevisados(
+        lote: { id: number; nombre_lote: string },
+        db: Kysely<Database>,
+    ) {
+        const pesaje = await db
+            .selectFrom('pesajes')
+            .select('id')
+            .where('lote_id', '=', lote.id)
+            .where('isActive', '=', 1)
+            .where('aprobado', 'is', null)
+            .limit(1)
+            .executeTakeFirst();
+
+        if (pesaje) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' tiene pesajes sin revisar por el aprobador`,
             );
         }
     }

@@ -41,4 +41,8 @@ export class LotesService {
         return await this.lotesRepository.aprobarLote(loteId, userId);
     }
 
+    async finalizar(loteId: number, userId: number) {
+        return await this.lotesRepository.finalizarLote(loteId, userId);
+    }
+
 }

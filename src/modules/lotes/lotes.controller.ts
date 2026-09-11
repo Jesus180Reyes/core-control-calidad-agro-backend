@@ -109,4 +109,17 @@ export class LotesController {
             msg: 'Lote aprobado correctamente',
         };
     }
+
+    @Patch(':id/finalizar/byApprover')
+    async finalizarByApprover(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const finalizado = await this.lotesService.finalizar(id, userId);
+        return {
+            ok: finalizado,
+            msg: 'Lote finalizado correctamente',
+        };
+    }
 }
