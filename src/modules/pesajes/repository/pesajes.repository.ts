@@ -413,7 +413,7 @@ export class PesajesRepository {
     private async validatePesajeActivo(pesajeId: number, db: Kysely<Database>) {
         const pesaje = await db
             .selectFrom('pesajes')
-            .select(['id', 'lote_id', 'isActive', 'motivo_rechazo'])
+            .select(['id', 'lote_id', 'isActive', 'motivo_rechazo', 'aprobado'])
             .where('id', '=', pesajeId)
             .executeTakeFirstOrThrow(
                 () =>
