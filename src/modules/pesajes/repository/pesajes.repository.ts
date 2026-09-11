@@ -28,9 +28,24 @@ export class PesajesRepository {
                 'pesajes.estado_calidad_id',
             )
             .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
+            .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
             .select([
                 'pesajes.id',
                 'pesajes.lote_id',
+                'lotes.nombre_lote as nombre_lote',
+                'lotes.variedad_o_talla as lote_variedad_o_talla',
+                'unidades_medida.nombre as lote_unidad_medida',
+                'lotes.peso_minimo as lote_peso_minimo',
+                'lotes.peso_ideal as lote_peso_ideal',
+                'lotes.peso_maximo as lote_peso_maximo',
+                'lotes.estado as lote_estado',
+                'etapas.nombre as etapa',
                 'pesajes.peso_bruto',
                 'pesajes.tara',
                 'pesajes.peso_neto',
