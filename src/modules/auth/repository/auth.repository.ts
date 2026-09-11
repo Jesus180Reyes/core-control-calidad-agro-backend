@@ -43,7 +43,7 @@ export class AuthRepository {
             currentUser,
         };
     }
-    async registerUser(data: RegisterUserDto) {
+    async registerUser(data: RegisterUserDto, createdBy: number) {
 
         const { complete_name, password, rol, username, cedula } = data;
 
@@ -61,7 +61,7 @@ export class AuthRepository {
                 complete_name,
                 rol_id: rol,
                 password: hashedPassword,
-                created_by: 1,
+                created_by: createdBy,
                 cedula,
             })
             .executeTakeFirstOrThrow();

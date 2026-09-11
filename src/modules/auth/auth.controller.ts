@@ -1,11 +1,13 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register.dto';
 import { LoginUserDto } from './dto/login.dto';
 import { Public } from 'src/decorators/public.decorator';
 
-// Sin @ApiBearerAuth: los dos endpoints son @Public() y no exigen token.
+// Sin @ApiBearerAuth a nivel de clase: login es @Public(). register si exige token
+// y lo declara por metodo.
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -32,16 +34,18 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(201)
-  @Public()
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Registrar un usuario',
     description:
-      'Abierto: no exige token, asi que cualquiera con acceso a la API puede crear un usuario. ' +
+      'Exige token: el usuario creado queda con created_by igual al userId del que llama. ' +
+      'No discrimina por rol, asi que cualquier usuario autenticado puede crear usuarios. ' +
       'La cedula es la clave natural y no puede repetirse. ' +
       'Devuelve el id del usuario creado, no el objeto usuario.',
   })
-  async register(@Body() data: RegisterUserDto) {
-    const user = await this.authService.registerUser(data);
+  async register(@Body() data: RegisterUserDto, @Req() req: Request) {
+    const { userId } = req.user as { userId: number };
+    const user = await this.authService.registerUser(data, userId);
     return {
       ok: true,
       msg: 'Usuario registrado correctamente',
