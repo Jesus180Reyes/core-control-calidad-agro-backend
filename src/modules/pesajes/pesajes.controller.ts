@@ -98,4 +98,14 @@ export class PesajesController {
             msg: 'Pesaje aprobado correctamente',
         };
     }
+
+    @Get(':id')
+    async findOne(@Param('id', ParseIntPipe) id: number) {
+        const pesaje = await this.pesajesService.findOne(id);
+        return {
+            ok: !!pesaje,
+            msg: 'Pesaje obtenido correctamente',
+            pesaje,
+        };
+    }
 }
