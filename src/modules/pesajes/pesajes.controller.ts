@@ -86,4 +86,16 @@ export class PesajesController {
             msg: 'Pesaje rechazado correctamente',
         };
     }
+    @Patch(':id/aprobar/byApprover')
+    async aprobarByApprover(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const aprobado = await this.pesajesService.aprobarByApprover(id, userId);
+        return {
+            ok: aprobado,
+            msg: 'Pesaje aprobado correctamente',
+        };
+    }
 }
