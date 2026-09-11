@@ -20,6 +20,10 @@ export class PesajesService {
         );
     }
 
+    async findOne(pesajeId: number) {
+        return await this.pesajesRepository.getPesajeById(pesajeId);
+    }
+
     async create(dto: CreatePesajeDto, userId: number) {
         return await this.pesajesRepository.createPesaje(dto, userId);
     }

@@ -3,6 +3,7 @@ import {
     BadRequestException,
     ForbiddenException,
     Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
@@ -191,6 +192,71 @@ export class PesajesRepository {
             .execute();
 
         return pesajes.map((p) => ({ ...p, aprobado: p.aprobado === null ? null : !!p.aprobado, fuera_de_rango: !!p.fuera_de_rango }));
+    }
+
+    async getPesajeById(pesajeId: number) {
+        const pesaje = await this.db
+            .selectFrom('pesajes')
+            .leftJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
+            .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .select([
+                'pesajes.id',
+                'pesajes.lote_id',
+                'lotes.nombre_lote as nombre_lote',
+                'lotes.variedad_o_talla as lote_variedad_o_talla',
+                'unidades_medida.nombre as lote_unidad_medida',
+                'lotes.peso_minimo as lote_peso_minimo',
+                'lotes.peso_ideal as lote_peso_ideal',
+                'lotes.peso_maximo as lote_peso_maximo',
+                'lotes.estado as lote_estado',
+                'etapas.nombre as etapa',
+                'pesajes.peso_bruto',
+                'pesajes.tara',
+                'pesajes.peso_neto',
+                'pesajes.fuera_de_rango',
+                'estados_calidad.codigo as estado_calidad_codigo',
+                'estados_calidad.nombre as estado_calidad',
+                'usuarios.complete_name as usuario',
+                'pesajes.dispositivo_identificador',
+                'pesajes.secuencia_dispositivo',
+                'pesajes.created_at',
+                'pesajes.aprobado',
+                'pesajes.isActive',
+                'pesajes.motivo_rechazo',
+            ])
+            .where('pesajes.id', '=', pesajeId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new NotFoundException(
+                        `El pesaje con id '${pesajeId}' no existe`,
+                    ),
+            );
+
+        const { isActive, motivo_rechazo, ...resto } = pesaje;
+        if (isActive === 0) {
+            throw new BadRequestException(
+                motivo_rechazo
+                    ? `Este pesaje no esta activo. Motivo: ${motivo_rechazo}`
+                    : 'Este pesaje no esta activo',
+            );
+        }
+
+        return {
+            ...resto,
+            fuera_de_rango: !!resto.fuera_de_rango,
+            aprobado: resto.aprobado === null ? null : !!resto.aprobado,
+        };
     }
 
     async createPesaje(data: CreatePesajeDto, userId: number) {
