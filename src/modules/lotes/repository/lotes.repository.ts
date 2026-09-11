@@ -212,6 +212,28 @@ export class LotesRepository {
         });
     }
 
+    async finalizarLote(loteId: number, userId: number) {
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateLoteNoFinalizado(loteId, trx);
+            const lote = await this.validateLoteEnClienteFinal(loteId, trx);
+            await this.validateLoteTienePesajes(lote, trx);
+            await this.validatePesajesRevisados(lote, trx);
+            const etapa = await this.resolveEtapa('FINALIZADO', trx);
+
+            await trx
+                .updateTable('lotes')
+                .set({
+                    etapa_id: etapa.id,
+                    finalizado_por: userId,
+                    finalizado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', loteId)
+                .execute();
+
+            return true;
+        });
+    }
+
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
         const lote = await db
             .selectFrom('lotes')
