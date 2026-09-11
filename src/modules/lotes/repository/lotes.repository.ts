@@ -280,6 +280,29 @@ export class LotesRepository {
         return lote;
     }
 
+    private async validateLoteNoFinalizado(
+        loteId: number,
+        db: Kysely<Database>,
+    ) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select(['id', 'nombre_lote', 'etapa_id'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new BadRequestException(`El lote con id '${loteId}' no existe`),
+            );
+
+        const finalizado = await this.resolveEtapa('FINALIZADO', db);
+
+        if (lote.etapa_id === finalizado.id) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' ya fue finalizado`,
+            );
+        }
+
+        return lote;
+    }
+
     private async validateEtapaEnProceso(
         lote: { nombre_lote: string; etapa_id: number | null },
         db: Kysely<Database>,
