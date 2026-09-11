@@ -1,6 +1,6 @@
 # SPEC 21 — Detalle de un pesaje por id
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 03, SPEC 10, SPEC 19
 > **Date:** 2026-09-11
 > **Objective:** Agregar `GET /pesajes/:id`, que devuelve los mismos 21 campos que `GET /pesajes/byLote/:loteId` para un solo pesaje, para que el frontend resuelva un código QR concatenando el id escaneado a la URL.
@@ -259,51 +259,51 @@ Nest resuelve por orden de declaración. `@Get(':id')` arriba se tragaría `/pes
 
 ## Acceptance criteria
 
-- [ ] `GET /pesajes/:id` aparece en el log de rutas de Nest, y las cinco rutas anteriores de `pesajes` siguen apareciendo.
-- [ ] `@Get(':id')` es el **último** método declarado en `PesajesController`, después de `@Get('historial')` y `@Get('byLote/:loteId')`.
-- [ ] `GET /pesajes/historial` sigue respondiendo 200 con la lista del usuario, **no** un 400 de `ParseIntPipe`.
-- [ ] `GET /pesajes/byLote/12` sigue respondiendo 200 con los pesajes del lote, **no** un 400 de `ParseIntPipe`.
-- [ ] No se creó ningún DTO: `src/modules/pesajes/dto/` sigue con exactamente cuatro archivos.
-- [ ] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `pesajes.controller.ts`, `pesajes.service.ts` y `repository/pesajes.repository.ts`.
-- [ ] `src/database/types/types.ts` **no cambió** y no se aplicó ningún DDL.
-- [ ] `src/app.module.ts` no cambió y la app arranca sin errores de compilación.
-- [ ] Pedir un pesaje activo responde 200 con la forma `{ ok: true, msg: 'Pesaje obtenido correctamente', pesaje }`.
-- [ ] El payload se llama `pesaje` en singular, no `pesajes` ni `data`.
-- [ ] El objeto `pesaje` trae exactamente **21** campos: los mismos de `getPesajesByLote`, con los mismos alias.
-- [ ] Ese objeto es **idéntico**, clave por clave y valor por valor, al elemento correspondiente del array de `GET /pesajes/byLote/:loteId`.
-- [ ] La respuesta **no** incluye `isActive`, `motivo_rechazo`, `rechazado_en`, `rechazado_por`, `aprobado_por`, `aprobado_en`, `usuario_id`, `estado_calidad_id` ni el nombre del cliente.
-- [ ] `fuera_de_rango` viene como `true` / `false`, nunca como `0` / `1`.
-- [ ] `aprobado` viene como `true`, `false` o `null`, nunca como `0` / `1`: los tres estados se distinguen.
-- [ ] La consulta tiene exactamente **cinco** `LEFT JOIN`: no se agregó el de `clientes`.
-- [ ] La consulta **no** tiene ningún `where` sobre `isActive`, `lotes.estado`, `lotes.etapa_id` ni `clientes.isActive`: la única condición del `where` es `pesajes.id`.
-- [ ] Se hace **una sola** consulta a la base por llamada, no dos.
-- [ ] Pedir un pesaje anulado (`isActive = 0`) responde **400** con `Este pesaje no esta activo. Motivo: <motivo_rechazo>`, no 200 y no 404.
-- [ ] Ese 400 **no** incluye el pesaje en el cuerpo de la respuesta.
-- [ ] Un pesaje anulado con `motivo_rechazo` nulo responde 400 con `Este pesaje no esta activo`, sin la palabra `null` ni `undefined` en el mensaje.
-- [ ] Un pesaje con `isActive = NULL` responde **200**, no 400: la comparación es `=== 0`, no `!== 1`.
-- [ ] Un pesaje activo de un lote **cerrado**, uno de un lote **rechazado** y uno de un lote **finalizado** se devuelven los tres con 200.
-- [ ] Un pesaje activo con `lote_id` nulo se devuelve con 200 y con `nombre_lote`, `lote_variedad_o_talla`, `lote_unidad_medida`, `lote_peso_minimo`, `lote_peso_ideal`, `lote_peso_maximo`, `lote_estado` y `etapa` en `null`: los cinco joins son `LEFT`.
-- [ ] Un pesaje con `dispositivo_identificador` y `secuencia_dispositivo` nulos se devuelve con 200 y esos dos campos en `null`.
-- [ ] Pedir un id que no existe responde **404** con `El pesaje con id 'X' no existe`, no 400, no 500 y no 200 con `pesaje: null`.
-- [ ] Un `id` de ruta no numérico responde 400 por `ParseIntPipe`.
-- [ ] Sin header `Authorization`, o con un token inválido, responde 401: el endpoint no es `@Public()`.
-- [ ] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote lee el pesaje igual: responde **200, no 403**. **Este spec no valida el vínculo.**
-- [ ] No se exige ningún rol, y `req.user` sigue siendo `{ userId, username }`.
-- [ ] El endpoint devuelve el mismo pesaje sin importar qué usuario lo pida: no filtra por `usuario_id`.
-- [ ] Cualquier query param enviado se ignora y la respuesta es idéntica: el handler no tiene `@Query()`.
-- [ ] El endpoint no escribe nada: llamarlo no modifica ninguna columna de `pesajes` ni de ninguna otra tabla.
-- [ ] `getPesajesByLote` y `getHistorialByUsuario` **no se modificaron**: ni joins, ni `select`, ni filtros, ni mapeo, ni orden.
-- [ ] `validatePesajeActivo`, `validateLoteAbierto`, `validateLoteEnClienteFinal`, `validatePesajeSinRevisar`, `validateVinculoOperador`, `resolveEtapa` y `resolveEstadoCalidad` **no se modificaron**.
-- [ ] Los siete filtros de SPEC 16 siguen funcionando igual en los dos `GET` de lista.
-- [ ] `POST /pesajes`, `PATCH /pesajes/:id/rechazar`, `PATCH /pesajes/:id/rechazar/byApprover` y `PATCH /pesajes/:id/aprobar/byApprover` funcionan exactamente igual que antes.
-- [ ] Los siete endpoints de `lotes`, los cuatro de `clientes`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual.
-- [ ] `permisos` sigue con exactamente **14 filas** y `catalogo_permisos` con **9**: no se sembró ninguna fila.
-- [ ] No se agregó ninguna dependencia a `package.json`: no hay librería de QR.
-- [ ] `POST /pesajes` sigue devolviendo exactamente `{ id, peso_neto, fuera_de_rango }`: no devuelve QR ni URL.
-- [ ] No existe `GET /lotes/:id` ni `GET /clientes/:id`.
-- [ ] `CLAUDE.md` documenta `GET /pesajes/:id` con sus 21 campos, su 404, su 400 de pesaje anulado y su falta de control de acceso.
-- [ ] `CLAUDE.md` ya **no** dice que no existe ningún `GET` por id, y su advertencia de colisión de rutas de `PesajesController` refleja que `@Get(':id')` ya existe y va al final.
-- [ ] Los conteos de `CLAUDE.md` quedan en **nueve** `:id` de ruta, **catorce** rutas que se saltan `validateVinculoOperador` deliberadamente y **seis** endpoints en el módulo `pesajes`.
+- [X] `GET /pesajes/:id` aparece en el log de rutas de Nest, y las cinco rutas anteriores de `pesajes` siguen apareciendo.
+- [X] `@Get(':id')` es el **último** método declarado en `PesajesController`, después de `@Get('historial')` y `@Get('byLote/:loteId')`.
+- [X] `GET /pesajes/historial` sigue respondiendo 200 con la lista del usuario, **no** un 400 de `ParseIntPipe`.
+- [X] `GET /pesajes/byLote/12` sigue respondiendo 200 con los pesajes del lote, **no** un 400 de `ParseIntPipe`.
+- [X] No se creó ningún DTO: `src/modules/pesajes/dto/` sigue con exactamente cuatro archivos.
+- [X] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `pesajes.controller.ts`, `pesajes.service.ts` y `repository/pesajes.repository.ts`.
+- [X] `src/database/types/types.ts` **no cambió** y no se aplicó ningún DDL.
+- [X] `src/app.module.ts` no cambió y la app arranca sin errores de compilación.
+- [X] Pedir un pesaje activo responde 200 con la forma `{ ok: true, msg: 'Pesaje obtenido correctamente', pesaje }`.
+- [X] El payload se llama `pesaje` en singular, no `pesajes` ni `data`.
+- [X] El objeto `pesaje` trae exactamente **21** campos: los mismos de `getPesajesByLote`, con los mismos alias.
+- [X] Ese objeto es **idéntico**, clave por clave y valor por valor, al elemento correspondiente del array de `GET /pesajes/byLote/:loteId`.
+- [X] La respuesta **no** incluye `isActive`, `motivo_rechazo`, `rechazado_en`, `rechazado_por`, `aprobado_por`, `aprobado_en`, `usuario_id`, `estado_calidad_id` ni el nombre del cliente.
+- [X] `fuera_de_rango` viene como `true` / `false`, nunca como `0` / `1`.
+- [X] `aprobado` viene como `true`, `false` o `null`, nunca como `0` / `1`: los tres estados se distinguen.
+- [X] La consulta tiene exactamente **cinco** `LEFT JOIN`: no se agregó el de `clientes`.
+- [X] La consulta **no** tiene ningún `where` sobre `isActive`, `lotes.estado`, `lotes.etapa_id` ni `clientes.isActive`: la única condición del `where` es `pesajes.id`.
+- [X] Se hace **una sola** consulta a la base por llamada, no dos.
+- [X] Pedir un pesaje anulado (`isActive = 0`) responde **400** con `Este pesaje no esta activo. Motivo: <motivo_rechazo>`, no 200 y no 404.
+- [X] Ese 400 **no** incluye el pesaje en el cuerpo de la respuesta.
+- [X] Un pesaje anulado con `motivo_rechazo` nulo responde 400 con `Este pesaje no esta activo`, sin la palabra `null` ni `undefined` en el mensaje.
+- [X] Un pesaje con `isActive = NULL` responde **200**, no 400: la comparación es `=== 0`, no `!== 1`.
+- [X] Un pesaje activo de un lote **cerrado**, uno de un lote **rechazado** y uno de un lote **finalizado** se devuelven los tres con 200.
+- [X] Un pesaje activo con `lote_id` nulo se devuelve con 200 y con `nombre_lote`, `lote_variedad_o_talla`, `lote_unidad_medida`, `lote_peso_minimo`, `lote_peso_ideal`, `lote_peso_maximo`, `lote_estado` y `etapa` en `null`: los cinco joins son `LEFT`.
+- [X] Un pesaje con `dispositivo_identificador` y `secuencia_dispositivo` nulos se devuelve con 200 y esos dos campos en `null`.
+- [X] Pedir un id que no existe responde **404** con `El pesaje con id 'X' no existe`, no 400, no 500 y no 200 con `pesaje: null`.
+- [X] Un `id` de ruta no numérico responde 400 por `ParseIntPipe`.
+- [X] Sin header `Authorization`, o con un token inválido, responde 401: el endpoint no es `@Public()`.
+- [X] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote lee el pesaje igual: responde **200, no 403**. **Este spec no valida el vínculo.**
+- [X] No se exige ningún rol, y `req.user` sigue siendo `{ userId, username }`.
+- [X] El endpoint devuelve el mismo pesaje sin importar qué usuario lo pida: no filtra por `usuario_id`.
+- [X] Cualquier query param enviado se ignora y la respuesta es idéntica: el handler no tiene `@Query()`.
+- [X] El endpoint no escribe nada: llamarlo no modifica ninguna columna de `pesajes` ni de ninguna otra tabla.
+- [X] `getPesajesByLote` y `getHistorialByUsuario` **no se modificaron**: ni joins, ni `select`, ni filtros, ni mapeo, ni orden.
+- [X] `validatePesajeActivo`, `validateLoteAbierto`, `validateLoteEnClienteFinal`, `validatePesajeSinRevisar`, `validateVinculoOperador`, `resolveEtapa` y `resolveEstadoCalidad` **no se modificaron**.
+- [X] Los siete filtros de SPEC 16 siguen funcionando igual en los dos `GET` de lista.
+- [X] `POST /pesajes`, `PATCH /pesajes/:id/rechazar`, `PATCH /pesajes/:id/rechazar/byApprover` y `PATCH /pesajes/:id/aprobar/byApprover` funcionan exactamente igual que antes.
+- [X] Los siete endpoints de `lotes`, los cuatro de `clientes`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual.
+- [X] `permisos` sigue con exactamente **14 filas** y `catalogo_permisos` con **9**: no se sembró ninguna fila.
+- [X] No se agregó ninguna dependencia a `package.json`: no hay librería de QR.
+- [X] `POST /pesajes` sigue devolviendo exactamente `{ id, peso_neto, fuera_de_rango }`: no devuelve QR ni URL.
+- [X] No existe `GET /lotes/:id` ni `GET /clientes/:id`.
+- [X] `CLAUDE.md` documenta `GET /pesajes/:id` con sus 21 campos, su 404, su 400 de pesaje anulado y su falta de control de acceso.
+- [X] `CLAUDE.md` ya **no** dice que no existe ningún `GET` por id, y su advertencia de colisión de rutas de `PesajesController` refleja que `@Get(':id')` ya existe y va al final.
+- [X] Los conteos de `CLAUDE.md` quedan en **nueve** `:id` de ruta, **catorce** rutas que se saltan `validateVinculoOperador` deliberadamente y **seis** endpoints en el módulo `pesajes`.
 
 ---
 
