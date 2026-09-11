@@ -270,11 +270,7 @@ export class PesajesRepository {
         return await this.db.transaction().execute(async (trx) => {
             const pesaje = await this.validatePesajeActivo(pesajeId, trx);
 
-            if (pesaje.motivo_rechazo !== null) {
-                throw new BadRequestException(
-                    `El pesaje con id '${pesajeId}' ya fue rechazado por el aprobador`,
-                );
-            }
+            this.validatePesajeSinRevisar(pesaje);
 
             if (pesaje.lote_id === null) {
                 throw new BadRequestException(
@@ -291,6 +287,34 @@ export class PesajesRepository {
                     rechazado_por: userId,
                     rechazado_en: sql<Date>`NOW()`,
                     aprobado: false,
+                })
+                .where('id', '=', pesajeId)
+                .execute();
+
+            return true;
+        });
+    }
+
+    async approvePesajeForApprover(pesajeId: number, userId: number) {
+        return await this.db.transaction().execute(async (trx) => {
+            const pesaje = await this.validatePesajeActivo(pesajeId, trx);
+
+            this.validatePesajeSinRevisar(pesaje);
+
+            if (pesaje.lote_id === null) {
+                throw new BadRequestException(
+                    `El pesaje con id '${pesajeId}' no tiene un lote asociado`,
+                );
+            }
+
+            await this.validateLoteEnClienteFinal(pesaje.lote_id, trx);
+
+            await trx
+                .updateTable('pesajes')
+                .set({
+                    aprobado: true,
+                    aprobado_por: userId,
+                    aprobado_en: sql<Date>`NOW()`,
                 })
                 .where('id', '=', pesajeId)
                 .execute();
@@ -413,7 +437,7 @@ export class PesajesRepository {
     private async validatePesajeActivo(pesajeId: number, db: Kysely<Database>) {
         const pesaje = await db
             .selectFrom('pesajes')
-            .select(['id', 'lote_id', 'isActive', 'motivo_rechazo'])
+            .select(['id', 'lote_id', 'isActive', 'motivo_rechazo', 'aprobado'])
             .where('id', '=', pesajeId)
             .executeTakeFirstOrThrow(
                 () =>
@@ -429,6 +453,23 @@ export class PesajesRepository {
         }
 
         return pesaje;
+    }
+
+    // `aprobado` es de tres estados: null = sin revisar, 1 = aprobado, 0 = rechazado.
+    // Se compara por truthiness porque MySQL devuelve el TINYINT como 0 / 1.
+    private validatePesajeSinRevisar(pesaje: {
+        id: string | number;
+        aprobado: boolean | null;
+    }) {
+        if (pesaje.aprobado === null) {
+            return;
+        }
+
+        const revision = pesaje.aprobado ? 'aprobado' : 'rechazado';
+
+        throw new BadRequestException(
+            `El pesaje con id '${Number(pesaje.id)}' ya fue ${revision} por el aprobador`,
+        );
     }
 
     private async resolveEstadoCalidad(

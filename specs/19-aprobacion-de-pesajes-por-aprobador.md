@@ -1,6 +1,6 @@
 # SPEC 19 — Aprobación de pesajes por el aprobador
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 03, SPEC 10, SPEC 13
 > **Date:** 2026-09-10
 > **Objective:** Agregar `PATCH /pesajes/:id/aprobar/byApprover`, que marca un pesaje activo y sin revisar de un lote en etapa `CLIENTE_FINAL` como aprobado (`aprobado = 1`, `aprobado_por`, `aprobado_en`), y documentar retroactivamente el flujo del aprobador que entró al repositorio sin spec.
@@ -257,55 +257,55 @@ Con el endpoint de este spec, el flujo del aprobador queda completo: lista los l
 
 ## Acceptance criteria
 
-- [ ] No se ejecutó ningún DDL: `DESCRIBE pesajes;` muestra exactamente las mismas columnas que antes del spec.
-- [ ] `src/database/types/types.ts` **no cambió**.
-- [ ] No se creó ningún DTO: `src/modules/pesajes/dto/` sigue con exactamente cuatro archivos (`create-pesaje.dto.ts`, `rechazar-pesaje.dto.ts`, `filtros-pesajes-lote.dto.ts`, `filtros-historial.dto.ts`).
-- [ ] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `pesajes.controller.ts`, `pesajes.service.ts` y `repository/pesajes.repository.ts`.
-- [ ] `src/app.module.ts` no cambió y la app arranca sin errores de compilación.
-- [ ] `PATCH /pesajes/:id/aprobar/byApprover` aparece en el log de rutas de Nest, y las otras cuatro rutas de `pesajes` siguen apareciendo.
-- [ ] `@Get('historial')` sigue declarado antes que cualquier ruta con `:id` en `PesajesController`.
-- [ ] El handler no tiene `@Body()` y el endpoint funciona con una petición sin body.
-- [ ] Aprobar un pesaje activo, sin revisar, de un lote cerrado en `CLIENTE_FINAL` responde 200 con exactamente `{ ok: true, msg: 'Pesaje aprobado correctamente' }`.
-- [ ] La respuesta **no** incluye ninguna clave de recurso: no hay `pesaje`, ni `data`.
-- [ ] Después de aprobar, la fila tiene `aprobado = 1`, `aprobado_por` con el `userId` del token (no el `usuario_id` del pesaje) y `aprobado_en` con la hora de la aprobación.
-- [ ] Después de aprobar, `isActive` sigue en `1`: aprobar **no** anula el pesaje.
-- [ ] Después de aprobar, `motivo_rechazo`, `rechazado_por` y `rechazado_en` siguen en `NULL`.
-- [ ] La aprobación **no** modifica `peso_bruto`, `tara`, `peso_neto`, `fuera_de_rango`, `estado_calidad_id`, `lote_id`, `usuario_id`, `dispositivo_identificador`, `secuencia_dispositivo` ni `created_at`.
-- [ ] La aprobación **no** modifica ninguna columna de la tabla `lotes`: el lote sigue `cerrado`, en `CLIENTE_FINAL`, con su `aprobado_por` y su `cerrado_en` intactos.
-- [ ] El pesaje aprobado sigue apareciendo en `GET /pesajes/byLote/:loteId`, ahora con `aprobado: true`.
-- [ ] El pesaje aprobado sigue apareciendo en `GET /pesajes/historial` de su operador, con `aprobado: true`.
-- [ ] Ninguna de las dos lecturas devuelve `aprobado_por` ni `aprobado_en`: los campos de las dos respuestas no cambiaron.
-- [ ] Aprobar un pesaje **ya aprobado** responde 400 con `El pesaje con id 'X' ya fue aprobado por el aprobador`, y `aprobado_por` y `aprobado_en` quedan intactos.
-- [ ] Aprobar un pesaje **ya rechazado por el aprobador** (`aprobado = 0`) responde 400 con `El pesaje con id 'X' ya fue rechazado por el aprobador`.
-- [ ] **`PATCH /pesajes/:id/rechazar/byApprover` sobre un pesaje ya aprobado responde 400** con `ya fue aprobado por el aprobador`, y no sobrescribe `aprobado` ni escribe `motivo_rechazo`. **Este es el agujero que el spec cierra: antes de este cambio respondía 200.**
-- [ ] `PATCH /pesajes/:id/rechazar/byApprover` sobre un pesaje ya rechazado por el aprobador sigue respondiendo 400 con **exactamente el mismo mensaje que antes** del spec.
-- [ ] `PATCH /pesajes/:id/rechazar/byApprover` sobre un pesaje sin revisar sigue funcionando igual que antes: escribe `aprobado = 0` y el trío de rechazo, y **no** toca `isActive`.
-- [ ] Aprobar un pesaje anulado por el operador (`isActive = 0`) responde 400 con `ya fue rechazado`, el mensaje de `validatePesajeActivo`, no el del validador de revisión.
-- [ ] Aprobar un `id` que no existe responde 400 con `El pesaje con id 'X' no existe`, no 404 y no 500.
-- [ ] Aprobar un pesaje con `lote_id` en `NULL` responde 400 con `no tiene un lote asociado`.
-- [ ] Aprobar un pesaje de un lote **abierto** responde 400 con `El lote 'X' no esta cerrado`.
-- [ ] Aprobar un pesaje de un lote **rechazado** responde 400 con `El lote 'X' ya fue rechazado`.
-- [ ] Aprobar un pesaje de un lote cerrado que no está en `CLIENTE_FINAL` responde 400 con `no esta en la etapa CLIENTE_FINAL`.
-- [ ] Si falta la fila `codigo = 'CLIENTE_FINAL'` en `etapas`, responde 400 `La etapa con codigo 'CLIENTE_FINAL' no existe`.
-- [ ] El número `2` **no aparece** en ninguna línea del código nuevo de este spec: la etapa se resuelve por `codigo`.
-- [ ] Un `id` de ruta no numérico responde 400 por `ParseIntPipe`.
-- [ ] Sin header `Authorization`, o con un token inválido, responde 401: el endpoint no es `@Public()`.
-- [ ] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote aprueba igual: responde **200, no 403**. **Este spec no valida el vínculo.**
-- [ ] No se exige ningún rol, y `req.user` sigue siendo `{ userId, username }`.
-- [ ] Quien aprueba puede ser el mismo usuario que registró el pesaje: no se compara contra `pesajes.usuario_id`.
-- [ ] Cuando cualquier validación falla, ninguna columna cambia: la transacción no deja escrituras parciales.
-- [ ] `validatePesajeActivo` conserva su firma, su condición y sus mensajes: lo único que cambió es que su `select` trae `aprobado`.
-- [ ] `validateLoteEnClienteFinal`, `resolveEtapa`, `validateLoteAbierto`, `validateVinculoOperador`, `validateLote`, `resolveEstadoCalidad` y `resolveCodigoEstadoCalidad` no se modificaron.
-- [ ] `POST /pesajes` y `PATCH /pesajes/:id/rechazar` funcionan exactamente igual que antes.
-- [ ] `POST /pesajes` contra un lote en `CLIENTE_FINAL` sigue respondiendo 400 `no esta abierto`: este spec no desbloquea el pesaje en cliente final.
-- [ ] Los cinco endpoints de `lotes`, los cuatro de `clientes`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual.
-- [ ] `permisos` sigue con exactamente **14 filas** y `catalogo_permisos` con **9**: no se sembró ninguna fila.
-- [ ] No existe ningún endpoint para deshacer una aprobación, para aprobar varios pesajes en una llamada, ni para finalizar el lote.
-- [ ] `FINALIZADO` sigue sin escribirse nunca, y aprobar el último pesaje sin revisar de un lote no cambia nada del lote.
-- [ ] `CLAUDE.md` documenta `PATCH /pesajes/:id/aprobar/byApprover` **y** los tres endpoints del aprobador que estaban sin documentar.
-- [ ] `CLAUDE.md` ya no dice que las tres columnas de aprobación de `pesajes` no las escribe nada, corrige el tipo de `aprobado` a `boolean | null` manteniendo la advertencia de tri-estado, y documenta el DDL y su FK como séptima excepción.
-- [ ] `CLAUDE.md` anota que `GET /lotes/cliente/:clienteId/all/approver` tiene `etapa_id = 2` clavado, contra la convención de resolver por `codigo`.
-- [ ] Los conteos de `CLAUDE.md` quedan en **siete** `PATCH`es, **siete** `UPDATE`s, **siete** escrituras abiertas a cualquier autenticado y **doce** rutas que se saltan `validateVinculoOperador`.
+- [X] No se ejecutó ningún DDL: `DESCRIBE pesajes;` muestra exactamente las mismas columnas que antes del spec.
+- [X] `src/database/types/types.ts` **no cambió**.
+- [X] No se creó ningún DTO: `src/modules/pesajes/dto/` sigue con exactamente cuatro archivos (`create-pesaje.dto.ts`, `rechazar-pesaje.dto.ts`, `filtros-pesajes-lote.dto.ts`, `filtros-historial.dto.ts`).
+- [X] No se creó ningún módulo, controller, service ni repositorio nuevo: solo se modificaron `pesajes.controller.ts`, `pesajes.service.ts` y `repository/pesajes.repository.ts`.
+- [X] `src/app.module.ts` no cambió y la app arranca sin errores de compilación.
+- [X] `PATCH /pesajes/:id/aprobar/byApprover` aparece en el log de rutas de Nest, y las otras cuatro rutas de `pesajes` siguen apareciendo.
+- [X] `@Get('historial')` sigue declarado antes que cualquier ruta con `:id` en `PesajesController`.
+- [X] El handler no tiene `@Body()` y el endpoint funciona con una petición sin body.
+- [X] Aprobar un pesaje activo, sin revisar, de un lote cerrado en `CLIENTE_FINAL` responde 200 con exactamente `{ ok: true, msg: 'Pesaje aprobado correctamente' }`.
+- [X] La respuesta **no** incluye ninguna clave de recurso: no hay `pesaje`, ni `data`.
+- [X] Después de aprobar, la fila tiene `aprobado = 1`, `aprobado_por` con el `userId` del token (no el `usuario_id` del pesaje) y `aprobado_en` con la hora de la aprobación.
+- [X] Después de aprobar, `isActive` sigue en `1`: aprobar **no** anula el pesaje.
+- [X] Después de aprobar, `motivo_rechazo`, `rechazado_por` y `rechazado_en` siguen en `NULL`.
+- [X] La aprobación **no** modifica `peso_bruto`, `tara`, `peso_neto`, `fuera_de_rango`, `estado_calidad_id`, `lote_id`, `usuario_id`, `dispositivo_identificador`, `secuencia_dispositivo` ni `created_at`.
+- [X] La aprobación **no** modifica ninguna columna de la tabla `lotes`: el lote sigue `cerrado`, en `CLIENTE_FINAL`, con su `aprobado_por` y su `cerrado_en` intactos.
+- [X] El pesaje aprobado sigue apareciendo en `GET /pesajes/byLote/:loteId`, ahora con `aprobado: true`.
+- [X] El pesaje aprobado sigue apareciendo en `GET /pesajes/historial` de su operador, con `aprobado: true`.
+- [X] Ninguna de las dos lecturas devuelve `aprobado_por` ni `aprobado_en`: los campos de las dos respuestas no cambiaron.
+- [X] Aprobar un pesaje **ya aprobado** responde 400 con `El pesaje con id 'X' ya fue aprobado por el aprobador`, y `aprobado_por` y `aprobado_en` quedan intactos.
+- [X] Aprobar un pesaje **ya rechazado por el aprobador** (`aprobado = 0`) responde 400 con `El pesaje con id 'X' ya fue rechazado por el aprobador`.
+- [X] **`PATCH /pesajes/:id/rechazar/byApprover` sobre un pesaje ya aprobado responde 400** con `ya fue aprobado por el aprobador`, y no sobrescribe `aprobado` ni escribe `motivo_rechazo`. **Este es el agujero que el spec cierra: antes de este cambio respondía 200.**
+- [X] `PATCH /pesajes/:id/rechazar/byApprover` sobre un pesaje ya rechazado por el aprobador sigue respondiendo 400 con **exactamente el mismo mensaje que antes** del spec.
+- [X] `PATCH /pesajes/:id/rechazar/byApprover` sobre un pesaje sin revisar sigue funcionando igual que antes: escribe `aprobado = 0` y el trío de rechazo, y **no** toca `isActive`.
+- [X] Aprobar un pesaje anulado por el operador (`isActive = 0`) responde 400 con `ya fue rechazado`, el mensaje de `validatePesajeActivo`, no el del validador de revisión.
+- [X] Aprobar un `id` que no existe responde 400 con `El pesaje con id 'X' no existe`, no 404 y no 500.
+- [X] Aprobar un pesaje con `lote_id` en `NULL` responde 400 con `no tiene un lote asociado`.
+- [X] Aprobar un pesaje de un lote **abierto** responde 400 con `El lote 'X' no esta cerrado`.
+- [X] Aprobar un pesaje de un lote **rechazado** responde 400 con `El lote 'X' ya fue rechazado`.
+- [X] Aprobar un pesaje de un lote cerrado que no está en `CLIENTE_FINAL` responde 400 con `no esta en la etapa CLIENTE_FINAL`.
+- [X] Si falta la fila `codigo = 'CLIENTE_FINAL'` en `etapas`, responde 400 `La etapa con codigo 'CLIENTE_FINAL' no existe`.
+- [X] El número `2` **no aparece** en ninguna línea del código nuevo de este spec: la etapa se resuelve por `codigo`.
+- [X] Un `id` de ruta no numérico responde 400 por `ParseIntPipe`.
+- [X] Sin header `Authorization`, o con un token inválido, responde 401: el endpoint no es `@Public()`.
+- [X] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote aprueba igual: responde **200, no 403**. **Este spec no valida el vínculo.**
+- [X] No se exige ningún rol, y `req.user` sigue siendo `{ userId, username }`.
+- [X] Quien aprueba puede ser el mismo usuario que registró el pesaje: no se compara contra `pesajes.usuario_id`.
+- [X] Cuando cualquier validación falla, ninguna columna cambia: la transacción no deja escrituras parciales.
+- [X] `validatePesajeActivo` conserva su firma, su condición y sus mensajes: lo único que cambió es que su `select` trae `aprobado`.
+- [X] `validateLoteEnClienteFinal`, `resolveEtapa`, `validateLoteAbierto`, `validateVinculoOperador`, `validateLote`, `resolveEstadoCalidad` y `resolveCodigoEstadoCalidad` no se modificaron.
+- [X] `POST /pesajes` y `PATCH /pesajes/:id/rechazar` funcionan exactamente igual que antes.
+- [X] `POST /pesajes` contra un lote en `CLIENTE_FINAL` sigue respondiendo 400 `no esta abierto`: este spec no desbloquea el pesaje en cliente final.
+- [X] Los cinco endpoints de `lotes`, los cuatro de `clientes`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual.
+- [X] `permisos` sigue con exactamente **14 filas** y `catalogo_permisos` con **9**: no se sembró ninguna fila.
+- [X] No existe ningún endpoint para deshacer una aprobación, para aprobar varios pesajes en una llamada, ni para finalizar el lote.
+- [X] `FINALIZADO` sigue sin escribirse nunca, y aprobar el último pesaje sin revisar de un lote no cambia nada del lote.
+- [X] `CLAUDE.md` documenta `PATCH /pesajes/:id/aprobar/byApprover` **y** los tres endpoints del aprobador que estaban sin documentar.
+- [X] `CLAUDE.md` ya no dice que las tres columnas de aprobación de `pesajes` no las escribe nada, corrige el tipo de `aprobado` a `boolean | null` manteniendo la advertencia de tri-estado, y documenta el DDL y su FK como séptima excepción.
+- [X] `CLAUDE.md` anota que `GET /lotes/cliente/:clienteId/all/approver` tiene `etapa_id = 2` clavado, contra la convención de resolver por `codigo`.
+- [X] Los conteos de `CLAUDE.md` quedan en **siete** `PATCH`es, **siete** `UPDATE`s, **siete** escrituras abiertas a cualquier autenticado y **doce** rutas que se saltan `validateVinculoOperador`.
 
 ---
 

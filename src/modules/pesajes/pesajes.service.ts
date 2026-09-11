@@ -38,4 +38,10 @@ export class PesajesService {
             userId,
         );
     }
+    async aprobarByApprover(pesajeId: number, userId: number) {
+        return await this.pesajesRepository.approvePesajeForApprover(
+            pesajeId,
+            userId,
+        );
+    }
 }
