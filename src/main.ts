@@ -16,9 +16,7 @@ async function bootstrap() {
     const config = new DocumentBuilder()
       .setTitle('Core Control Calidad Agro API')
       .setDescription(
-        'API de control de calidad para lotes de exportacion agricola. ' +
-        'Cubre el flujo de pesajes contra un rango de tolerancia y el ciclo de ' +
-        'vida de un lote: EN_PROCESO, CLIENTE_FINAL, RECHAZADO y FINALIZADO.',
+        'API de control de calidad para lotes de exportacion agricola.'
       )
       .setVersion('1.0.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
