@@ -12,7 +12,7 @@ async function bootstrap() {
 
   app.enableCors();
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV === 'development') {
     const config = new DocumentBuilder()
       .setTitle('Core Control Calidad Agro API')
       .setDescription(

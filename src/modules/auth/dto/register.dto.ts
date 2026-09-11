@@ -16,7 +16,6 @@ const registerSchema = z
             .min(8, 'La contraseña debe tener al menos 8 caracteres'),
 
         rol: z.number(),
-        created_by: z.number(),
         cedula: z.string(),
 
 
