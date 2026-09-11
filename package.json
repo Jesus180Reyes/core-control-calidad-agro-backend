@@ -27,6 +27,7 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.4.7",
     "bcrypt": "^6.0.0",
     "kysely": "^0.29.4",
     "mysql2": "^3.23.1",
