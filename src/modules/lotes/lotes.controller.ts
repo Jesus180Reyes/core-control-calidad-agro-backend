@@ -89,6 +89,19 @@ export class LotesController {
         };
     }
 
+    @Get('cliente/:clienteId/all/finalizados')
+    async findAllLotesFinalizadosByCliente(
+        @Param('clienteId', ParseIntPipe) clienteId: number,
+    ) {
+        const lotes =
+            await this.lotesService.findAllLotesFinalizadosByCliente(clienteId);
+        return {
+            ok: !!lotes,
+            msg: 'Lotes obtenidos correctamente',
+            lotes,
+        };
+    }
+
     @Post()
     @HttpCode(201)
     @ApiOperation({
