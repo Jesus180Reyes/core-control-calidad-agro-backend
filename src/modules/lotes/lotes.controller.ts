@@ -90,6 +90,26 @@ export class LotesController {
     }
 
     @Get('cliente/:clienteId/all/finalizados')
+    @ApiOperation({
+        summary: 'Lotes finalizados de un cliente',
+        description:
+            'Los lotes que el aprobador ya firmo como terminados, es decir los que estan en la ' +
+            'etapa FINALIZADO. Es la unica lectura que los muestra: las otras tres rutas ' +
+            'cliente/... filtran estado = abierto o la etapa CLIENTE_FINAL, asi que un lote ' +
+            'finalizado desaparece de todas ellas y aparece aqui. ' +
+            'Devuelve los mismos 10 campos que sus tres hermanas mas cuatro de auditoria: ' +
+            'aprobado_por, aprobado_en, finalizado_por y finalizado_en. Es el unico endpoint del ' +
+            'proyecto que expone quien firmo un lote y cuando; los dos usuarios viajan con su ' +
+            'nombre completo, nunca con su id. La terna de rechazo no viaja: en un lote ' +
+            'finalizado es siempre null. ' +
+            'La etapa se resuelve por el codigo FINALIZADO, no por un id hardcodeado, a diferencia ' +
+            'de la bandeja del aprobador. Si esa fila falta en etapas, responde 400. ' +
+            'Ordena por finalizado_en DESC, no por created_at como las otras tres. ' +
+            'No acepta ningun query param. Un cliente sin lotes finalizados, o un clienteId que no ' +
+            'existe, responden 200 con una lista vacia. ' +
+            'NO valida el vinculo cliente_operador.',
+    })
+    @ApiParam({ name: 'clienteId', description: 'Id del cliente', example: 1 })
     async findAllLotesFinalizadosByCliente(
         @Param('clienteId', ParseIntPipe) clienteId: number,
     ) {
