@@ -20,6 +20,9 @@ export class LotesService {
     async findAllLotesByClienteForApprover(clienteId: number) {
         return await this.lotesRepository.getAllLotesByClienteForApprover(clienteId);
     }
+    async findAllLotesFinalizadosByCliente(clienteId: number) {
+        return await this.lotesRepository.getLotesFinalizadosByCliente(clienteId);
+    }
 
     async rechazar(loteId: number, dto: RechazarLoteDto, userId: number) {
         return await this.lotesRepository.rechazarLote(loteId, dto, userId);
