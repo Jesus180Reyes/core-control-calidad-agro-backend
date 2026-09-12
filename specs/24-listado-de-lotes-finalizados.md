@@ -1,6 +1,6 @@
 # SPEC 24 — Listado de lotes finalizados de un cliente
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02 (crea el módulo `lotes` y sus lecturas), SPEC 13 (escribe `aprobado_por`/`aprobado_en`), SPEC 20 (escribe la etapa `FINALIZADO` y el par `finalizado_por`/`finalizado_en`), SPEC 22 (Swagger, donde hay que documentar la ruta nueva)
 > **Date:** 2026-09-12
 > **Objective:** Agregar `GET /lotes/cliente/:clienteId/all/finalizados`, que lista los lotes en la etapa `FINALIZADO` de un cliente con los 10 campos de siempre más quién los aprobó y quién los finalizó, para que el trabajo terminado deje de ser invisible por la API.
