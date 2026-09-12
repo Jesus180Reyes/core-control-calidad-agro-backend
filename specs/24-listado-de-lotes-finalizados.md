@@ -178,37 +178,37 @@ Su fallo es un `BadRequestException`. Es decir: si la fila `FINALIZADO` no está
 
 ## Acceptance criteria
 
-- [ ] La app arranca, `npm run build` pasa y `npm run lint` no introduce errores nuevos.
-- [ ] El log de Nest mapea **27** rutas, con el reparto `auth` 2, `catalogos` 3, `clientes` 4, `lotes` **9**, `permisos` 1, `pesajes` 7, más `GET /`.
-- [ ] `GET /lotes/cliente/:clienteId/all/finalizados` responde **200** con la forma `{ ok, msg, lotes }`.
-- [ ] Cada elemento de `lotes` tiene exactamente **14** claves: las 10 de `GET /lotes/cliente/:clienteId` más `aprobado_por`, `aprobado_en`, `finalizado_por` y `finalizado_en`.
-- [ ] Las 10 primeras claves tienen los mismos nombres y el mismo orden que en las tres lecturas existentes.
-- [ ] `aprobado_por` y `finalizado_por` traen el **nombre completo** del usuario, no un id numérico.
-- [ ] Un lote en la etapa `FINALIZADO` del cliente aparece en la lista.
-- [ ] Un lote **aprobado pero no finalizado** del mismo cliente **no** aparece, y sigue apareciendo en `GET /lotes/cliente/:clienteId/all/approver`.
-- [ ] Un lote **rechazado** no aparece.
-- [ ] Un lote **abierto** no aparece, y sigue apareciendo en `GET /lotes/cliente/:clienteId` y en `/all`.
-- [ ] La lista viene ordenada por `finalizado_en` descendente.
-- [ ] Un cliente sin lotes finalizados responde **200** con `lotes: []`, no 404.
-- [ ] Un `clienteId` inexistente responde **200** con `lotes: []`.
-- [ ] Un `clienteId` no numérico responde **400** del `ParseIntPipe`.
-- [ ] Sin token, la ruta responde **401**.
-- [ ] Un usuario **sin** fila en `cliente_operador` para ese cliente responde **200**, no 403.
-- [ ] La etapa se filtra resolviendo `etapas` por `codigo = 'FINALIZADO'`: **no** hay ningún `etapa_id` numérico literal en el método nuevo.
-- [ ] Los dos joins a `usuarios` son `LEFT JOIN` con alias distintos.
-- [ ] `GET /lotes/cliente/:clienteId`, `/all` y `/all/approver` devuelven exactamente los mismos campos y filas que antes de este spec.
-- [ ] `getAllLotesByClienteForApprover` sigue con su `where('lotes.etapa_id', '=', 2)` intacto.
-- [ ] El handler nuevo está declarado **después** de `@Get('cliente/:clienteId/all/approver')` en `LotesController`.
-- [ ] El handler nuevo tiene `@ApiOperation` con resumen y descripción, y `@ApiParam` para `clienteId`.
-- [ ] No se agregó ningún `@ApiResponse` en ninguna parte.
-- [ ] `/docs-json` tiene **26** operaciones en **25** claves de `paths`.
-- [ ] No se creó ningún archivo nuevo: los únicos archivos de código tocados son el repositorio, el servicio y el controller de `lotes`.
-- [ ] No se creó ningún DTO y no se agregó ningún query param.
-- [ ] `src/database/types/types.ts` no cambió y no se aplicó ningún DDL.
-- [ ] `catalogo_permisos` sigue con **9** filas y `permisos` con **14**.
-- [ ] Ningún endpoint de `pesajes`, `clientes`, `auth`, `permisos` o `catalogos` cambió.
-- [ ] `README.md` no cambió.
-- [ ] `CLAUDE.md` documenta el endpoint, sus 14 campos, los conteos nuevos y que el lote finalizado ya no es invisible.
+- [X] La app arranca, `npm run build` pasa y `npm run lint` no introduce errores nuevos.
+- [X] El log de Nest mapea **27** rutas, con el reparto `auth` 2, `catalogos` 3, `clientes` 4, `lotes` **9**, `permisos` 1, `pesajes` 7, más `GET /`.
+- [X] `GET /lotes/cliente/:clienteId/all/finalizados` responde **200** con la forma `{ ok, msg, lotes }`.
+- [X] Cada elemento de `lotes` tiene exactamente **14** claves: las 10 de `GET /lotes/cliente/:clienteId` más `aprobado_por`, `aprobado_en`, `finalizado_por` y `finalizado_en`.
+- [X] Las 10 primeras claves tienen los mismos nombres y el mismo orden que en las tres lecturas existentes.
+- [X] `aprobado_por` y `finalizado_por` traen el **nombre completo** del usuario, no un id numérico.
+- [X] Un lote en la etapa `FINALIZADO` del cliente aparece en la lista.
+- [X] Un lote **aprobado pero no finalizado** del mismo cliente **no** aparece, y sigue apareciendo en `GET /lotes/cliente/:clienteId/all/approver`.
+- [X] Un lote **rechazado** no aparece.
+- [X] Un lote **abierto** no aparece, y sigue apareciendo en `GET /lotes/cliente/:clienteId` y en `/all`.
+- [X] La lista viene ordenada por `finalizado_en` descendente.
+- [X] Un cliente sin lotes finalizados responde **200** con `lotes: []`, no 404.
+- [X] Un `clienteId` inexistente responde **200** con `lotes: []`.
+- [X] Un `clienteId` no numérico responde **400** del `ParseIntPipe`.
+- [X] Sin token, la ruta responde **401**.
+- [X] Un usuario **sin** fila en `cliente_operador` para ese cliente responde **200**, no 403.
+- [X] La etapa se filtra resolviendo `etapas` por `codigo = 'FINALIZADO'`: **no** hay ningún `etapa_id` numérico literal en el método nuevo.
+- [X] Los dos joins a `usuarios` son `LEFT JOIN` con alias distintos.
+- [X] `GET /lotes/cliente/:clienteId`, `/all` y `/all/approver` devuelven exactamente los mismos campos y filas que antes de este spec.
+- [X] `getAllLotesByClienteForApprover` sigue con su `where('lotes.etapa_id', '=', 2)` intacto.
+- [X] El handler nuevo está declarado **después** de `@Get('cliente/:clienteId/all/approver')` en `LotesController`.
+- [X] El handler nuevo tiene `@ApiOperation` con resumen y descripción, y `@ApiParam` para `clienteId`.
+- [X] No se agregó ningún `@ApiResponse` en ninguna parte.
+- [X] `/docs-json` tiene **26** operaciones en **25** claves de `paths`.
+- [X] No se creó ningún archivo nuevo: los únicos archivos de código tocados son el repositorio, el servicio y el controller de `lotes`.
+- [X] No se creó ningún DTO y no se agregó ningún query param.
+- [X] `src/database/types/types.ts` no cambió y no se aplicó ningún DDL.
+- [X] `catalogo_permisos` sigue con **9** filas y `permisos` con **14**.
+- [X] Ningún endpoint de `pesajes`, `clientes`, `auth`, `permisos` o `catalogos` cambió.
+- [X] `README.md` no cambió.
+- [X] `CLAUDE.md` documenta el endpoint, sus 14 campos, los conteos nuevos y que el lote finalizado ya no es invisible.
 
 ---
 
