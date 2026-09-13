@@ -1,0 +1,289 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Flujo de Negocio: del Cliente al Lote FINALIZADO",
+    "output": "docs/flujo-negocio.html",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "Alta del operador"
+        },
+        "backend": {
+          "label": "Escritura de estado"
+        },
+        "security": {
+          "label": "Compuerta o rechazo"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "operador",
+      "label": "Operador · planta"
+    },
+    {
+      "id": "supervisor",
+      "label": "Supervisor"
+    },
+    {
+      "id": "aprobador",
+      "label": "Aprobador · cliente final"
+    },
+    {
+      "id": "excepciones",
+      "label": "Rechazos y anulaciones",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "fase_captura",
+      "label": "Captura",
+      "fromCol": 0,
+      "toCol": 2
+    },
+    {
+      "id": "fase_aprobacion",
+      "label": "Aprobación",
+      "fromCol": 3,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "fase_cierre",
+      "label": "Cierre",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "crear_cliente",
+    "crear_lote",
+    "registrar_pesaje",
+    "aprobar_lote",
+    "revisar_pesajes",
+    "finalizar_lote"
+  ],
+  "semanticChecks": {
+    "allowedRoots": [
+      "crear_cliente"
+    ],
+    "allowedTerminals": [
+      "finalizar_lote",
+      "rechazar_cliente",
+      "rechazar_lote",
+      "anular_pesaje",
+      "rechazo_aprobador"
+    ],
+    "requiredEdges": [
+      {
+        "from": "aprobar_lote",
+        "to": "revisar_pesajes"
+      },
+      {
+        "from": "revisar_pesajes",
+        "to": "finalizar_lote"
+      }
+    ],
+    "requiredPaths": [
+      {
+        "from": "crear_cliente",
+        "to": "finalizar_lote"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "crear_cliente",
+      "lane": "operador",
+      "col": 0,
+      "type": "frontend",
+      "label": "Crear Cliente",
+      "sublabel": "POST /clientes",
+      "width": 124
+    },
+    {
+      "id": "crear_lote",
+      "lane": "operador",
+      "col": 1,
+      "type": "backend",
+      "label": "Crear Lote",
+      "sublabel": "abierto · EN_PROCESO",
+      "width": 148
+    },
+    {
+      "id": "registrar_pesaje",
+      "lane": "operador",
+      "col": 2,
+      "type": "backend",
+      "label": "Registrar Pesaje",
+      "sublabel": "peso_neto · rango",
+      "width": 140
+    },
+    {
+      "id": "aprobar_lote",
+      "lane": "supervisor",
+      "col": 3,
+      "type": "security",
+      "label": "Aprobar Lote",
+      "sublabel": "cierra → CLIENTE_FINAL",
+      "width": 156
+    },
+    {
+      "id": "revisar_pesajes",
+      "lane": "aprobador",
+      "col": 4,
+      "type": "security",
+      "label": "Revisar Pesajes",
+      "sublabel": "aprobado 1 / 0",
+      "width": 132
+    },
+    {
+      "id": "finalizar_lote",
+      "lane": "aprobador",
+      "col": 5,
+      "type": "backend",
+      "label": "Finalizar Lote",
+      "sublabel": "etapa FINALIZADO",
+      "width": 136
+    },
+    {
+      "id": "rechazar_cliente",
+      "lane": "excepciones",
+      "col": 1,
+      "type": "security",
+      "label": "Rechazar Cliente",
+      "sublabel": "isActive = 0",
+      "width": 132
+    },
+    {
+      "id": "rechazar_lote",
+      "lane": "excepciones",
+      "col": 2,
+      "type": "security",
+      "label": "Rechazar Lote",
+      "sublabel": "etapa RECHAZADO",
+      "width": 132
+    },
+    {
+      "id": "anular_pesaje",
+      "lane": "excepciones",
+      "col": 3,
+      "type": "security",
+      "label": "Anular Pesaje",
+      "sublabel": "isActive = 0",
+      "width": 124
+    },
+    {
+      "id": "rechazo_aprobador",
+      "lane": "excepciones",
+      "col": 5,
+      "type": "security",
+      "label": "Rechazo Final",
+      "sublabel": "etapa RECHAZADO",
+      "width": 132
+    }
+  ],
+  "edges": [
+    {
+      "from": "crear_cliente",
+      "to": "crear_lote",
+      "label": "vínculo operador",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "crear_lote",
+      "to": "registrar_pesaje",
+      "label": "lote abierto",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "registrar_pesaje",
+      "to": "aprobar_lote",
+      "label": "≥ 1 pesaje activo",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "aprobar_lote",
+      "to": "revisar_pesajes",
+      "label": "lote cerrado",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "revisar_pesajes",
+      "to": "finalizar_lote",
+      "label": "todos revisados",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "crear_cliente",
+      "to": "rechazar_cliente",
+      "label": "motivo requerido",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "crear_lote",
+      "to": "rechazar_lote",
+      "label": "libera nombre_lote",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "registrar_pesaje",
+      "to": "anular_pesaje",
+      "label": "motivo requerido",
+      "variant": "security",
+      "role": "error",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "revisar_pesajes",
+      "to": "rechazo_aprobador",
+      "label": "lote ya cerrado",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Camino principal",
+      "items": [
+        "El cliente nace activo, sin aprobación previa",
+        "Abrir lote exige vínculo cliente_operador",
+        "Finalizar exige pesajes revisados, no aprobados"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Qué detiene el flujo",
+      "items": [
+        "Aprobar exige lote abierto con pesaje activo",
+        "Al cerrar el lote, POST /pesajes da 400",
+        "Los rechazos son irreversibles y sin cascada"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Control de acceso real",
+      "items": [
+        "Crear cliente, lote y pesaje validan el vínculo",
+        "Aprobar y rechazar: abiertos a cualquier token",
+        "'cerrado' = rechazado, aprobado o finalizado"
+      ]
+    }
+  ]
+}
