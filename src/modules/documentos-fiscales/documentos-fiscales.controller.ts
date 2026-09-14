@@ -16,6 +16,7 @@ import { DocumentosFiscalesService } from './documentos-fiscales.service';
 import { CreateDocumentoFiscalDto } from './dto/create-documento-fiscal.dto';
 import { FiltrosDocumentosFiscalesDto } from './dto/filtros-documentos-fiscales.dto';
 import { CompletarDocumentoFiscalDto } from './dto/completar-documento-fiscal.dto';
+import { AnularDocumentoFiscalDto } from './dto/anular-documento-fiscal.dto';
 
 @ApiTags('documentos-fiscales')
 @ApiBearerAuth()
@@ -59,6 +60,20 @@ export class DocumentosFiscalesController {
         return {
             ok: true,
             msg: 'Documento fiscal completado correctamente',
+        };
+    }
+
+    @Patch(':id/anular')
+    async anular(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: AnularDocumentoFiscalDto,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        await this.documentosFiscalesService.anular(id, dto, userId);
+        return {
+            ok: true,
+            msg: 'Documento fiscal anulado correctamente',
         };
     }
 }

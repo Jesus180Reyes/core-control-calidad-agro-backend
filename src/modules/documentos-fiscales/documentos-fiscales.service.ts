@@ -3,6 +3,7 @@ import { DocumentosFiscalesRepository } from './repository/documentos-fiscales.r
 import { CreateDocumentoFiscalDto } from './dto/create-documento-fiscal.dto';
 import { FiltrosDocumentosFiscalesDto } from './dto/filtros-documentos-fiscales.dto';
 import { CompletarDocumentoFiscalDto } from './dto/completar-documento-fiscal.dto';
+import { AnularDocumentoFiscalDto } from './dto/anular-documento-fiscal.dto';
 
 @Injectable()
 export class DocumentosFiscalesService {
@@ -27,6 +28,18 @@ export class DocumentosFiscalesService {
         return await this.documentosFiscalesRepository.completarDocumentoFiscal(
             documentoId,
             dto,
+        );
+    }
+
+    async anular(
+        documentoId: number,
+        dto: AnularDocumentoFiscalDto,
+        userId: number,
+    ) {
+        return await this.documentosFiscalesRepository.anularDocumentoFiscal(
+            documentoId,
+            dto,
+            userId,
         );
     }
 }

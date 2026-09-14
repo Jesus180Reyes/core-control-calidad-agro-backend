@@ -1,10 +1,11 @@
 import { DatabaseService } from 'src/database/database.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateDocumentoFiscalDto } from '../dto/create-documento-fiscal.dto';
 import { FiltrosDocumentosFiscalesDto } from '../dto/filtros-documentos-fiscales.dto';
 import { CompletarDocumentoFiscalDto } from '../dto/completar-documento-fiscal.dto';
+import { AnularDocumentoFiscalDto } from '../dto/anular-documento-fiscal.dto';
 
 type PaisConfig = {
     id: number;
@@ -219,6 +220,36 @@ export class DocumentosFiscalesRepository {
                 .set({
                     ...(documento_aduanero !== undefined ? { documento_aduanero } : {}),
                     ...(archivo_url !== undefined ? { archivo_url } : {}),
+                })
+                .where('id', '=', documentoId)
+                .execute();
+
+            return true;
+        });
+    }
+
+    /**
+     * Anulacion logica. NO borra las filas hijas: se anula el documento, no se
+     * destruye la evidencia. Como validateLotesNoFacturados filtra isActive = 1,
+     * anular libera los lotes — pero no el numero, que el UNIQUE sigue ocupando.
+     */
+    async anularDocumentoFiscal(
+        documentoId: number,
+        data: AnularDocumentoFiscalDto,
+        userId: number,
+    ) {
+        const { motivo } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateDocumentoActivo(documentoId, trx);
+
+            await trx
+                .updateTable('documentos_fiscales')
+                .set({
+                    isActive: 0,
+                    motivo_anulacion: motivo,
+                    anulado_por: userId,
+                    anulado_en: sql<Date>`NOW()`,
                 })
                 .where('id', '=', documentoId)
                 .execute();
