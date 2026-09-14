@@ -9,6 +9,7 @@ import { LotesModule } from './modules/lotes/lotes.module';
 import { PesajesModule } from './modules/pesajes/pesajes.module';
 import { PermisosModule } from './modules/permisos/permisos.module';
 import { CatalogosModule } from './modules/catalogos/catalogos.module';
+import { DocumentosFiscalesModule } from './modules/documentos-fiscales/documentos-fiscales.module';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -26,6 +27,7 @@ import { JwtModule } from '@nestjs/jwt';
     PesajesModule,
     PermisosModule,
     CatalogosModule,
+    DocumentosFiscalesModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       global: true,

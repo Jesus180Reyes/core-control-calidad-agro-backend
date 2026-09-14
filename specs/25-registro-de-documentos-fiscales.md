@@ -424,64 +424,64 @@ Del país devuelve `codigo_pais`, `etiqueta_autorizacion` y `etiqueta_identifica
 
 ## Acceptance criteria
 
-- [ ] La app arranca, `npm run build` pasa y `npm run lint` no introduce errores nuevos.
-- [ ] El log de Nest mapea **32** rutas, con el reparto `auth` 2, `catalogos` 3, `clientes` 4, `lotes` 9, `permisos` 1, `pesajes` 7, `documentos-fiscales` **5**, más `GET /`.
-- [ ] Las cuatro tablas existen en MySQL con sus ocho FKs y sus cuatro `UNIQUE`.
-- [ ] `paises_config` tiene la fila de Honduras con `moneda = 'HNL'`, `etiqueta_autorizacion = 'CAI'` y `etiqueta_identificacion = 'RTN'`.
-- [ ] `clientes` tiene la columna `constancia_exonerado` y **no** tiene `pais_id`.
-- [ ] `POST /documentos-fiscales` responde **201** con `{ ok, msg, documento_id }` y crea las filas de las tres tablas en una sola transacción.
-- [ ] Un `POST` **sin** `pais_id` se registra contra el único país activo.
-- [ ] Con dos países activos, un `POST` sin `pais_id` responde **400** pidiendo el campo.
-- [ ] Un `pais_id` inexistente o con `isActive = 0` responde **400**.
-- [ ] Un `POST` **sin** `moneda` guarda la moneda de `paises_config`.
-- [ ] Un `numero_completo` que no cumple `patron_numero` del país responde **400**.
-- [ ] Con `patron_numero` en `NULL`, cualquier `numero_completo` se acepta.
-- [ ] Con `requiere_autorizacion = 1`, un `POST` sin `autorizacion` responde **400**; con `0`, se acepta.
-- [ ] El mismo `numero_completo` puede existir en dos países distintos.
-- [ ] Un `numero_completo` ya registrado **en el mismo país** responde **400** con mensaje legible, no un error de MySQL.
-- [ ] **No hay ninguna expresión regular de Honduras en ningún DTO ni en ningún archivo de código.** El único lugar donde vive es la fila de `paises_config`.
-- [ ] **No existen las columnas `cai`, `duca`, `orden_compra_exenta` ni `es_centroamerica`** en ninguna tabla.
-- [ ] Un `POST` con `impuestos` vacío o ausente crea el documento sin filas en `documento_fiscal_impuesto`.
-- [ ] Un `POST` con dos impuestos de tarifas distintas crea dos filas; con dos de la misma tarifa responde 400.
-- [ ] Un `cliente_id` inexistente o con `isActive = 0` responde **400**.
-- [ ] Un lote **abierto** responde **400**.
-- [ ] Un lote **aprobado y no finalizado** responde **400**.
-- [ ] Un lote **rechazado** responde **400**.
-- [ ] Un lote de **otro cliente** responde **400**.
-- [ ] Un lote ya vinculado a un documento con `isActive = 1` responde **400**.
-- [ ] `lotes: []` responde **400**.
-- [ ] Un `total` que no cuadra con la suma de importes responde **400**; una diferencia de 0.01 se acepta.
-- [ ] `documento_aduanero` y `archivo_url` enviados en el `POST` se ignoran y quedan en `NULL`.
-- [ ] `GET /documentos-fiscales` responde **200** con `{ ok, msg, documentos }`, ordenado por `fecha_emision` descendente.
-- [ ] Los tres query params filtran, se combinan con `AND`, y **ningún valor inválido produce 400**.
-- [ ] Sin params, el listado no incluye documentos anulados.
-- [ ] `PATCH /documentos-fiscales/:id/completar` escribe `documento_aduanero` y `archivo_url` cuando están en `NULL` y responde `{ ok, msg }`.
-- [ ] Un segundo `completar` sobre un campo ya escrito responde **400**, y el otro campo puede completarse por separado.
-- [ ] Un `completar` sin ninguno de los dos campos responde **400**.
-- [ ] `PATCH /documentos-fiscales/:id/anular` escribe `isActive = 0`, `motivo_anulacion`, `anulado_por` y `anulado_en`, y responde `{ ok, msg }` sin payload.
-- [ ] Un `motivo` de menos de 5 o más de 255 caracteres responde **400**.
-- [ ] Anular dos veces responde **400** la segunda.
-- [ ] Anular **no borra** las filas de `documento_fiscal_impuesto` ni de `documento_fiscal_lote`.
-- [ ] Después de anular, el mismo `lote_id` puede registrarse en un documento nuevo.
-- [ ] `GET /documentos-fiscales/:id` responde **200** con `{ ok, msg, documento }`, incluyendo país, impuestos, lotes y, por cada lote, `nombre_lote`, `producto`, `unidad_medida`, `aprobado_por`, `aprobado_en`, `finalizado_por`, `finalizado_en`, el conteo de pesajes activos y la suma de `peso_neto`.
-- [ ] El detalle devuelve `etiqueta_autorizacion` y `etiqueta_identificacion` del país.
-- [ ] `aprobado_por` y `finalizado_por` traen el nombre completo del usuario, no un id.
-- [ ] Un documento **anulado** responde **200** en el detalle, con `isActive: 0` y su `motivo_anulacion`.
-- [ ] Un id inexistente responde **404**; un id no numérico responde **400** del `ParseIntPipe`.
-- [ ] `@Get(':id')` está declarado **último** en `DocumentosFiscalesController`, y `GET /documentos-fiscales` sigue respondiendo el listado.
-- [ ] Las cinco rutas responden **401** sin token.
-- [ ] Un usuario **sin** fila en `cliente_operador` para ese cliente responde **200**/**201**, no 403, en las cinco rutas.
-- [ ] Los cinco handlers tienen `@ApiOperation` con resumen y descripción; los tres con `:id` tienen `@ApiParam`.
-- [ ] La clase tiene `@ApiTags` y `@ApiBearerAuth`, y no se agregó ningún `@ApiResponse`.
-- [ ] `/docs-json` tiene **31** operaciones en **29** claves de `paths`.
-- [ ] Los 27 endpoints previos devuelven exactamente los mismos campos y filas que antes de este spec.
-- [ ] `GET /clientes` y `GET /clientes/all` siguen devolviendo **seis** campos: la columna nueva de `clientes` no se filtró a ninguna respuesta.
-- [ ] `ClientesRepository` no cambió: los validadores de `rtn` y `codigo_exportacion` siguen filtrando solo `isActive = 1`.
-- [ ] `catalogo_permisos` sigue con **9** filas, `permisos` con **14** y `roles` con **2**.
-- [ ] No existe ningún `PermissionsGuard` ni decorador `@Permisos()`.
-- [ ] No se generó ningún correlativo, ninguna autorización, ningún cálculo de impuesto y ningún PDF.
-- [ ] `README.md` no cambió.
-- [ ] `CLAUDE.md` documenta el módulo, las tablas, los cinco endpoints, todos los conteos nuevos y lo que exige habilitar un segundo país.
+- [X] La app arranca, `npm run build` pasa y `npm run lint` no introduce errores nuevos.
+- [X] El log de Nest mapea **32** rutas, con el reparto `auth` 2, `catalogos` 3, `clientes` 4, `lotes` 9, `permisos` 1, `pesajes` 7, `documentos-fiscales` **5**, más `GET /`.
+- [X] Las cuatro tablas existen en MySQL con sus ocho FKs y sus cuatro `UNIQUE`.
+- [X] `paises_config` tiene la fila de Honduras con `moneda = 'HNL'`, `etiqueta_autorizacion = 'CAI'` y `etiqueta_identificacion = 'RTN'`.
+- [X] `clientes` tiene la columna `constancia_exonerado` y **no** tiene `pais_id`.
+- [X] `POST /documentos-fiscales` responde **201** con `{ ok, msg, documento_id }` y crea las filas de las tres tablas en una sola transacción.
+- [X] Un `POST` **sin** `pais_id` se registra contra el único país activo.
+- [X] Con dos países activos, un `POST` sin `pais_id` responde **400** pidiendo el campo.
+- [X] Un `pais_id` inexistente o con `isActive = 0` responde **400**.
+- [X] Un `POST` **sin** `moneda` guarda la moneda de `paises_config`.
+- [X] Un `numero_completo` que no cumple `patron_numero` del país responde **400**.
+- [X] Con `patron_numero` en `NULL`, cualquier `numero_completo` se acepta.
+- [X] Con `requiere_autorizacion = 1`, un `POST` sin `autorizacion` responde **400**; con `0`, se acepta.
+- [X] El mismo `numero_completo` puede existir en dos países distintos.
+- [X] Un `numero_completo` ya registrado **en el mismo país** responde **400** con mensaje legible, no un error de MySQL.
+- [X] **No hay ninguna expresión regular de Honduras en ningún DTO ni en ningún archivo de código.** El único lugar donde vive es la fila de `paises_config`.
+- [X] **No existen las columnas `cai`, `duca`, `orden_compra_exenta` ni `es_centroamerica`** en ninguna tabla.
+- [X] Un `POST` con `impuestos` vacío o ausente crea el documento sin filas en `documento_fiscal_impuesto`.
+- [X] Un `POST` con dos impuestos de tarifas distintas crea dos filas; con dos de la misma tarifa responde 400.
+- [X] Un `cliente_id` inexistente o con `isActive = 0` responde **400**.
+- [X] Un lote **abierto** responde **400**.
+- [X] Un lote **aprobado y no finalizado** responde **400**.
+- [X] Un lote **rechazado** responde **400**.
+- [X] Un lote de **otro cliente** responde **400**.
+- [X] Un lote ya vinculado a un documento con `isActive = 1` responde **400**.
+- [X] `lotes: []` responde **400**.
+- [X] Un `total` que no cuadra con la suma de importes responde **400**; una diferencia de 0.01 se acepta.
+- [X] `documento_aduanero` y `archivo_url` enviados en el `POST` se ignoran y quedan en `NULL`.
+- [X] `GET /documentos-fiscales` responde **200** con `{ ok, msg, documentos }`, ordenado por `fecha_emision` descendente.
+- [X] Los tres query params filtran, se combinan con `AND`, y **ningún valor inválido produce 400**.
+- [X] Sin params, el listado no incluye documentos anulados.
+- [X] `PATCH /documentos-fiscales/:id/completar` escribe `documento_aduanero` y `archivo_url` cuando están en `NULL` y responde `{ ok, msg }`.
+- [X] Un segundo `completar` sobre un campo ya escrito responde **400**, y el otro campo puede completarse por separado.
+- [X] Un `completar` sin ninguno de los dos campos responde **400**.
+- [X] `PATCH /documentos-fiscales/:id/anular` escribe `isActive = 0`, `motivo_anulacion`, `anulado_por` y `anulado_en`, y responde `{ ok, msg }` sin payload.
+- [X] Un `motivo` de menos de 5 o más de 255 caracteres responde **400**.
+- [X] Anular dos veces responde **400** la segunda.
+- [X] Anular **no borra** las filas de `documento_fiscal_impuesto` ni de `documento_fiscal_lote`.
+- [X] Después de anular, el mismo `lote_id` puede registrarse en un documento nuevo.
+- [X] `GET /documentos-fiscales/:id` responde **200** con `{ ok, msg, documento }`, incluyendo país, impuestos, lotes y, por cada lote, `nombre_lote`, `producto`, `unidad_medida`, `aprobado_por`, `aprobado_en`, `finalizado_por`, `finalizado_en`, el conteo de pesajes activos y la suma de `peso_neto`.
+- [X] El detalle devuelve `etiqueta_autorizacion` y `etiqueta_identificacion` del país.
+- [X] `aprobado_por` y `finalizado_por` traen el nombre completo del usuario, no un id.
+- [X] Un documento **anulado** responde **200** en el detalle, con `isActive: 0` y su `motivo_anulacion`.
+- [X] Un id inexistente responde **404**; un id no numérico responde **400** del `ParseIntPipe`.
+- [X] `@Get(':id')` está declarado **último** en `DocumentosFiscalesController`, y `GET /documentos-fiscales` sigue respondiendo el listado.
+- [X] Las cinco rutas responden **401** sin token.
+- [X] Un usuario **sin** fila en `cliente_operador` para ese cliente responde **200**/**201**, no 403, en las cinco rutas.
+- [X] Los cinco handlers tienen `@ApiOperation` con resumen y descripción; los tres con `:id` tienen `@ApiParam`.
+- [X] La clase tiene `@ApiTags` y `@ApiBearerAuth`, y no se agregó ningún `@ApiResponse`.
+- [X] `/docs-json` tiene **31** operaciones en **29** claves de `paths`.
+- [X] Los 27 endpoints previos devuelven exactamente los mismos campos y filas que antes de este spec.
+- [X] `GET /clientes` y `GET /clientes/all` siguen devolviendo **seis** campos: la columna nueva de `clientes` no se filtró a ninguna respuesta.
+- [X] `ClientesRepository` no cambió: los validadores de `rtn` y `codigo_exportacion` siguen filtrando solo `isActive = 1`.
+- [X] `catalogo_permisos` sigue con **9** filas, `permisos` con **14** y `roles` con **2**.
+- [X] No existe ningún `PermissionsGuard` ni decorador `@Permisos()`.
+- [X] No se generó ningún correlativo, ninguna autorización, ningún cálculo de impuesto y ningún PDF.
+- [X] `README.md` no cambió.
+- [X] `CLAUDE.md` documenta el módulo, las tablas, los cinco endpoints, todos los conteos nuevos y lo que exige habilitar un segundo país.
 
 ---
 
