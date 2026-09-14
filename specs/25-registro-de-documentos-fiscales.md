@@ -1,6 +1,6 @@
 # SPEC 25 — Registro de documentos fiscales
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 02 (crea el módulo `lotes`), SPEC 11 (rechazo de clientes, que libera el `rtn` para reuso), SPEC 13 (escribe `aprobado_por`/`aprobado_en`), SPEC 20 (escribe la etapa `FINALIZADO` y el par `finalizado_por`/`finalizado_en`), SPEC 22 (Swagger, donde hay que documentar las rutas nuevas)
 > **Date:** 2026-09-14
 > **Objective:** Crear el módulo `documentos-fiscales`, que registra las facturas emitidas fuera del sistema y las amarra a los lotes finalizados que respaldan, con el régimen de cada país como dato y no como estructura, para que ante una auditoría la evidencia de trazabilidad de una exportación declarada se resuelva en una consulta.
