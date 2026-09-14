@@ -95,6 +95,7 @@ export interface ClientesTable {
   correo_contacto: string | null;
   telefono: string | null;
   direccion_planta: string | null;
+  constancia_exonerado: string | null;
   ubicacionLongitud: string | null;
   ubicacionLatitude: string | null;
   isActive: Generated<number | null>;
@@ -137,6 +138,63 @@ export interface PermisosTable {
   created_at: Generated<Date | string | null>;
 }
 
+export interface PaisesConfigTable {
+  id: Generated<number>;
+  codigo_pais: string;
+  nombre: string;
+  moneda: string;
+  etiqueta_autorizacion: string;
+  etiqueta_identificacion: string;
+  patron_numero: string | null;
+  patron_autorizacion: string | null;
+  requiere_autorizacion: Generated<number>;
+  isActive: Generated<number>;
+  created_at: Generated<Date | string | null>;
+}
+
+export interface DocumentosFiscalesTable {
+  id: Generated<number>;
+  pais_id: number;
+  cliente_id: number;
+  tipo_documento: 'FACTURA' | 'NOTA_CREDITO' | 'NOTA_DEBITO';
+  numero_completo: string;
+  autorizacion: string | null;
+  fecha_emision: Date | string;
+  moneda: string;
+  tipo_cambio: Generated<string | number>;
+  importe_exento: Generated<string | number>;
+  importe_exonerado: Generated<string | number>;
+  total: string | number;
+  referencia_exencion: string | null;
+  pais_destino: string | null;
+  documento_aduanero: string | null;
+  archivo_url: string | null;
+  motivo_anulacion: string | null;
+  anulado_por: number | null;
+  anulado_en: Date | string | null;
+  isActive: Generated<number>;
+  created_by: number;
+  created_at: Generated<Date | string | null>;
+}
+
+export interface DocumentoFiscalImpuestoTable {
+  id: Generated<number>;
+  documento_id: number;
+  tarifa: string | number;
+  base_gravada: string | number;
+  impuesto: string | number;
+  created_at: Generated<Date | string | null>;
+}
+
+export interface DocumentoFiscalLoteTable {
+  id: Generated<number>;
+  documento_id: number;
+  lote_id: number;
+  cantidad: string | number;
+  unidad_medida_id: number | null;
+  created_at: Generated<Date | string | null>;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -164,5 +222,9 @@ export interface Database {
   etapas: EtapasTable;
   catalogo_permisos: CatalogoPermisosTable;
   permisos: PermisosTable;
+  paises_config: PaisesConfigTable;
+  documentos_fiscales: DocumentosFiscalesTable;
+  documento_fiscal_impuesto: DocumentoFiscalImpuestoTable;
+  documento_fiscal_lote: DocumentoFiscalLoteTable;
   bitacora: BitacoraView;
 }
