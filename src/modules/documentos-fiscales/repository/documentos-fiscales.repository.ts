@@ -1,5 +1,9 @@
 import { DatabaseService } from 'src/database/database.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateDocumentoFiscalDto } from '../dto/create-documento-fiscal.dto';
@@ -193,6 +197,169 @@ export class DocumentosFiscalesRepository {
 
             return documentoId;
         });
+    }
+
+    /**
+     * El endpoint de auditoria: la cabecera, su pais, sus impuestos, sus lotes y
+     * la trazabilidad de cada lote. Devuelve el documento aunque este anulado —
+     * al reves que el SPEC 21 con los pesajes — porque una lectura que existe
+     * para auditar no puede esconder justo lo que el auditor busca.
+     */
+    async getDocumentoFiscalById(documentoId: number) {
+        const documento = await this.db
+            .selectFrom('documentos_fiscales')
+            .innerJoin('clientes', 'clientes.id', 'documentos_fiscales.cliente_id')
+            .innerJoin(
+                'paises_config',
+                'paises_config.id',
+                'documentos_fiscales.pais_id',
+            )
+            .leftJoin(
+                'usuarios as anulador',
+                'anulador.id',
+                'documentos_fiscales.anulado_por',
+            )
+            .select([
+                'documentos_fiscales.id',
+                'documentos_fiscales.tipo_documento',
+                'documentos_fiscales.numero_completo',
+                'documentos_fiscales.autorizacion',
+                'documentos_fiscales.fecha_emision',
+                'documentos_fiscales.moneda',
+                'documentos_fiscales.tipo_cambio',
+                'documentos_fiscales.importe_exento',
+                'documentos_fiscales.importe_exonerado',
+                'documentos_fiscales.total',
+                'documentos_fiscales.referencia_exencion',
+                'documentos_fiscales.pais_destino',
+                'documentos_fiscales.documento_aduanero',
+                'documentos_fiscales.archivo_url',
+                'documentos_fiscales.cliente_id',
+                'clientes.nombre as cliente',
+                'clientes.rtn as cliente_rtn',
+                'documentos_fiscales.isActive',
+                'documentos_fiscales.motivo_anulacion',
+                'anulador.complete_name as anulado_por',
+                'documentos_fiscales.anulado_en',
+                'documentos_fiscales.created_at',
+                'paises_config.codigo_pais',
+                'paises_config.etiqueta_autorizacion',
+                'paises_config.etiqueta_identificacion',
+            ])
+            .where('documentos_fiscales.id', '=', documentoId)
+            .executeTakeFirst();
+
+        if (!documento) {
+            throw new NotFoundException(
+                `El documento fiscal con id '${documentoId}' no existe`,
+            );
+        }
+
+        const {
+            codigo_pais,
+            etiqueta_autorizacion,
+            etiqueta_identificacion,
+            ...cabecera
+        } = documento;
+
+        const impuestos = await this.db
+            .selectFrom('documento_fiscal_impuesto')
+            .select(['tarifa', 'base_gravada', 'impuesto'])
+            .where('documento_id', '=', documentoId)
+            .orderBy('tarifa', 'asc')
+            .execute();
+
+        const lotes = await this.db
+            .selectFrom('documento_fiscal_lote')
+            .innerJoin('lotes', 'lotes.id', 'documento_fiscal_lote.lote_id')
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .leftJoin(
+                'unidades_medida as unidad_facturada',
+                'unidad_facturada.id',
+                'documento_fiscal_lote.unidad_medida_id',
+            )
+            .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
+            .leftJoin(
+                'usuarios as finalizador',
+                'finalizador.id',
+                'lotes.finalizado_por',
+            )
+            .select([
+                'documento_fiscal_lote.lote_id',
+                'documento_fiscal_lote.cantidad',
+                'unidad_facturada.nombre as unidad_medida_facturada',
+                'lotes.nombre_lote',
+                'lotes.variedad_o_talla',
+                'productos.nombre as producto',
+                'unidades_medida.nombre as unidad_medida',
+                'aprobador.complete_name as aprobado_por',
+                'lotes.aprobado_en',
+                'finalizador.complete_name as finalizado_por',
+                'lotes.finalizado_en',
+            ])
+            .where('documento_fiscal_lote.documento_id', '=', documentoId)
+            .orderBy('documento_fiscal_lote.id', 'asc')
+            .execute();
+
+        const resumenPesajes = await this.resumirPesajes(
+            lotes.map((lote) => Number(lote.lote_id)),
+        );
+
+        return {
+            ...cabecera,
+            pais: {
+                codigo_pais,
+                etiqueta_autorizacion,
+                etiqueta_identificacion,
+            },
+            impuestos,
+            lotes: lotes.map((lote) => {
+                const resumen = resumenPesajes.get(Number(lote.lote_id));
+                return {
+                    ...lote,
+                    pesajes_activos: resumen?.pesajes_activos ?? 0,
+                    peso_neto_total: resumen?.peso_neto_total ?? 0,
+                };
+            }),
+        };
+    }
+
+    /**
+     * El conteo de pesajes activos y la suma de su peso neto, por lote: el
+     * respaldo fisico de lo que declara el documento. Una sola consulta
+     * agrupada, no una por lote.
+     */
+    private async resumirPesajes(loteIds: number[]) {
+        if (loteIds.length === 0) {
+            return new Map<number, { pesajes_activos: number; peso_neto_total: number }>();
+        }
+
+        const filas = await this.db
+            .selectFrom('pesajes')
+            .select((eb) => [
+                'pesajes.lote_id',
+                eb.fn.count('pesajes.id').as('pesajes_activos'),
+                eb.fn.sum('pesajes.peso_neto').as('peso_neto_total'),
+            ])
+            .where('pesajes.lote_id', 'in', loteIds)
+            .where('pesajes.isActive', '=', 1)
+            .groupBy('pesajes.lote_id')
+            .execute();
+
+        return new Map(
+            filas.map((fila) => [
+                Number(fila.lote_id),
+                {
+                    pesajes_activos: Number(fila.pesajes_activos),
+                    peso_neto_total: Number(fila.peso_neto_total ?? 0),
+                },
+            ]),
+        );
     }
 
     /**

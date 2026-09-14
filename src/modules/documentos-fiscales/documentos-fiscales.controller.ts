@@ -76,4 +76,16 @@ export class DocumentosFiscalesController {
             msg: 'Documento fiscal anulado correctamente',
         };
     }
+
+    // Declarado ULTIMO a proposito: Nest resuelve por orden de declaracion, y
+    // un @Get(':id') por encima de @Get() o de los dos @Patch se los tragaria.
+    @Get(':id')
+    async findOne(@Param('id', ParseIntPipe) id: number) {
+        const documento = await this.documentosFiscalesService.findOne(id);
+        return {
+            ok: !!documento,
+            msg: 'Documento fiscal obtenido correctamente',
+            documento,
+        };
+    }
 }

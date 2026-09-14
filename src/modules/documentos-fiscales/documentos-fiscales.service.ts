@@ -17,6 +17,12 @@ export class DocumentosFiscalesService {
         );
     }
 
+    async findOne(documentoId: number) {
+        return await this.documentosFiscalesRepository.getDocumentoFiscalById(
+            documentoId,
+        );
+    }
+
     async create(dto: CreateDocumentoFiscalDto, userId: number) {
         return await this.documentosFiscalesRepository.createDocumentoFiscal(
             dto,
