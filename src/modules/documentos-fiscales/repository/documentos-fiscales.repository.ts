@@ -3,6 +3,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateDocumentoFiscalDto } from '../dto/create-documento-fiscal.dto';
+import { FiltrosDocumentosFiscalesDto } from '../dto/filtros-documentos-fiscales.dto';
+import { CompletarDocumentoFiscalDto } from '../dto/completar-documento-fiscal.dto';
 
 type PaisConfig = {
     id: number;
@@ -27,6 +29,72 @@ export class DocumentosFiscalesRepository {
 
     get db() {
         return this.dbService.client;
+    }
+
+    async getDocumentosFiscales(filtros: FiltrosDocumentosFiscalesDto) {
+        let query = this.db
+            .selectFrom('documentos_fiscales')
+            .innerJoin('clientes', 'clientes.id', 'documentos_fiscales.cliente_id')
+            .innerJoin(
+                'paises_config',
+                'paises_config.id',
+                'documentos_fiscales.pais_id',
+            )
+            .select([
+                'documentos_fiscales.id',
+                'documentos_fiscales.tipo_documento',
+                'documentos_fiscales.numero_completo',
+                'documentos_fiscales.autorizacion',
+                'documentos_fiscales.fecha_emision',
+                'documentos_fiscales.moneda',
+                'documentos_fiscales.tipo_cambio',
+                'documentos_fiscales.importe_exento',
+                'documentos_fiscales.importe_exonerado',
+                'documentos_fiscales.total',
+                'documentos_fiscales.referencia_exencion',
+                'documentos_fiscales.pais_destino',
+                'documentos_fiscales.documento_aduanero',
+                'documentos_fiscales.archivo_url',
+                'documentos_fiscales.cliente_id',
+                'clientes.nombre as cliente',
+                'clientes.rtn as cliente_rtn',
+                'paises_config.codigo_pais as pais',
+                'documentos_fiscales.created_at',
+            ])
+            .where('documentos_fiscales.isActive', '=', 1);
+
+        if (filtros.cliente_id !== undefined) {
+            query = query.where(
+                'documentos_fiscales.cliente_id',
+                '=',
+                filtros.cliente_id,
+            );
+        }
+
+        if (filtros.desde !== undefined) {
+            query = query.where(
+                'documentos_fiscales.fecha_emision',
+                '>=',
+                filtros.desde,
+            );
+        }
+
+        // fecha_emision es DATE, no DATETIME, asi que el <= ya incluye todo el
+        // dia y no hace falta el DATE_ADD que usan los filtros de pesajes.
+        if (filtros.hasta !== undefined) {
+            query = query.where(
+                'documentos_fiscales.fecha_emision',
+                '<=',
+                filtros.hasta,
+            );
+        }
+
+        const documentos = await query
+            .orderBy('documentos_fiscales.fecha_emision', 'desc')
+            .orderBy('documentos_fiscales.id', 'desc')
+            .execute();
+
+        return documentos;
     }
 
     async createDocumentoFiscal(data: CreateDocumentoFiscalDto, userId: number) {
@@ -124,6 +192,87 @@ export class DocumentosFiscalesRepository {
 
             return documentoId;
         });
+    }
+
+    /**
+     * La unica escritura del modulo que no es de auditoria ni de ciclo de vida:
+     * el documento aduanero llega despues de la factura, cuando cierra aduana.
+     * Cada campo se escribe una sola vez.
+     */
+    async completarDocumentoFiscal(
+        documentoId: number,
+        data: CompletarDocumentoFiscalDto,
+    ) {
+        const { documento_aduanero, archivo_url } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            const documento = await this.validateDocumentoActivo(documentoId, trx);
+            this.validateCampoDisponible(
+                documento,
+                'documento_aduanero',
+                documento_aduanero,
+            );
+            this.validateCampoDisponible(documento, 'archivo_url', archivo_url);
+
+            await trx
+                .updateTable('documentos_fiscales')
+                .set({
+                    ...(documento_aduanero !== undefined ? { documento_aduanero } : {}),
+                    ...(archivo_url !== undefined ? { archivo_url } : {}),
+                })
+                .where('id', '=', documentoId)
+                .execute();
+
+            return true;
+        });
+    }
+
+    private async validateDocumentoActivo(
+        documentoId: number,
+        db: Kysely<Database>,
+    ) {
+        const documento = await db
+            .selectFrom('documentos_fiscales')
+            .select([
+                'id',
+                'numero_completo',
+                'isActive',
+                'documento_aduanero',
+                'archivo_url',
+            ])
+            .where('id', '=', documentoId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El documento fiscal con id '${documentoId}' no existe`,
+                    ),
+            );
+
+        if (!documento.isActive) {
+            throw new BadRequestException(
+                `El documento '${documento.numero_completo}' ya fue anulado`,
+            );
+        }
+
+        return documento;
+    }
+
+    private validateCampoDisponible(
+        documento: {
+            numero_completo: string;
+            documento_aduanero: string | null;
+            archivo_url: string | null;
+        },
+        campo: 'documento_aduanero' | 'archivo_url',
+        valor: string | undefined,
+    ) {
+        if (valor === undefined) return;
+
+        if (documento[campo] !== null) {
+            throw new BadRequestException(
+                `El campo ${campo} del documento '${documento.numero_completo}' ya fue completado`,
+            );
+        }
     }
 
     /**
