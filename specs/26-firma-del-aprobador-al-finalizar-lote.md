@@ -236,53 +236,53 @@ Los errores del SPEC 20 —`no existe`, `ya fue finalizado`, `ya fue rechazado`,
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE lotes;` muestra `firma_aprobador` como `mediumtext`, nullable.
-- [ ] `SHOW CREATE TABLE lotes;` **no** muestra ninguna FK ni índice nuevo sobre `firma_aprobador`.
-- [ ] El DDL no modificó ninguna fila existente: todos los lotes anteriores quedan con `firma_aprobador = NULL`, incluidos los ya finalizados.
-- [ ] `LotesTable` en `src/database/types/types.ts` declara `firma_aprobador: string | null`, y ninguna otra interfaz del archivo cambió.
-- [ ] Existe `src/modules/lotes/dto/finalizar-lote.dto.ts` con `FinalizarLoteDto`, y `src/modules/lotes/dto/` pasa a tener exactamente **tres** archivos.
-- [ ] El schema del DTO **no** contiene ningún `.transform()`, ningún `.optional()` y ningún `.catch()`.
-- [ ] El schema aplica `.max(500000)` **antes** que el `.regex()`.
-- [ ] No se creó ningún módulo, controller, service, repositorio ni endpoint nuevo.
-- [ ] `src/app.module.ts` y `src/modules/lotes/lotes.module.ts` no cambiaron.
-- [ ] El log de Nest sigue mapeando **32** rutas, con el reparto `auth` 2, `catalogos` 3, `clientes` 4, `lotes` **9**, `permisos` 1, `pesajes` 7, `documentos-fiscales` 5, más `GET /`.
-- [ ] `PATCH /lotes/:id/finalizar/byApprover` con un lote finalizable y una firma válida responde 200 con exactamente `{ ok: true, msg: 'Lote finalizado correctamente' }`.
-- [ ] La respuesta del 200 tiene exactamente **dos** claves: **no** devuelve `firma_aprobador` ni ninguna clave de recurso.
-- [ ] Después de finalizar, la fila tiene `firma_aprobador` con el string **completo** que se envió: `LENGTH(firma_aprobador)` coincide con la longitud del string enviado.
-- [ ] El valor guardado, pegado en el `src` de un `<img>`, pinta la firma.
-- [ ] Después de finalizar, `etapa_id` es el de la fila `codigo = 'FINALIZADO'`, `finalizado_por` es el `userId` del token y `finalizado_en` la hora de la finalización.
-- [ ] Después de finalizar, `estado` sigue en `'cerrado'` y `cerrado_en` conserva **la hora de la aprobación**, no la de la finalización.
-- [ ] Después de finalizar, `aprobado_por`, `aprobado_en`, `motivo_rechazo`, `rechazado_por`, `rechazado_en`, los tres pesos, `variedad_o_talla`, `resumen_ia`, `created_by` y `created_at` quedan **sin cambios**.
-- [ ] La finalización **no** modifica ninguna fila de `pesajes`.
-- [ ] `PATCH /lotes/:id/finalizar/byApprover` **sin body** responde **400** `Firma del aprobador requerida`, y ninguna columna del lote cambia. **Este es el cambio incompatible del spec.**
-- [ ] Un body `{}` responde 400 con el mismo mensaje.
-- [ ] `firma_aprobador` en `null` o en un número responde 400.
-- [ ] `firma_aprobador` en `""` responde 400 `La firma debe ser un data URL de PNG en base64`.
-- [ ] Un base64 **sin** el prefijo `data:image/png;base64,` responde 400.
-- [ ] Un data URL de `image/jpeg`, de `image/webp` o de `image/svg+xml` responde 400.
-- [ ] Una cadena de **500.001** caracteres responde 400 `La firma no puede exceder los 500000 caracteres`.
-- [ ] Una cadena de exactamente **500.000** caracteres con formato válido **no** es rechazada por el límite.
-- [ ] Cuando el DTO rechaza, la transacción del repositorio **nunca corre**: ninguna columna cambia.
-- [ ] Una petición con firma inválida **y** un lote no finalizable devuelve el error de la **firma**, no el del lote.
-- [ ] Los ocho mensajes de error del SPEC 20 siguen **idénticos** cuando la firma es válida: `no existe`, `ya fue finalizado`, `ya fue rechazado`, `no esta cerrado`, `no esta en la etapa CLIENTE_FINAL`, `no tiene pesajes registrados`, `tiene pesajes sin revisar por el aprobador` y `La etapa con codigo 'FINALIZADO' no existe`.
-- [ ] `validateLoteNoFinalizado`, `validateLoteEnClienteFinal`, `validateLoteTienePesajes`, `validatePesajesRevisados`, `resolveEtapa`, `validateLoteAbierto`, `validateEtapaEnProceso` y `validateVinculoOperador` **no se modificaron**: ni firma, ni condición, ni mensajes, ni `select`.
-- [ ] `finalizarLote` sigue corriendo sus cinco validaciones dentro de la misma transacción y en el mismo orden.
-- [ ] El `UPDATE` escribe exactamente **cuatro** columnas.
-- [ ] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote finaliza igual: responde **200, no 403**. Este spec no cambia el control de acceso.
-- [ ] `GET /lotes/cliente/:clienteId/all/finalizados` devuelve exactamente los mismos **14** campos que antes: **no** incluye `firma_aprobador`.
-- [ ] `GET /lotes/cliente/:clienteId`, `/all` y `/all/approver` devuelven exactamente los mismos **10** campos que antes.
-- [ ] Ningún endpoint de la API devuelve `firma_aprobador` en ninguna respuesta.
-- [ ] No hay ningún `selectAll()` en `LotesRepository`.
-- [ ] `PATCH /lotes/:id/aprobar` sigue **sin** body y **sin** DTO.
-- [ ] `PATCH /pesajes/:id/aprobar/byApprover` sigue **sin** body y **sin** DTO.
-- [ ] Los otros ocho endpoints de `lotes`, los siete de `pesajes`, los cuatro de `clientes`, los cinco de `documentos-fiscales`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual que antes.
-- [ ] `catalogo_permisos` sigue con **9** filas y `permisos` con **14**: no se sembró ninguna fila.
-- [ ] El handler tiene su `@ApiOperation` actualizado, sin la frase "sin cuerpo de peticion", y `/docs` muestra el schema del body con `firma_aprobador` como requerido.
-- [ ] No se agregó ningún `@ApiResponse` en ninguna parte.
-- [ ] `/docs-json` sigue con **31** operaciones en **29** claves de `paths`.
-- [ ] `npm run build` pasa y `npm run lint` no introduce errores nuevos.
-- [ ] `README.md` no cambió.
-- [ ] `CLAUDE.md` documenta la columna, el DDL sin FK, el cuerpo obligatorio, que los endpoints sin body pasan de tres a **dos**, que `finalizarLote` escribe **cuatro** columnas, y que la firma se escribe y no se lee.
+- [X] `DESCRIBE lotes;` muestra `firma_aprobador` como `mediumtext`, nullable.
+- [X] `SHOW CREATE TABLE lotes;` **no** muestra ninguna FK ni índice nuevo sobre `firma_aprobador`.
+- [X] El DDL no modificó ninguna fila existente: todos los lotes anteriores quedan con `firma_aprobador = NULL`, incluidos los ya finalizados.
+- [X] `LotesTable` en `src/database/types/types.ts` declara `firma_aprobador: string | null`, y ninguna otra interfaz del archivo cambió.
+- [X] Existe `src/modules/lotes/dto/finalizar-lote.dto.ts` con `FinalizarLoteDto`, y `src/modules/lotes/dto/` pasa a tener exactamente **tres** archivos.
+- [X] El schema del DTO **no** contiene ningún `.transform()`, ningún `.optional()` y ningún `.catch()`.
+- [X] El schema aplica `.max(500000)` **antes** que el `.regex()`.
+- [X] No se creó ningún módulo, controller, service, repositorio ni endpoint nuevo.
+- [X] `src/app.module.ts` y `src/modules/lotes/lotes.module.ts` no cambiaron.
+- [X] El log de Nest sigue mapeando **32** rutas, con el reparto `auth` 2, `catalogos` 3, `clientes` 4, `lotes` **9**, `permisos` 1, `pesajes` 7, `documentos-fiscales` 5, más `GET /`.
+- [X] `PATCH /lotes/:id/finalizar/byApprover` con un lote finalizable y una firma válida responde 200 con exactamente `{ ok: true, msg: 'Lote finalizado correctamente' }`.
+- [X] La respuesta del 200 tiene exactamente **dos** claves: **no** devuelve `firma_aprobador` ni ninguna clave de recurso.
+- [X] Después de finalizar, la fila tiene `firma_aprobador` con el string **completo** que se envió: `LENGTH(firma_aprobador)` coincide con la longitud del string enviado.
+- [X] El valor guardado, pegado en el `src` de un `<img>`, pinta la firma.
+- [X] Después de finalizar, `etapa_id` es el de la fila `codigo = 'FINALIZADO'`, `finalizado_por` es el `userId` del token y `finalizado_en` la hora de la finalización.
+- [X] Después de finalizar, `estado` sigue en `'cerrado'` y `cerrado_en` conserva **la hora de la aprobación**, no la de la finalización.
+- [X] Después de finalizar, `aprobado_por`, `aprobado_en`, `motivo_rechazo`, `rechazado_por`, `rechazado_en`, los tres pesos, `variedad_o_talla`, `resumen_ia`, `created_by` y `created_at` quedan **sin cambios**.
+- [X] La finalización **no** modifica ninguna fila de `pesajes`.
+- [X] `PATCH /lotes/:id/finalizar/byApprover` **sin body** responde **400** `Firma del aprobador requerida`, y ninguna columna del lote cambia. **Este es el cambio incompatible del spec.**
+- [X] Un body `{}` responde 400 con el mismo mensaje.
+- [X] `firma_aprobador` en `null` o en un número responde 400.
+- [X] `firma_aprobador` en `""` responde 400 `La firma debe ser un data URL de PNG en base64`.
+- [X] Un base64 **sin** el prefijo `data:image/png;base64,` responde 400.
+- [X] Un data URL de `image/jpeg`, de `image/webp` o de `image/svg+xml` responde 400.
+- [X] Una cadena de **500.001** caracteres responde 400 `La firma no puede exceder los 500000 caracteres`.
+- [X] Una cadena de exactamente **500.000** caracteres con formato válido **no** es rechazada por el límite.
+- [X] Cuando el DTO rechaza, la transacción del repositorio **nunca corre**: ninguna columna cambia.
+- [X] Una petición con firma inválida **y** un lote no finalizable devuelve el error de la **firma**, no el del lote.
+- [X] Los ocho mensajes de error del SPEC 20 siguen **idénticos** cuando la firma es válida: `no existe`, `ya fue finalizado`, `ya fue rechazado`, `no esta cerrado`, `no esta en la etapa CLIENTE_FINAL`, `no tiene pesajes registrados`, `tiene pesajes sin revisar por el aprobador` y `La etapa con codigo 'FINALIZADO' no existe`.
+- [X] `validateLoteNoFinalizado`, `validateLoteEnClienteFinal`, `validateLoteTienePesajes`, `validatePesajesRevisados`, `resolveEtapa`, `validateLoteAbierto`, `validateEtapaEnProceso` y `validateVinculoOperador` **no se modificaron**: ni firma, ni condición, ni mensajes, ni `select`.
+- [X] `finalizarLote` sigue corriendo sus cinco validaciones dentro de la misma transacción y en el mismo orden.
+- [X] El `UPDATE` escribe exactamente **cuatro** columnas.
+- [X] Un `Operador` **sin** fila en `cliente_operador` para el cliente del lote finaliza igual: responde **200, no 403**. Este spec no cambia el control de acceso.
+- [X] `GET /lotes/cliente/:clienteId/all/finalizados` devuelve exactamente los mismos **14** campos que antes: **no** incluye `firma_aprobador`.
+- [X] `GET /lotes/cliente/:clienteId`, `/all` y `/all/approver` devuelven exactamente los mismos **10** campos que antes.
+- [X] Ningún endpoint de la API devuelve `firma_aprobador` en ninguna respuesta.
+- [X] No hay ningún `selectAll()` en `LotesRepository`.
+- [X] `PATCH /lotes/:id/aprobar` sigue **sin** body y **sin** DTO.
+- [X] `PATCH /pesajes/:id/aprobar/byApprover` sigue **sin** body y **sin** DTO.
+- [X] Los otros ocho endpoints de `lotes`, los siete de `pesajes`, los cuatro de `clientes`, los cinco de `documentos-fiscales`, `GET /permisos/me`, los tres `GET /catalogos/*` y los dos de `auth` responden igual que antes.
+- [X] `catalogo_permisos` sigue con **9** filas y `permisos` con **14**: no se sembró ninguna fila.
+- [X] El handler tiene su `@ApiOperation` actualizado, sin la frase "sin cuerpo de peticion", y `/docs` muestra el schema del body con `firma_aprobador` como requerido.
+- [X] No se agregó ningún `@ApiResponse` en ninguna parte.
+- [X] `/docs-json` sigue con **31** operaciones en **29** claves de `paths`.
+- [X] `npm run build` pasa y `npm run lint` no introduce errores nuevos.
+- [X] `README.md` no cambió.
+- [X] `CLAUDE.md` documenta la columna, el DDL sin FK, el cuerpo obligatorio, que los endpoints sin body pasan de tres a **dos**, que `finalizarLote` escribe **cuatro** columnas, y que la firma se escribe y no se lee.
 
 ---
 
