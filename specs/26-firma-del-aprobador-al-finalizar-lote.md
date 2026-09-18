@@ -1,6 +1,6 @@
 # SPEC 26 — Firma del aprobador al finalizar un lote
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02 (crea el módulo `lotes`), SPEC 13 (escribe `aprobado_por`/`aprobado_en`), SPEC 20 (crea `PATCH /lotes/:id/finalizar/byApprover`, que este spec modifica), SPEC 22 (Swagger, donde hay que documentar el cuerpo nuevo), SPEC 24 (la única lectura de lotes finalizados, que **no** debe devolver la firma)
 > **Date:** 2026-09-18
 > **Objective:** Agregar la columna `lotes.firma_aprobador` y exigirla como cuerpo obligatorio de `PATCH /lotes/:id/finalizar/byApprover`, de modo que un lote no se pueda finalizar sin la firma manuscrita del aprobador guardada como data URL de PNG en base64.
