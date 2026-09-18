@@ -8,6 +8,7 @@ import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateLoteDto } from '../dto/create-lote.dto';
 import { RechazarLoteDto } from '../dto/rechazar-lote.dto';
+import { FinalizarLoteDto } from '../dto/finalizar-lote.dto';
 
 @Injectable()
 export class LotesRepository {
@@ -245,7 +246,11 @@ export class LotesRepository {
         });
     }
 
-    async finalizarLote(loteId: number, userId: number) {
+    async finalizarLote(
+        loteId: number,
+        dto: FinalizarLoteDto,
+        userId: number,
+    ) {
         return await this.db.transaction().execute(async (trx) => {
             await this.validateLoteNoFinalizado(loteId, trx);
             const lote = await this.validateLoteEnClienteFinal(loteId, trx);
@@ -259,6 +264,7 @@ export class LotesRepository {
                     etapa_id: etapa.id,
                     finalizado_por: userId,
                     finalizado_en: sql<Date>`NOW()`,
+                    firma_aprobador: dto.firma_aprobador,
                 })
                 .where('id', '=', loteId)
                 .execute();

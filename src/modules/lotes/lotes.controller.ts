@@ -14,6 +14,7 @@ import type { Request } from 'express';
 import { LotesService } from './lotes.service';
 import { CreateLoteDto } from './dto/create-lote.dto';
 import { RechazarLoteDto } from './dto/rechazar-lote.dto';
+import { FinalizarLoteDto } from './dto/finalizar-lote.dto';
 
 @ApiTags('lotes')
 @ApiBearerAuth()
@@ -227,7 +228,12 @@ export class LotesController {
         summary: 'Finalizar un lote, como aprobador',
         description:
             'Ultimo paso del flujo: mueve el lote a la etapa FINALIZADO. Es lo unico en el proyecto ' +
-            'que escribe esa etapa. Sin cuerpo de peticion. ' +
+            'que escribe esa etapa. ' +
+            'EXIGE un cuerpo con firma_aprobador: la firma manuscrita del aprobador como data URL ' +
+            'de PNG en base64, es decir una cadena que empieza por "data:image/png;base64,". Es ' +
+            'obligatoria, de modo que una llamada sin cuerpo responde 400; solo se acepta PNG, y el ' +
+            'maximo son 500000 caracteres. La firma se guarda y NO la devuelve ninguna lectura de ' +
+            'la API, ni siquiera el listado de lotes finalizados. ' +
             'Exige que el lote este cerrado en CLIENTE_FINAL, que no haya sido finalizado ya y que ' +
             'TODOS sus pesajes activos esten revisados, es decir con aprobado distinto de null. Pide ' +
             'revisados, no aprobados: un lote cuyos pesajes el aprobador rechazo todos finaliza bien. ' +
@@ -239,10 +245,11 @@ export class LotesController {
     @ApiParam({ name: 'id', description: 'Id del lote a finalizar', example: 1 })
     async finalizarByApprover(
         @Param('id', ParseIntPipe) id: number,
+        @Body() dto: FinalizarLoteDto,
         @Req() req: Request,
     ) {
         const { userId } = req.user as { userId: number };
-        const finalizado = await this.lotesService.finalizar(id, userId);
+        const finalizado = await this.lotesService.finalizar(id, dto, userId);
         return {
             ok: finalizado,
             msg: 'Lote finalizado correctamente',
