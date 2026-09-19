@@ -187,13 +187,18 @@ export class LotesController {
             'El resumen viaja EN MARKDOWN CRUDO —saltos de linea reales y negritas con **— y ' +
             'lo renderiza el cliente con su paquete de markdown, sin habilitar el HTML crudo. ' +
             'El backend no produce HTML en ningun punto. ' +
-            'Solo admite lotes FINALIZADOS: es el unico punto del ciclo donde el dato esta ' +
-            'completo y congelado. Se escribe UNA vez y no se sobrescribe, de modo que un lote ' +
-            'que ya tiene resumen responde 400; corregirlo es un UPDATE a mano. ' +
+            'ES IDEMPOTENTE: si el lote YA tiene resumen, devuelve el que tiene —igual que ' +
+            'GET /lotes/{id}/resumen—, sin llamar a Gemini y sin tocar la columna; solo lo ' +
+            'genera cuando resumen_ia esta en null. Asi que se escribe UNA vez y no se ' +
+            'sobrescribe nunca; corregirlo sigue siendo un UPDATE a mano. ' +
+            'Para GENERARLO el lote debe estar FINALIZADO: es el unico punto del ciclo donde el ' +
+            'dato esta completo y congelado. Esa condicion no se aplica cuando el resumen ya ' +
+            'existe, porque entonces esto es una lectura. ' +
             'El modelo redacta, no calcula: todas las cifras salen de dos consultas agregadas ' +
             'y viajan ya resueltas en el prompt. ' +
             '404 si el lote no existe —el unico 404 en una escritura del proyecto—. 400 si no ' +
-            'esta finalizado, si ya tiene resumen o si no tiene pesajes activos. 503 si falta ' +
+            'esta finalizado o si no tiene pesajes activos, ambas solo cuando hay que generarlo. ' +
+            '503 si falta ' +
             'GEMINI_API_KEY. 502 si Gemini no responde, tarda mas de GEMINI_TIMEOUT_MS o ' +
             'devuelve algo que no pasa la validacion; en todos esos casos no se guarda nada. ' +
             'NO valida el vinculo cliente_operador.',

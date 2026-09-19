@@ -286,13 +286,24 @@ export class LotesRepository {
      * ocurre FUERA de toda transaccion: `DatabaseMiddleware` abre un pool de UNA
      * conexion por peticion, y retenerla mientras responde Google es la regla
      * que este spec no puede romper. La transaccion envuelve solo la
-     * revalidacion y el UPDATE de una columna.
+     * relectura y el UPDATE de una columna.
+     *
+     * **Es idempotente:** un lote que ya tiene `resumen_ia` devuelve el que
+     * tiene, sin llamar a Gemini y sin tocar la columna, en vez del 400 con que
+     * respondia el SPEC 27 original. Sigue escribiendose UNA sola vez —nada
+     * sobrescribe un resumen— y el tope de gasto sigue siendo el mismo: una
+     * llamada por lote, pase el que pase.
      */
     async generarResumenLote(loteId: number) {
         // 1. Validaciones, fuera de transaccion.
         const lote = await this.validateLoteExiste(loteId, this.db);
+
+        // Si ya hay resumen, esto se comporta como el GET y termina aqui.
+        // Va ANTES que el resto de validadores a proposito: un lote que ya
+        // tiene resumen se lee siempre, sin que su estado actual lo impida.
+        if (lote.resumen_ia !== null) return lote.resumen_ia;
+
         this.validateLoteFinalizado(lote);
-        await this.validateResumenDisponible(loteId, this.db);
         await this.validateLoteTienePesajesActivos(lote, this.db);
 
         // 2. Las cifras, fuera de transaccion. El modelo redacta, no calcula.
@@ -320,13 +331,23 @@ export class LotesRepository {
         // 3. El fetch. Fuera de transaccion, insisto.
         const resumen = await this.gemini.generarResumenDeLote(payload);
 
-        // 4. Ahora si: revalidar con el trx y escribir.
+        // 4. Ahora si: releer con el trx y escribir.
         return await this.db.transaction().execute(async (trx) => {
             // Segunda pasada. Cierra la ventana de carrera que abren los
             // segundos del paso 3: dos peticiones simultaneas sobre el mismo
             // lote pasan las dos el paso 1, y la segunda en llegar aqui
-            // responde 400 en vez de pisar el resumen de la primera.
-            await this.validateResumenDisponible(loteId, trx);
+            // devuelve el resumen de la primera en vez de pisarlo. El resumen
+            // que esta llamada le pidio a Gemini se descarta.
+            const actual = await trx
+                .selectFrom('lotes')
+                .select('resumen_ia')
+                .where('id', '=', loteId)
+                .executeTakeFirstOrThrow(
+                    () =>
+                        new NotFoundException(`El lote con id '${loteId}' no existe`),
+                );
+
+            if (actual.resumen_ia !== null) return actual.resumen_ia;
 
             await trx
                 .updateTable('lotes')
@@ -459,36 +480,6 @@ export class LotesRepository {
         if (lote.finalizado_por === null) {
             throw new BadRequestException(
                 `El lote '${lote.nombre_lote}' no esta finalizado. Solo se puede resumir un lote finalizado`,
-            );
-        }
-    }
-
-    /**
-     * Un resumen se escribe UNA vez y no se sobrescribe, igual que
-     * `completarDocumentoFiscal` del SPEC 25. Corregirlo es un UPDATE a mano.
-     *
-     * Consulta la base en vez de mirar una fila ya leida a proposito: corre dos
-     * veces —antes de llamar a Gemini y otra vez dentro de la transaccion con
-     * el `trx`— y es la segunda pasada la que cierra la ventana de carrera que
-     * abren los segundos de la llamada. Dos peticiones simultaneas sobre el
-     * mismo lote pasan las dos la primera, y la segunda en llegar responde 400
-     * en lugar de pisar el resumen de la primera.
-     */
-    private async validateResumenDisponible(
-        loteId: number,
-        db: Kysely<Database>,
-    ) {
-        const lote = await db
-            .selectFrom('lotes')
-            .select(['nombre_lote', 'resumen_ia'])
-            .where('id', '=', loteId)
-            .executeTakeFirstOrThrow(
-                () => new NotFoundException(`El lote con id '${loteId}' no existe`),
-            );
-
-        if (lote.resumen_ia !== null) {
-            throw new BadRequestException(
-                `El lote '${lote.nombre_lote}' ya tiene un resumen generado`,
             );
         }
     }
