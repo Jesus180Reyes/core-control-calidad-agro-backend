@@ -123,11 +123,6 @@ export class LotesController {
         };
     }
 
-    // Declarado DESPUES de las cuatro rutas cliente/... por costumbre del
-    // proyecto, aunque aqui el orden no es load-bearing: ':id/resumen' lleva un
-    // segmento literal detras del parametro, asi que es disjunto de
-    // 'cliente/:clienteId' y ninguno se traga al otro. La trampa del :id que
-    // documenta CLAUDE.md necesita un @Get(':id') pelado, y este no lo es.
     @Get(':id/resumen')
     @ApiOperation({
         summary: 'Resumen IA de un lote',
