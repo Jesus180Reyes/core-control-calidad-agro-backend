@@ -199,7 +199,7 @@ Nada de esto ocurre dentro de una transacción. El `DatabaseMiddleware` abre un 
 
 ## Acceptance criteria
 
-- [ ] `POST /chat` sin token responde 401.
+- [X] `POST /chat` sin token responde 401.
 - [ ] `POST /chat` con `{ mensaje: "cómo va el lote <nombre real>" }` responde 200 y `respuesta` contiene las cifras que devuelve `metricas_de_lote` para ese lote.
 - [ ] Ninguna cifra de esa respuesta difiere de la que devuelve la consulta ejecutada a mano en MySQL.
 - [ ] `POST /chat` con `{ mensaje: "cuál es la raíz cuadrada de 20" }` responde 200 con la frase fija de negativa, y la fila de `chat_log` de ese turno tiene `herramientas` en `NULL`.

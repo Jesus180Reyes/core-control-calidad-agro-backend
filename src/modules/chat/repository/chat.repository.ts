@@ -501,9 +501,18 @@ export class ChatRepository {
     /**
      * Resuelve un nombre a ids, que es el primer paso de casi toda consulta.
      *
-     * Busca en las dos tablas donde hay nombres —`usuarios` y `clientes`—
-     * porque el supervisor no distingue: "los pesajes de Carlos" y "los lotes de
-     * Agroexport" son la misma frase para el.
+     * Busca en las TRES tablas donde hay nombres —`usuarios`, `clientes` y
+     * `lotes`— porque el supervisor no distingue: "los pesajes de Carlos", "los
+     * lotes de Agroexport" y "como va el BILLS2026" son la misma frase para el.
+     *
+     * **Los lotes se anadieron despues de que el chat fallara con la pregunta
+     * mas natural del dominio.** Con solo personas y clientes, "como va el lote
+     * X" obligaba al modelo a barrer `lotes_de_cliente` cliente por cliente y
+     * estado por estado, y se comia las tres vueltas antes de poder redactar
+     * —esta en `chat_log`, que llego a resolver el lote en la tercera vuelta y
+     * se quedo sin turno para escribir la respuesta—. Con esto la cadena es
+     * buscar, consultar, redactar. El nombre de la herramienta se queda corto,
+     * pero ya se le quedaba: buscaba clientes, que no son personas.
      *
      * No restringe a la cartera de quien pregunta, y eso es coherente con lo que
      * ya existe: `GET /catalogos/usuarios` devuelve el id y el nombre de TODOS
@@ -539,7 +548,28 @@ export class ChatRepository {
             .limit(ChatRepository.MAX_COINCIDENCIAS)
             .execute();
 
-        // Los dos totales van aparte de las dos listas por la regla de los
+        // Los lotes salen con su cliente resuelto y con la etapa en que estan,
+        // para que el modelo pueda decidir si el que encontro es el que le
+        // preguntaron sin gastar otra vuelta. No se filtra por estado: un lote
+        // cerrado o finalizado sigue siendo un lote por el que se pregunta.
+        const lotes = await this.db
+            .selectFrom('lotes')
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .select([
+                'lotes.id',
+                'lotes.nombre_lote',
+                'lotes.cliente_id',
+                'clientes.nombre as cliente',
+                'lotes.estado',
+                'etapas.nombre as etapa',
+            ])
+            .where('lotes.nombre_lote', 'like', patron)
+            .orderBy('lotes.created_at', 'desc')
+            .limit(ChatRepository.MAX_COINCIDENCIAS)
+            .execute();
+
+        // Los tres totales van aparte de las tres listas por la regla de los
         // defaults: cuando se muestran menos filas de las que hay, se dice
         // cuantas hay. Sin el total, diez coincidencias se leen como todas.
         const totalPersonas = await this.db
@@ -555,15 +585,23 @@ export class ChatRepository {
             .where('clientes.nombre', 'like', patron)
             .executeTakeFirst();
 
+        const totalLotes = await this.db
+            .selectFrom('lotes')
+            .select((eb) => eb.fn.countAll().as('total'))
+            .where('lotes.nombre_lote', 'like', patron)
+            .executeTakeFirst();
+
         const cuantasPersonas = Number(totalPersonas?.total ?? 0);
         const cuantosClientes = Number(totalClientes?.total ?? 0);
+        const cuantosLotes = Number(totalLotes?.total ?? 0);
 
-        if (cuantasPersonas === 0 && cuantosClientes === 0) {
+        if (cuantasPersonas === 0 && cuantosClientes === 0 && cuantosLotes === 0) {
             return {
                 buscado: texto,
                 personas: [],
                 clientes: [],
-                aviso: `No hay ninguna persona ni cliente cuyo nombre contenga '${texto}'.`,
+                lotes: [],
+                aviso: `No hay ninguna persona, cliente ni lote cuyo nombre contenga '${texto}'.`,
             };
         }
 
@@ -577,6 +615,8 @@ export class ChatRepository {
                 estado: c.isActive === 1 ? 'activo' : 'rechazado',
             })),
             total_clientes: cuantosClientes,
+            lotes,
+            total_lotes: cuantosLotes,
         };
     }
 

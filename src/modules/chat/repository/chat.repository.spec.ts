@@ -292,6 +292,54 @@ describe('ChatRepository / despachador', () => {
         expect(resultado.aviso).toContain('buscar_persona');
     });
 
+    it('encuentra un lote por su nombre, que es la pregunta mas natural del dominio', async () => {
+        // Sin esto, "como va el lote X" obligaba al modelo a barrer
+        // lotes_de_cliente cliente por cliente y se comia las tres vueltas.
+        const { repo } = crearRepositorio(
+            [
+                [], // usuarios
+                [], // clientes
+                [
+                    {
+                        id: 41,
+                        nombre_lote: 'BILLS2026',
+                        cliente_id: 39,
+                        cliente: 'Agroexport',
+                        estado: 'abierto',
+                        etapa: 'EN PROCESO',
+                    },
+                ],
+                { total: 0 }, // total usuarios
+                { total: 0 }, // total clientes
+                { total: 1 }, // total lotes
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'buscar_persona', argumentos: { texto: 'BILLS2026' } },
+            contexto,
+        )) as { lotes: { id: number }[]; total_lotes: number };
+
+        expect(resultado.total_lotes).toBe(1);
+        expect(resultado.lotes[0].id).toBe(41);
+    });
+
+    it('un nombre que no existe en ninguna de las tres tablas lo dice', async () => {
+        const { repo } = crearRepositorio(
+            [[], [], [], { total: 0 }, { total: 0 }, { total: 0 }],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'buscar_persona', argumentos: { texto: 'NO_EXISTE' } },
+            contexto,
+        )) as { aviso: string };
+
+        expect(resultado.aviso).toContain('NO_EXISTE');
+        expect(resultado.aviso).toContain('lote');
+    });
+
     it('un pesaje anulado no devuelve sus pesos, devuelve su motivo', async () => {
         const { repo } = crearRepositorio(
             [{ id: 5, isActive: 0, motivo_rechazo: 'Tara mal puesta' }],

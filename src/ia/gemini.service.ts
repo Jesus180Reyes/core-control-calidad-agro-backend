@@ -72,8 +72,18 @@ export class GeminiService {
      * alli el modelo solo redacta sobre cifras dadas y el mas barato basta, aqui
      * ELIGE la herramienta, que es la decision de la que depende todo el turno.
      * Reusar `GEMINI_MODEL` acoplaria las dos cosas para siempre.
+     *
+     * **Es una version fija y no el alias `gemini-flash-latest`**, que tambien
+     * existe. Un alias cambia de modelo por debajo sin avisar, y como el SPEC 28
+     * decidio no guardar `modelo` en `chat_log`, una regresion de calidad no se
+     * podria atribuir a nada. Con la version escrita, al menos el cambio es un
+     * commit.
+     *
+     * Ojo al elegirlo: `gemini-3.1-flash` NO existe —solo su variante lite— y la
+     * API responde 404, que `generateContent` convierte en 502 y el chat en su
+     * texto de disculpa. Comprobar contra `GET /v1beta/models` antes de cambiarlo.
      */
-    private static readonly MODELO_CHAT_POR_DEFECTO = 'gemini-3.1-flash';
+    private static readonly MODELO_CHAT_POR_DEFECTO = 'gemini-3.8-flash';
     /**
      * 45 s y no los 20 s de la version aprobada del SPEC 27. El paso 6 del plan
      * midio la latencia real: las llamadas que funcionan van de 1,0 a 18,2 s, y
@@ -113,6 +123,8 @@ export class GeminiService {
      */
     private static readonly MSG_CHAT_NO_VALIDO =
         'La respuesta del servicio de IA no es valida';
+    private static readonly MSG_CHAT_NO_RESPONDIO =
+        'El servicio de IA no respondio correctamente';
 
     constructor(private readonly config: ConfigService) { }
 
@@ -209,6 +221,7 @@ export class GeminiService {
             modelo,
             apiKey,
             construirPeticionChat(contexto, contents),
+            GeminiService.MSG_CHAT_NO_RESPONDIO,
         );
 
         const candidato = cuerpo?.candidates?.[0];
@@ -255,10 +268,15 @@ export class GeminiService {
      * llama decide que es una salida valida, que hacer con `finishReason` y si
      * lo que viene es texto o una llamada a funcion.
      *
-     * Siempre falla con 502 y el mismo mensaje. El chat del SPEC 28 no quiere
-     * ese codigo —un supervisor lee un 502 como que la aplicacion esta caida—,
-     * asi que lo atrapa arriba y responde 200 con un texto de disculpa. La
-     * traduccion es de quien llama, no de aqui.
+     * Siempre falla con 502. El chat del SPEC 28 no quiere ese codigo —un
+     * supervisor lee un 502 como que la aplicacion esta caida—, asi que lo
+     * atrapa arriba y responde 200 con un texto de disculpa. La traduccion es de
+     * quien llama, no de aqui.
+     *
+     * `mensajeDeFallo` existe porque el texto del 502 del resumen es parte de su
+     * respuesta publica y no se puede tocar, pero decir "no se pudo generar el
+     * resumen" en el log de un turno de chat manda a buscar un resumen que no
+     * existe. Lo vimos la primera vez que el chat fallo de verdad.
      *
      * @throws BadGatewayException 502 si Gemini no responde, responde != 2xx o
      * responde algo que no es JSON.
@@ -267,6 +285,7 @@ export class GeminiService {
         modelo: string,
         apiKey: string,
         cuerpoPeticion: unknown,
+        mensajeDeFallo: string = GeminiService.MSG_NO_RESPONDIO,
     ): Promise<T> {
         const timeoutMs = this.resolverTimeout();
 
@@ -295,7 +314,7 @@ export class GeminiService {
                     ? `Gemini no respondio en ${timeoutMs} ms (modelo ${modelo})`
                     : `Error de red llamando a Gemini (modelo ${modelo}): ${(error as Error)?.message}`,
             );
-            throw new BadGatewayException(GeminiService.MSG_NO_RESPONDIO);
+            throw new BadGatewayException(mensajeDeFallo);
         } finally {
             clearTimeout(temporizador);
         }
@@ -305,14 +324,14 @@ export class GeminiService {
             this.logger.error(
                 `Gemini respondio ${respuesta.status} (modelo ${modelo}): ${detalle.slice(0, 500)}`,
             );
-            throw new BadGatewayException(GeminiService.MSG_NO_RESPONDIO);
+            throw new BadGatewayException(mensajeDeFallo);
         }
 
         try {
             return (await respuesta.json()) as T;
         } catch {
             this.logger.error('Gemini respondio 200 con un cuerpo que no es JSON');
-            throw new BadGatewayException(GeminiService.MSG_NO_RESPONDIO);
+            throw new BadGatewayException(mensajeDeFallo);
         }
     }
 

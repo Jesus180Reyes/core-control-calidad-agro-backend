@@ -165,14 +165,14 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'buscar_persona',
         description:
-            'Busca personas y clientes por un fragmento de su nombre y devuelve sus ids. Usala SIEMPRE antes de cualquier otra herramienta cuando el usuario nombre a alguien o a un cliente en lugar de dar un id.',
+            'Busca personas, clientes Y LOTES por un fragmento de su nombre, y devuelve sus ids. Es la unica forma de encontrar un lote por su nombre. Usala SIEMPRE, y como PRIMERA llamada, cuando el usuario nombre a alguien, a un cliente o a un lote en lugar de darte un id. Nunca recorras los clientes uno por uno con lotes_de_cliente para encontrar un lote por su nombre: usa esta.',
         parameters: {
             type: 'OBJECT',
             properties: {
                 texto: {
                     type: 'STRING',
                     description:
-                        'Fragmento del nombre a buscar, tal como lo escribio el usuario. Puede ser un nombre de pila, un apellido o el nombre de una empresa.',
+                        'Fragmento del nombre a buscar, tal como lo escribio el usuario. Puede ser un nombre de pila, un apellido, el nombre de una empresa o el nombre de un lote.',
                 },
             },
             required: ['texto'],
@@ -194,7 +194,7 @@ export const HERRAMIENTAS_CHAT = [
                 cliente_id: {
                     type: 'INTEGER',
                     description:
-                        'Id del cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes.',
+                        'Id del cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes. Esta herramienta lista los lotes de UN cliente: si lo que buscas es un lote por su nombre, usa buscar_persona en su lugar.',
                 },
                 estado: {
                     type: 'STRING',
@@ -220,7 +220,7 @@ export const HERRAMIENTAS_CHAT = [
                 lote_id: {
                     type: 'INTEGER',
                     description:
-                        'Id del lote. Resuelvelo antes con lotes_de_cliente; nunca lo inventes.',
+                        'Id del lote. Si solo tienes su nombre, resuelvelo antes con buscar_persona; nunca lo inventes.',
                 },
             },
             required: ['lote_id'],
