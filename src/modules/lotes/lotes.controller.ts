@@ -123,6 +123,38 @@ export class LotesController {
         };
     }
 
+    // Declarado DESPUES de las cuatro rutas cliente/... por costumbre del
+    // proyecto, aunque aqui el orden no es load-bearing: ':id/resumen' lleva un
+    // segmento literal detras del parametro, asi que es disjunto de
+    // 'cliente/:clienteId' y ninguno se traga al otro. La trampa del :id que
+    // documenta CLAUDE.md necesita un @Get(':id') pelado, y este no lo es.
+    @Get(':id/resumen')
+    @ApiOperation({
+        summary: 'Resumen IA de un lote',
+        description:
+            'Devuelve el resumen de cierre que genero POST /lotes/{id}/resumen, o null si ' +
+            'todavia no se ha generado. ' +
+            'El resumen viaja EN MARKDOWN CRUDO: una cadena con saltos de linea reales y ' +
+            'negritas con **, que el cliente debe renderizar con su paquete de markdown. El ' +
+            'backend no produce HTML en ningun punto. El formato es un subconjunto cerrado: ' +
+            'un parrafo de apertura, una linea en blanco y entre 3 y 5 vinetas que empiezan ' +
+            'por "- ". No trae titulos, enlaces, tablas ni HTML. ' +
+            'Al renderizarlo, el cliente NO debe habilitar el HTML crudo de su paquete. ' +
+            'Solo dos respuestas: 404 si el lote no existe, y 200 en cualquier otro caso. NO ' +
+            'valida el estado del lote, asi que uno abierto, rechazado o sin finalizar ' +
+            'responde 200 con resumen en null, porque no tiene resumen, no porque se prohiba ' +
+            'leerlo. NO valida el vinculo cliente_operador.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del lote', example: 33 })
+    async obtenerResumen(@Param('id', ParseIntPipe) id: number) {
+        const resumen = await this.lotesService.obtenerResumen(id);
+        return {
+            ok: true,
+            msg: 'Resumen obtenido correctamente',
+            resumen,
+        };
+    }
+
     @Post()
     @HttpCode(201)
     @ApiOperation({
@@ -141,6 +173,38 @@ export class LotesController {
         return {
             ok: !!lote,
             msg: 'Lote creado correctamente',
+        };
+    }
+
+    @Post(':id/resumen')
+    @HttpCode(200)
+    @ApiOperation({
+        summary: 'Generar el resumen IA de un lote finalizado',
+        description:
+            'Arma las metricas del lote en SQL, se las manda a Gemini y guarda el markdown ' +
+            'que devuelve en lotes.resumen_ia, que hasta este spec nunca se escribia. ' +
+            'SIN CUERPO DE PETICION y sin DTO. Responde 200 con { ok, msg, resumen }. ' +
+            'El resumen viaja EN MARKDOWN CRUDO —saltos de linea reales y negritas con **— y ' +
+            'lo renderiza el cliente con su paquete de markdown, sin habilitar el HTML crudo. ' +
+            'El backend no produce HTML en ningun punto. ' +
+            'Solo admite lotes FINALIZADOS: es el unico punto del ciclo donde el dato esta ' +
+            'completo y congelado. Se escribe UNA vez y no se sobrescribe, de modo que un lote ' +
+            'que ya tiene resumen responde 400; corregirlo es un UPDATE a mano. ' +
+            'El modelo redacta, no calcula: todas las cifras salen de dos consultas agregadas ' +
+            'y viajan ya resueltas en el prompt. ' +
+            '404 si el lote no existe —el unico 404 en una escritura del proyecto—. 400 si no ' +
+            'esta finalizado, si ya tiene resumen o si no tiene pesajes activos. 503 si falta ' +
+            'GEMINI_API_KEY. 502 si Gemini no responde, tarda mas de GEMINI_TIMEOUT_MS o ' +
+            'devuelve algo que no pasa la validacion; en todos esos casos no se guarda nada. ' +
+            'NO valida el vinculo cliente_operador.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del lote finalizado', example: 33 })
+    async generarResumen(@Param('id', ParseIntPipe) id: number) {
+        const resumen = await this.lotesService.generarResumen(id);
+        return {
+            ok: !!resumen,
+            msg: 'Resumen generado correctamente',
+            resumen,
         };
     }
 

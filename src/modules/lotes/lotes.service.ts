@@ -49,4 +49,12 @@ export class LotesService {
         return await this.lotesRepository.finalizarLote(loteId, dto, userId);
     }
 
+    async generarResumen(loteId: number) {
+        return await this.lotesRepository.generarResumenLote(loteId);
+    }
+
+    async obtenerResumen(loteId: number) {
+        return await this.lotesRepository.getResumenLote(loteId);
+    }
+
 }
