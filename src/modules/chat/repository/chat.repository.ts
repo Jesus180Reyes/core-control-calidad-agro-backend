@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { sql } from 'kysely';
+import { RawBuilder, SelectQueryBuilder, sql } from 'kysely';
 import { DatabaseService } from 'src/database/database.service';
 import { GeminiService, LlamadaHerramienta } from 'src/ia/gemini.service';
 import { ContextoChat } from 'src/ia/prompts/chat.prompt';
@@ -26,6 +26,42 @@ type ResultadoHerramienta = Record<string, unknown>;
  * que la tabla de discriminadores de CLAUDE.md describe.
  */
 type EstadoDeLote = 'abierto' | 'finalizado' | 'pendiente_aprobacion';
+
+/**
+ * La ventana relativa que el modelo puede pedir. Se resuelve SIEMPRE en MySQL
+ * con `CURDATE()`, nunca en Node y menos en el modelo: el reloj que cuenta es
+ * el mismo con el que `NOW()` escribio los `created_at`.
+ */
+type Periodo = 'hoy' | 'esta_semana' | 'este_mes';
+
+/**
+ * Los filtros que comparten las dos herramientas de pesajes. Cada una usa los
+ * suyos —`usuario_id` solo tiene sentido en la de un lote, `cliente_id` solo en
+ * la de una persona— pero la coercion es la misma, asi que el tipo es uno.
+ *
+ * `limite` no es opcional: si el modelo no lo manda, el coercionador ya puso el
+ * default de 10. Que sea obligatorio aqui evita que una herramienta nueva se
+ * olvide de aplicarlo y devuelva la tabla entera.
+ */
+interface FiltrosDePesajes {
+    lote_id?: number;
+    cliente_id?: number;
+    usuario_id?: number;
+    estado_calidad_id?: number;
+    fuera_de_rango?: boolean;
+    nombre?: string;
+    desde?: string;
+    hasta?: string;
+    periodo?: Periodo;
+    limite: number;
+}
+
+/** Las dos fronteras de una ventana temporal, ya como SQL. */
+interface Ventana {
+    desde?: RawBuilder<Date>;
+    hasta?: RawBuilder<Date>;
+    descripcion?: string;
+}
 
 /**
  * El chat de consultas (SPEC 28).
@@ -133,6 +169,18 @@ export class ChatRepository {
 
             case 'metricas_de_lote':
                 return await this.metricasDeLote(this.aEntero(args.lote_id));
+
+            case 'pesajes_de_lote':
+                return await this.pesajesDeLote(
+                    this.aEntero(args.lote_id),
+                    this.aFiltrosDePesajes(args),
+                );
+
+            case 'pesajes_de_usuario':
+                return await this.pesajesDeUsuario(
+                    this.aEntero(args.usuario_id),
+                    this.aFiltrosDePesajes(args),
+                );
 
             case 'resumen_del_lote':
                 return await this.resumenDelLote(this.aEntero(args.lote_id));
@@ -571,6 +619,285 @@ export class ChatRepository {
     }
 
     // ---------------------------------------------------------------------
+    // Herramienta 5: pesajes_de_lote
+    // ---------------------------------------------------------------------
+
+    /**
+     * Los pesajes de un lote, transcrito de `getPesajesByLote` con los seis
+     * filtros del SPEC 16 y el `periodo` que anade este spec.
+     *
+     * Devuelve menos columnas que el endpoint y no por ahorrar codigo: cada
+     * columna viaja a Google en cada vuelta, y los datos del lote —nombre,
+     * rango, unidad— se dicen UNA vez en la cabecera en vez de repetirse en las
+     * veinte filas.
+     *
+     * `isActive = 1` se aplica siempre y ningun argumento puede levantarlo, como
+     * en el endpoint: los pesajes anulados no se listan. Que un pesaje anulado
+     * exista solo se sabe preguntando por su id.
+     */
+    private async pesajesDeLote(
+        loteId: number | undefined,
+        filtros: FiltrosDePesajes,
+    ): Promise<ResultadoHerramienta> {
+        if (loteId === undefined) {
+            return { error: 'Falta el id del lote.' };
+        }
+
+        const lote = await this.datosDelLote(loteId);
+        if (!lote) {
+            return { error: `No existe ningun lote con id ${loteId}.` };
+        }
+
+        const ventana = this.ventanaDelPeriodo(filtros);
+
+        let consulta = this.db
+            .selectFrom('pesajes')
+            .leftJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
+            .select([
+                'pesajes.id',
+                'pesajes.peso_bruto',
+                'pesajes.tara',
+                'pesajes.peso_neto',
+                'pesajes.fuera_de_rango',
+                'estados_calidad.nombre as estado_calidad',
+                'usuarios.complete_name as registrado_por',
+                'pesajes.created_at',
+                'pesajes.aprobado',
+            ])
+            .where('pesajes.lote_id', '=', loteId)
+            .where('pesajes.isActive', '=', 1);
+
+        if (filtros.usuario_id !== undefined) {
+            consulta = consulta.where('pesajes.usuario_id', '=', filtros.usuario_id);
+        }
+        if (filtros.estado_calidad_id !== undefined) {
+            consulta = consulta.where(
+                'pesajes.estado_calidad_id',
+                '=',
+                filtros.estado_calidad_id,
+            );
+        }
+        if (filtros.fuera_de_rango !== undefined) {
+            consulta = consulta.where(
+                'pesajes.fuera_de_rango',
+                '=',
+                sql<boolean>`${filtros.fuera_de_rango ? 1 : 0}`,
+            );
+        }
+        if (filtros.nombre !== undefined) {
+            // El unico texto que esta consulta alcanza es el nombre de quien
+            // peso, igual que en el endpoint. Ojo: filtra por una columna que
+            // llega por LEFT JOIN, asi que deja fuera los pesajes sin usuario.
+            consulta = consulta.where(
+                'usuarios.complete_name',
+                'like',
+                `%${filtros.nombre}%`,
+            );
+        }
+        if (ventana.desde !== undefined) {
+            consulta = consulta.where('pesajes.created_at', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            consulta = consulta.where('pesajes.created_at', '<', ventana.hasta);
+        }
+
+        const total = await this.contarFiltrados(consulta);
+        const filas = Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO);
+        const pesajes = await consulta
+            .orderBy('pesajes.created_at', 'desc')
+            .limit(filas)
+            .execute();
+
+        const cabecera = {
+            lote: lote.nombre_lote,
+            cliente: lote.cliente,
+            unidad_medida: lote.unidad_medida,
+            rango_peso: {
+                minimo: this.dosDecimales(lote.peso_minimo),
+                ideal: this.dosDecimales(lote.peso_ideal),
+                maximo: this.dosDecimales(lote.peso_maximo),
+            },
+            filtros_aplicados: this.filtrosEnPalabras(filtros, ventana),
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                pesajes: [],
+                total: 0,
+                aviso: `No hay ningun pesaje activo del lote ${lote.nombre_lote} con esos criterios. Los pesajes anulados no se listan; si hace falta, se puede consultar uno concreto por su id.`,
+            };
+        }
+
+        return {
+            ...cabecera,
+            total,
+            mostrados: pesajes.length,
+            pesajes: pesajes.map((p) => ({
+                id: Number(p.id),
+                peso_bruto: this.dosDecimales(p.peso_bruto),
+                tara: this.dosDecimales(p.tara),
+                peso_neto: this.dosDecimales(p.peso_neto),
+                fuera_de_rango: !!p.fuera_de_rango,
+                estado_calidad: p.estado_calidad,
+                registrado_por: p.registrado_por,
+                registrado_en: this.fechaHora(p.created_at),
+                revision_del_aprobador: this.revision(p.aprobado),
+            })),
+        };
+    }
+
+    // ---------------------------------------------------------------------
+    // Herramienta 6: pesajes_de_usuario
+    // ---------------------------------------------------------------------
+
+    /**
+     * Los pesajes que registro una persona, con los siete filtros del SPEC 16.
+     *
+     * Es `getHistorialByUsuario` con OTRO `userId`, y ahi esta lo que hay que
+     * entender antes de tocarla: el endpoint del SPEC 15 garantiza que nadie
+     * puede pedir el historial de otro porque no hay donde escribir su id —el
+     * SPEC 16 le dio siete parametros y le nego `?usuario_id` justo para no
+     * romperlo—. **Esta herramienta si recibe ese id, y por tanto no tiene esa
+     * garantia.** No es un descuido: el SPEC 28 decide que el chat queda abierto
+     * a cualquier autenticado, con la misma razon del SPEC 24, y lo registra
+     * como riesgo aceptado. No copiar esto a un endpoint nuevo.
+     *
+     * Hereda lo que el historial deliberadamente NO filtra: no mira
+     * `lotes.estado` ni `clientes.isActive`, asi que es el unico sitio del chat
+     * donde salen el nombre de un lote cerrado y el de un cliente rechazado.
+     */
+    private async pesajesDeUsuario(
+        usuarioId: number | undefined,
+        filtros: FiltrosDePesajes,
+    ): Promise<ResultadoHerramienta> {
+        if (usuarioId === undefined) {
+            return { error: 'Falta el id de la persona.' };
+        }
+
+        const persona = await this.db
+            .selectFrom('usuarios')
+            .select(['id', 'complete_name'])
+            .where('id', '=', usuarioId)
+            .executeTakeFirst();
+
+        if (!persona) {
+            return { error: `No existe ninguna persona con id ${usuarioId}.` };
+        }
+
+        const ventana = this.ventanaDelPeriodo(filtros);
+
+        let consulta = this.db
+            .selectFrom('pesajes')
+            .leftJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .select([
+                'pesajes.id',
+                'pesajes.lote_id',
+                'lotes.nombre_lote',
+                'clientes.nombre as cliente',
+                'unidades_medida.nombre as unidad_medida',
+                'pesajes.peso_neto',
+                'pesajes.fuera_de_rango',
+                'estados_calidad.nombre as estado_calidad',
+                'pesajes.created_at',
+                'pesajes.aprobado',
+            ])
+            .where('pesajes.usuario_id', '=', usuarioId)
+            .where('pesajes.isActive', '=', 1);
+
+        if (filtros.lote_id !== undefined) {
+            consulta = consulta.where('pesajes.lote_id', '=', filtros.lote_id);
+        }
+        if (filtros.cliente_id !== undefined) {
+            consulta = consulta.where('lotes.cliente_id', '=', filtros.cliente_id);
+        }
+        if (filtros.estado_calidad_id !== undefined) {
+            consulta = consulta.where(
+                'pesajes.estado_calidad_id',
+                '=',
+                filtros.estado_calidad_id,
+            );
+        }
+        if (filtros.fuera_de_rango !== undefined) {
+            consulta = consulta.where(
+                'pesajes.fuera_de_rango',
+                '=',
+                sql<boolean>`${filtros.fuera_de_rango ? 1 : 0}`,
+            );
+        }
+        if (filtros.nombre !== undefined) {
+            // Filtra el nombre del LOTE, no el de la persona, igual que el
+            // endpoint: la persona ya viene fijada por el id.
+            consulta = consulta.where(
+                'lotes.nombre_lote',
+                'like',
+                `%${filtros.nombre}%`,
+            );
+        }
+        if (ventana.desde !== undefined) {
+            consulta = consulta.where('pesajes.created_at', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            consulta = consulta.where('pesajes.created_at', '<', ventana.hasta);
+        }
+
+        const total = await this.contarFiltrados(consulta);
+        const filas = Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO);
+        const pesajes = await consulta
+            .orderBy('pesajes.created_at', 'desc')
+            .limit(filas)
+            .execute();
+
+        const cabecera = {
+            persona: persona.complete_name,
+            filtros_aplicados: this.filtrosEnPalabras(filtros, ventana),
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                pesajes: [],
+                total: 0,
+                aviso: `${persona.complete_name} no tiene ningun pesaje activo con esos criterios. Los pesajes anulados no se listan.`,
+            };
+        }
+
+        return {
+            ...cabecera,
+            total,
+            mostrados: pesajes.length,
+            pesajes: pesajes.map((p) => ({
+                id: Number(p.id),
+                lote_id: p.lote_id,
+                lote: p.nombre_lote,
+                cliente: p.cliente,
+                peso_neto: this.dosDecimales(p.peso_neto),
+                unidad_medida: p.unidad_medida,
+                fuera_de_rango: !!p.fuera_de_rango,
+                estado_calidad: p.estado_calidad,
+                registrado_en: this.fechaHora(p.created_at),
+                revision_del_aprobador: this.revision(p.aprobado),
+            })),
+        };
+    }
+
+    // ---------------------------------------------------------------------
     // Herramienta 7: resumen_del_lote
     // ---------------------------------------------------------------------
 
@@ -714,14 +1041,7 @@ export class ChatRepository {
             estado_calidad: pesaje.estado_calidad,
             registrado_por: pesaje.registrado_por,
             registrado_en: this.fechaHora(pesaje.created_at),
-            // Tri-estado, no booleano: null es "el aprobador todavia no lo ha
-            // revisado", que no es lo mismo que "no aprobado".
-            revision_del_aprobador:
-                pesaje.aprobado === null
-                    ? 'pendiente'
-                    : pesaje.aprobado
-                        ? 'aprobado'
-                        : 'rechazado',
+            revision_del_aprobador: this.revision(pesaje.aprobado),
         };
     }
 
@@ -803,6 +1123,183 @@ export class ChatRepository {
             ])
             .where('lotes.id', '=', loteId)
             .executeTakeFirst();
+    }
+
+    /**
+     * Los filtros de pesajes, todos coercionados de golpe.
+     *
+     * Un argumento invalido se **ignora**, nunca se interpreta y nunca es un
+     * error: es la regla del SPEC 16 —ningun filtro puede producir un 400— con
+     * el matiz que aqui la hace todavia mas necesaria, que del otro lado no hay
+     * un frontend con una errata sino un modelo generando texto. El riesgo
+     * conocido es el mismo de alli: un filtro descartado devuelve una lista que
+     * parece filtrada y no lo esta. Se compensa diciendo en la respuesta que
+     * filtros se aplicaron de verdad.
+     */
+    private aFiltrosDePesajes(args: Record<string, unknown>): FiltrosDePesajes {
+        return {
+            lote_id: this.aEntero(args.lote_id),
+            cliente_id: this.aEntero(args.cliente_id),
+            usuario_id: this.aEntero(args.usuario_id),
+            estado_calidad_id: this.aEntero(args.estado_calidad_id),
+            fuera_de_rango: this.aBooleano(args.fuera_de_rango),
+            nombre: this.aTexto(args.nombre),
+            desde: this.aFecha(args.desde),
+            hasta: this.aFecha(args.hasta),
+            periodo: this.aPeriodo(args.periodo),
+            limite: this.aLimite(args.limite),
+        };
+    }
+
+    /**
+     * La ventana temporal, resuelta a SQL.
+     *
+     * Dos reglas. **Una fecha explicita gana al periodo**: si el usuario dijo
+     * una fecha concreta, esa manda y el `periodo` se descarta entero, sin
+     * mezclarlos. Y **el periodo se calcula en MySQL**, con `CURDATE()`, nunca
+     * en Node: el reloj que decide que es "hoy" tiene que ser el mismo con el
+     * que `NOW()` escribio los `created_at`, y el del proceso de Node puede
+     * estar en otra zona.
+     *
+     * `hasta` es siempre exclusivo con `DATE_ADD(..., INTERVAL 1 DAY)`, que es
+     * como el SPEC 16 incluye el dia entero pese a que `created_at` es DATETIME.
+     * "esta semana" empieza el lunes —`WEEKDAY()` devuelve 0 ese dia— y "este
+     * mes" el dia 1, no hace 30 dias.
+     */
+    private ventanaDelPeriodo(filtros: FiltrosDePesajes): Ventana {
+        if (filtros.desde !== undefined || filtros.hasta !== undefined) {
+            const partes: string[] = [];
+            if (filtros.desde) partes.push(`desde el ${filtros.desde}`);
+            if (filtros.hasta) partes.push(`hasta el ${filtros.hasta} incluido`);
+
+            return {
+                desde:
+                    filtros.desde !== undefined
+                        ? sql<Date>`${filtros.desde}`
+                        : undefined,
+                hasta:
+                    filtros.hasta !== undefined
+                        ? sql<Date>`DATE_ADD(${filtros.hasta}, INTERVAL 1 DAY)`
+                        : undefined,
+                descripcion: partes.join(' '),
+            };
+        }
+
+        switch (filtros.periodo) {
+            case 'hoy':
+                return {
+                    desde: sql<Date>`CURDATE()`,
+                    hasta: sql<Date>`DATE_ADD(CURDATE(), INTERVAL 1 DAY)`,
+                    descripcion: 'solo los de hoy',
+                };
+            case 'esta_semana':
+                return {
+                    desde: sql<Date>`DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`,
+                    descripcion: 'desde el lunes de esta semana',
+                };
+            case 'este_mes':
+                return {
+                    desde: sql<Date>`DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
+                    descripcion: 'desde el dia 1 de este mes',
+                };
+            default:
+                return {};
+        }
+    }
+
+    /**
+     * `COUNT(*)` sobre la MISMA consulta, con sus joins y sus filtros, antes de
+     * aplicarle el orden y el limite.
+     *
+     * Es un `clearSelect()` y no una consulta escrita aparte a proposito: dos
+     * consultas gemelas se desincronizan al primer filtro que alguien anada solo
+     * en una, y entonces el total miente —"20 de 5"— con toda la autoridad de un
+     * numero. Aqui es imposible que difieran porque son la misma.
+     */
+    private async contarFiltrados<DB, TB extends keyof DB, O>(
+        consulta: SelectQueryBuilder<DB, TB, O>,
+    ): Promise<number> {
+        const fila = await consulta
+            .clearSelect()
+            .clearOrderBy()
+            .select(sql<number | string>`COUNT(*)`.as('total'))
+            .executeTakeFirst();
+
+        // El tipo de salida es generico, asi que Kysely no puede saber que
+        // acabamos de dejar una sola columna; la asercion es solo para eso.
+        const total = (fila as { total?: number | string } | undefined)?.total;
+
+        return Number(total ?? 0);
+    }
+
+    /**
+     * Los filtros que de verdad se aplicaron, en una frase.
+     *
+     * Existe por la regla que gobierna toda la tabla de defaults: **cuando se
+     * asume algo, se dice en voz alta**. El modelo no puede saber que su
+     * `?fuera_de_rango: "quizas"` se cayo en la coercion, asi que se le dice lo
+     * que quedo en pie y el lo traslada a la respuesta.
+     */
+    private filtrosEnPalabras(
+        filtros: FiltrosDePesajes,
+        ventana: Ventana,
+    ): string {
+        const partes: string[] = [
+            `los ${Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO)} mas recientes`,
+        ];
+
+        if (ventana.descripcion) partes.push(ventana.descripcion);
+        if (filtros.fuera_de_rango === true) partes.push('solo fuera de rango');
+        if (filtros.fuera_de_rango === false) partes.push('solo dentro de rango');
+        if (filtros.nombre) partes.push(`que contengan '${filtros.nombre}'`);
+
+        return partes.join(', ');
+    }
+
+    /**
+     * El tri-estado de `pesajes.aprobado` en palabras.
+     *
+     * `null` es "nadie lo ha revisado", que NO es lo mismo que rechazado. La
+     * columna vuelve de MySQL como 0/1, asi que se compara por verdad y nunca
+     * con `=== false`, que compilaria y dejaria pasar un 0.
+     */
+    private revision(aprobado: boolean | null): string {
+        if (aprobado === null) return 'pendiente';
+        return aprobado ? 'aprobado' : 'rechazado';
+    }
+
+    /** `true`/`false`, y tambien las cadenas, que es como a veces llegan. */
+    private aBooleano(valor: unknown): boolean | undefined {
+        if (typeof valor === 'boolean') return valor;
+        if (valor === 'true') return true;
+        if (valor === 'false') return false;
+        return undefined;
+    }
+
+    /**
+     * Una fecha `'YYYY-MM-DD'` que exista de verdad.
+     *
+     * El `refine` de la forma no basta: `2026-02-30` encaja con la expresion
+     * regular y no es un dia. Es el mismo par regex + comprobacion que
+     * `fechaISO` en `src/schemas/`, escrito aqui porque aquello valida un DTO y
+     * esto valida lo que propuso un modelo.
+     */
+    private aFecha(valor: unknown): string | undefined {
+        if (typeof valor !== 'string') return undefined;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return undefined;
+
+        const fecha = new Date(`${valor}T00:00:00Z`);
+        return !Number.isNaN(fecha.getTime()) &&
+            fecha.toISOString().startsWith(valor)
+            ? valor
+            : undefined;
+    }
+
+    /** Uno de los tres periodos, o nada. Un valor raro no se interpreta. */
+    private aPeriodo(valor: unknown): Periodo | undefined {
+        return valor === 'hoy' || valor === 'esta_semana' || valor === 'este_mes'
+            ? valor
+            : undefined;
     }
 
     /** Texto no vacio y acotado. El tope corta un argumento absurdo, no un nombre. */
