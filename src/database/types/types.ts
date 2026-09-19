@@ -196,6 +196,16 @@ export interface DocumentoFiscalLoteTable {
   created_at: Generated<Date | string | null>;
 }
 
+export interface ChatLogTable {
+  id: Generated<string | number>;
+  usuario_id: number;
+  conversacion: string | null;
+  mensaje: string | null;
+  herramientas: string | null;
+  respuesta: string | null;
+  created_at: Generated<Date | string | null>;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -227,5 +237,6 @@ export interface Database {
   documentos_fiscales: DocumentosFiscalesTable;
   documento_fiscal_impuesto: DocumentoFiscalImpuestoTable;
   documento_fiscal_lote: DocumentoFiscalLoteTable;
+  chat_log: ChatLogTable;
   bitacora: BitacoraView;
 }
