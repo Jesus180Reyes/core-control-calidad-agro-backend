@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RawBuilder, SelectQueryBuilder, sql } from 'kysely';
 import { DatabaseService } from 'src/database/database.service';
 import { GeminiService, LlamadaHerramienta } from 'src/ia/gemini.service';
-import { ContextoChat } from 'src/ia/prompts/chat.prompt';
+import {
+    ContenidoGemini,
+    ContextoChat,
+    construirContents,
+} from 'src/ia/prompts/chat.prompt';
 import { PreguntarDto } from '../dto/preguntar.dto';
 
 /**
@@ -102,6 +106,30 @@ export class ChatRepository {
     /** Coincidencias que devuelve `buscar_persona` antes de pedir afinar. */
     private static readonly MAX_COINCIDENCIAS = 10;
 
+    /**
+     * Vueltas del bucle, es decir llamadas a Gemini por turno.
+     *
+     * Tres alcanzan para la cadena mas larga que el chat necesita —resolver un
+     * nombre, consultar con el id, redactar— y son a la vez el tope de gasto de
+     * un turno. Un modelo que se atasca pidiendo la misma funcion una y otra vez
+     * se para aqui, no cuando se acaba la paciencia de quien pregunta.
+     */
+    private static readonly MAX_VUELTAS = 3;
+
+    /**
+     * Los dos textos con los que el turno se rinde. Son markdown valido porque
+     * es lo que el frontend renderiza, y son 200 y no un 5xx por decision del
+     * SPEC 28: al otro lado hay un supervisor en una pantalla de chat, y un
+     * codigo de error ahi se lee como que la aplicacion esta caida.
+     *
+     * Estan separados porque invitan a cosas distintas: uno a repetir tal cual,
+     * el otro a preguntar de otra forma.
+     */
+    private static readonly TEXTO_DISCULPA =
+        'No pude resolver la consulta en este momento. Vuelve a intentarlo en unos segundos.';
+    private static readonly TEXTO_NO_CONVERGE =
+        'Me enrede consultando los datos y no llegue a una respuesta. Prueba a preguntarlo de otra forma, nombrando el lote, el cliente o la persona.';
+
     constructor(
         private readonly dbService: DatabaseService,
         private readonly gemini: GeminiService,
@@ -114,19 +142,133 @@ export class ChatRepository {
     /**
      * Un turno de conversacion.
      *
-     * Devuelve markdown crudo, la misma forma que `POST /lotes/:id/resumen`: un
-     * string con saltos de linea reales que el frontend renderiza sin habilitar
-     * el modo HTML de su paquete de markdown.
+     * El orden es el del SPEC 28 y cada paso esta donde esta por una razon:
      *
-     * TODO(SPEC 28, pasos 10 y 12): bucle de herramientas, tope diario y
-     * registro en `chat_log`. Hoy responde un texto fijo y no llama a Gemini.
+     * 1. El contexto se resuelve por SQL, sin IA. Es lo que el despachador usa
+     *    despues para no creerse lo que proponga el modelo.
+     * 2. El bucle, con tope de tres vueltas. Cada vuelta es una llamada a
+     *    Gemini que o pide herramientas o entrega el texto final.
+     * 3. Ese texto es la respuesta.
+     *
+     * **Nada de esto ocurre dentro de una transaccion.** El `DatabaseMiddleware`
+     * abre un pool de UNA conexion por peticion y retenerla durante la latencia
+     * de Google es la regla que el SPEC 27 fijo. Aqui pesa mas que alli: un
+     * turno puede llamar tres veces.
+     *
+     * **Siempre devuelve un string y nunca lanza.** Un 503 por falta de clave,
+     * un 502 por timeout, un modelo que no converge o una consulta que revienta
+     * acaban en un texto de disculpa. El unico codigo que este endpoint sabe
+     * devolver es 200.
+     *
+     * TODO(SPEC 28, paso 12): tope diario y registro en `chat_log`.
      */
-    responder(dto: PreguntarDto, usuarioId: number): Promise<string> {
-        void this.gemini;
-        void dto;
-        void usuarioId;
+    async responder(dto: PreguntarDto, usuarioId: number): Promise<string> {
+        // 1. El contexto, por SQL y sin IA.
+        const contexto = await this.contextoDe(usuarioId);
 
-        return Promise.resolve('El chat todavia no esta conectado al modelo.');
+        const contents = construirContents(dto.mensaje, dto.historial);
+        const usadas: LlamadaHerramienta[] = [];
+
+        // 2. El bucle. Se sale por el texto; agotar las vueltas es rendirse.
+        let respuesta = ChatRepository.TEXTO_NO_CONVERGE;
+
+        try {
+            for (let vuelta = 1; vuelta <= ChatRepository.MAX_VUELTAS; vuelta++) {
+                const turno = await this.gemini.conversar(contexto, contents);
+
+                if (turno.tipo === 'texto') {
+                    respuesta = turno.texto;
+                    break;
+                }
+
+                // El turno del modelo se reenvia TAL CUAL antes de los
+                // resultados. No es ceremonia: el protocolo exige que la
+                // peticion de la funcion siga en la conversacion cuando llega su
+                // respuesta, y sin esto Gemini vuelve a pedir lo mismo hasta
+                // agotar las tres vueltas.
+                contents.push({ role: 'model', parts: turno.partes });
+
+                const respuestas: ContenidoGemini['parts'] = [];
+                for (const llamada of turno.llamadas) {
+                    const resultado = await this.despachar(llamada, contexto);
+                    usadas.push(llamada);
+                    respuestas.push({
+                        functionResponse: {
+                            name: llamada.nombre,
+                            response: resultado,
+                        },
+                    });
+                }
+
+                contents.push({ role: 'user', parts: respuestas });
+            }
+
+            if (respuesta === ChatRepository.TEXTO_NO_CONVERGE) {
+                this.logger.warn(
+                    `El turno no convergio en ${ChatRepository.MAX_VUELTAS} vueltas (usuario ${usuarioId})`,
+                );
+            }
+        } catch (error) {
+            // Aqui se traduce lo que `GeminiService` lanza: el 503 sin clave y
+            // el 502 de red, timeout o salida invalida. Tambien cae aqui una
+            // consulta que fallo de verdad, que es lo unico que las herramientas
+            // no convierten en texto por su cuenta.
+            this.logger.error(
+                `El turno de chat fallo (usuario ${usuarioId}): ${(error as Error)?.message}`,
+            );
+            respuesta = ChatRepository.TEXTO_DISCULPA;
+        }
+
+        this.logger.debug(
+            usadas.length === 0
+                ? `Turno sin herramientas (usuario ${usuarioId})`
+                : `Herramientas usadas (usuario ${usuarioId}): ${usadas.map((u) => u.nombre).join(', ')}`,
+        );
+
+        return respuesta;
+    }
+
+    /**
+     * Lo que el servidor sabe antes de hablar con nadie: quien pregunta y que
+     * clientes tiene en su cartera.
+     *
+     * Le sirve al modelo para resolver "mi cliente" sin preguntar, y sobre todo
+     * le sirve al despachador, que compara contra esto lo que el modelo propone.
+     * La cartera vacia es normal y no se trata como error: un aprobador o un
+     * ADMIN no tienen ninguna fila en `cliente_operador`, y esa es exactamente
+     * la razon por la que el SPEC 28 no filtra el chat por cartera.
+     *
+     * Si el usuario del token ya no existe, el turno sigue con un nombre
+     * generico en vez de fallar, igual que `GET /pesajes/historial` responde
+     * 200 con lista vacia en ese caso.
+     */
+    private async contextoDe(usuarioId: number): Promise<ContextoChat> {
+        const usuario = await this.db
+            .selectFrom('usuarios')
+            .select(['id', 'complete_name'])
+            .where('id', '=', usuarioId)
+            .executeTakeFirst();
+
+        const clientes = await this.db
+            .selectFrom('clientes')
+            .innerJoin(
+                'cliente_operador',
+                'cliente_operador.cliente_id',
+                'clientes.id',
+            )
+            .select(['clientes.id', 'clientes.nombre'])
+            .where('cliente_operador.usuario_id', '=', usuarioId)
+            .where('clientes.isActive', '=', 1)
+            .orderBy('clientes.nombre', 'asc')
+            .execute();
+
+        return {
+            usuario: {
+                id: usuarioId,
+                nombre: usuario?.complete_name ?? 'Usuario',
+            },
+            clientes,
+        };
     }
 
     // ---------------------------------------------------------------------
