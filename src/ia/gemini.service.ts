@@ -9,14 +9,48 @@ import {
     construirPeticionResumen,
     ResumenLotePayload,
 } from './prompts/resumen-lote.prompt';
+import {
+    ContenidoGemini,
+    ContextoChat,
+    construirPeticionChat,
+    ParteGemini,
+} from './prompts/chat.prompt';
 
 /** Solo la parte de la respuesta de Gemini que consumimos. */
 interface RespuestaGemini {
     candidates?: {
-        content?: { parts?: { text?: string }[] };
+        content?: {
+            parts?: {
+                text?: string;
+                functionCall?: { name?: string; args?: Record<string, unknown> };
+            }[];
+        };
         finishReason?: string;
     }[];
 }
+
+/** Una funcion que el modelo pide ejecutar. Nada aqui esta validado todavia. */
+export interface LlamadaHerramienta {
+    nombre: string;
+    argumentos: Record<string, unknown>;
+}
+
+/**
+ * Lo que devuelve una vuelta de `conversar()`.
+ *
+ * `partes` es el turno del modelo tal cual vino, y quien llama tiene que
+ * reenviarlo como `{ role: 'model', parts }` antes de mandar los resultados de
+ * las herramientas: el protocolo exige que la peticion de la funcion siga en la
+ * conversacion cuando llega su respuesta. Sin eso, Gemini vuelve a pedir la
+ * misma funcion en bucle hasta agotar las tres vueltas.
+ */
+export type TurnoGemini =
+    | { tipo: 'texto'; texto: string; partes: ParteGemini[] }
+    | {
+        tipo: 'herramientas';
+        llamadas: LlamadaHerramienta[];
+        partes: ParteGemini[];
+    };
 
 /**
  * Cliente de la API REST de Gemini (SPEC 27).
@@ -34,6 +68,13 @@ export class GeminiService {
 
     private static readonly MODELO_POR_DEFECTO = 'gemini-3.1-flash-lite';
     /**
+     * El chat usa su propio modelo, `GEMINI_CHAT_MODEL`, y no el del resumen:
+     * alli el modelo solo redacta sobre cifras dadas y el mas barato basta, aqui
+     * ELIGE la herramienta, que es la decision de la que depende todo el turno.
+     * Reusar `GEMINI_MODEL` acoplaria las dos cosas para siempre.
+     */
+    private static readonly MODELO_CHAT_POR_DEFECTO = 'gemini-3.1-flash';
+    /**
      * 45 s y no los 20 s de la version aprobada del SPEC 27. El paso 6 del plan
      * midio la latencia real: las llamadas que funcionan van de 1,0 a 18,2 s, y
      * con el tope en 20 s se tiraba una respuesta buena que tardo 18,2 s —en la
@@ -43,6 +84,13 @@ export class GeminiService {
 
     /** Tope duro de la salida. No se trunca: se rechaza y se vuelve a pedir. */
     private static readonly MAX_CARACTERES = 2000;
+
+    /**
+     * El chat admite mas que el resumen porque aqui si caben tablas: veinte
+     * filas de pesajes con sus columnas se comen los 2000 del SPEC 27 sin haber
+     * hecho nada raro. Sigue siendo un tope duro y sigue sin truncar.
+     */
+    private static readonly MAX_CARACTERES_CHAT = 4000;
 
     /**
      * Exige una letra, un '!' o un '/' detras del '<', de modo que un '<' suelto
@@ -56,6 +104,15 @@ export class GeminiService {
         'No se pudo generar el resumen: el servicio de IA no respondio correctamente';
     private static readonly MSG_NO_VALIDA =
         'No se pudo generar el resumen: la respuesta del servicio de IA no es valida';
+    /**
+     * Mensajes propios del chat. Ninguno llega nunca al supervisor: el SPEC 28
+     * exige responder 200 con un texto de disculpa pase lo que pase, asi que
+     * `ChatRepository` atrapa estas excepciones y las sustituye. Existen para
+     * que el log diga que fallo y para no reciclar un texto que habla de
+     * "generar el resumen" cuando no hay ningun resumen de por medio.
+     */
+    private static readonly MSG_CHAT_NO_VALIDO =
+        'La respuesta del servicio de IA no es valida';
 
     constructor(private readonly config: ConfigService) { }
 
@@ -107,6 +164,87 @@ export class GeminiService {
         const crudo = partes.map((parte) => parte?.text ?? '').join('');
 
         return this.validarSalida(crudo);
+    }
+
+    /**
+     * Una vuelta del chat (SPEC 28): manda la conversacion y devuelve lo que el
+     * modelo decidio, que es una de dos cosas y nunca las dos a medias.
+     *
+     * - `tipo: 'herramientas'` — pidio ejecutar una o varias funciones. El
+     *   despachador valida los argumentos contra el contexto del servidor y
+     *   vuelve a llamar aqui con los resultados. Que el modelo lo haya pedido no
+     *   lo hace legitimo.
+     * - `tipo: 'texto'` — la respuesta final, ya en markdown.
+     *
+     * Quien llama debe hacerlo FUERA de cualquier transaccion, por la misma
+     * razon que el resumen: el `DatabaseMiddleware` abre un pool de UNA conexion
+     * por peticion y retenerla durante la latencia de Google la deja bloqueada.
+     *
+     * Lanza igual que `generarResumenDeLote`, y eso es deliberado: aqui no se
+     * traduce nada. El SPEC 28 quiere 200 con texto de disculpa ante cualquier
+     * fallo, pero eso es decision del repositorio del chat, que es quien sabe
+     * que al otro lado hay un supervisor mirando una pantalla y no un
+     * desarrollador leyendo un codigo de estado.
+     *
+     * @throws ServiceUnavailableException 503 si falta `GEMINI_API_KEY`.
+     * @throws BadGatewayException 502 si Gemini falla o devuelve algo invalido.
+     */
+    async conversar(
+        contexto: ContextoChat,
+        contents: ContenidoGemini[],
+    ): Promise<TurnoGemini> {
+        const apiKey = (this.config.get<string>('GEMINI_API_KEY') ?? '').trim();
+        if (!apiKey) {
+            this.logger.error(
+                'GEMINI_API_KEY ausente o vacia: el chat de consultas esta apagado',
+            );
+            throw new ServiceUnavailableException(GeminiService.MSG_SIN_CONFIGURAR);
+        }
+
+        const modelo =
+            (this.config.get<string>('GEMINI_CHAT_MODEL') ?? '').trim() ||
+            GeminiService.MODELO_CHAT_POR_DEFECTO;
+
+        const cuerpo = await this.generateContent<RespuestaGemini>(
+            modelo,
+            apiKey,
+            construirPeticionChat(contexto, contents),
+        );
+
+        const candidato = cuerpo?.candidates?.[0];
+        const partes = (candidato?.content?.parts ?? []) as ParteGemini[];
+
+        // El orden importa: las llamadas a funcion se miran ANTES que
+        // finishReason y antes que el texto. Un turno que pide herramientas
+        // puede traer ademas un texto de relleno —"déjame revisarlo"— que no es
+        // la respuesta final y que no debe salir a pantalla.
+        const llamadas: LlamadaHerramienta[] = (candidato?.content?.parts ?? [])
+            .flatMap((parte) => (parte?.functionCall ? [parte.functionCall] : []))
+            .filter((llamada) => !!llamada.name)
+            .map((llamada) => ({
+                nombre: String(llamada.name),
+                argumentos: llamada.args ?? {},
+            }));
+
+        if (llamadas.length > 0) {
+            return { tipo: 'herramientas', llamadas, partes };
+        }
+
+        // Sin llamadas, el turno es la respuesta final, asi que un corte por
+        // maxOutputTokens la deja partida a media tabla. El mismo argumento del
+        // SPEC 27: no se trunca lo que ya venia truncado, se descarta.
+        if (candidato?.finishReason === 'MAX_TOKENS') {
+            this.logger.error(
+                'Gemini corto la respuesta del chat por maxOutputTokens; el markdown vendria truncado',
+            );
+            throw new BadGatewayException(GeminiService.MSG_CHAT_NO_VALIDO);
+        }
+
+        const crudo = (candidato?.content?.parts ?? [])
+            .map((parte) => parte?.text ?? '')
+            .join('');
+
+        return { tipo: 'texto', texto: this.validarSalidaChat(crudo), partes };
     }
 
     /**
@@ -233,6 +371,48 @@ export class GeminiService {
                 'Gemini devolvio una etiqueta HTML dentro del resumen; se descarta la respuesta',
             );
             throw new BadGatewayException(GeminiService.MSG_NO_VALIDA); // 6
+        }
+
+        return limpio;
+    }
+
+    /**
+     * Las mismas reglas del resumen sobre el markdown del chat, con dos
+     * diferencias y ninguna es de estilo.
+     *
+     * La primera es el tope, 4000 en vez de 2000, porque aqui el formato admite
+     * tablas. La segunda es a donde va a parar el rechazo: el resumen se guarda
+     * como registro permanente de un lote y por eso vuelve un 502 que alguien
+     * tiene que mirar; esto se pinta en una pantalla de chat, asi que el
+     * repositorio atrapa la excepcion y responde 200 invitando a repetir.
+     *
+     * El rechazo de etiquetas HTML se mantiene tal cual, y aqui pesa mas que
+     * alli: el chat recibe nombres de lote, de cliente y de persona en cada
+     * consulta, que es el vector de inyeccion que el SPEC 27 ya documento.
+     */
+    private validarSalidaChat(texto: string): string {
+        const limpio = texto
+            .trim()
+            .replace(/\r\n?/g, '\n')
+            .replace(/\n{3,}/g, '\n\n');
+
+        if (!limpio) {
+            this.logger.error('Gemini devolvio un turno de chat vacio');
+            throw new BadGatewayException(GeminiService.MSG_CHAT_NO_VALIDO);
+        }
+
+        if (limpio.length > GeminiService.MAX_CARACTERES_CHAT) {
+            this.logger.error(
+                `Gemini devolvio ${limpio.length} caracteres en el chat, por encima del maximo de ${GeminiService.MAX_CARACTERES_CHAT}`,
+            );
+            throw new BadGatewayException(GeminiService.MSG_CHAT_NO_VALIDO);
+        }
+
+        if (GeminiService.ETIQUETA_HTML.test(limpio)) {
+            this.logger.error(
+                'Gemini devolvio una etiqueta HTML dentro del chat; se descarta la respuesta',
+            );
+            throw new BadGatewayException(GeminiService.MSG_CHAT_NO_VALIDO);
         }
 
         return limpio;
