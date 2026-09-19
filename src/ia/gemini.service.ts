@@ -33,7 +33,13 @@ export class GeminiService {
     private readonly logger = new Logger(GeminiService.name);
 
     private static readonly MODELO_POR_DEFECTO = 'gemini-3.1-flash-lite';
-    private static readonly TIMEOUT_POR_DEFECTO_MS = 20000;
+    /**
+     * 45 s y no los 20 s de la version aprobada del SPEC 27. El paso 6 del plan
+     * midio la latencia real: las llamadas que funcionan van de 1,0 a 18,2 s, y
+     * con el tope en 20 s se tiraba una respuesta buena que tardo 18,2 s —en la
+     * primera tanda fallaron 4 de 6 llamadas por timeout—.
+     */
+    private static readonly TIMEOUT_POR_DEFECTO_MS = 45000;
 
     /** Tope duro de la salida. No se trunca: se rechaza y se vuelve a pedir. */
     private static readonly MAX_CARACTERES = 2000;
@@ -125,7 +131,21 @@ export class GeminiService {
             throw new BadGatewayException(GeminiService.MSG_NO_RESPONDIO);
         }
 
-        const partes = cuerpo?.candidates?.[0]?.content?.parts ?? [];
+        const candidato = cuerpo?.candidates?.[0];
+
+        // Septima regla, fuera de las seis del SPEC 27: si el modelo agoto
+        // maxOutputTokens, el markdown viene cortado a media vineta. Pasaria
+        // las otras seis —no esta vacio, no excede 2000 y no trae HTML— y se
+        // guardaria truncado como registro permanente, que es justo lo que el
+        // spec dice querer evitar cuando rechaza truncar por longitud.
+        if (candidato?.finishReason === 'MAX_TOKENS') {
+            this.logger.error(
+                'Gemini corto la respuesta por maxOutputTokens; el markdown vendria truncado',
+            );
+            throw new BadGatewayException(GeminiService.MSG_NO_VALIDA);
+        }
+
+        const partes = candidato?.content?.parts ?? [];
         const crudo = partes.map((parte) => parte?.text ?? '').join('');
 
         return this.validarSalida(crudo);
