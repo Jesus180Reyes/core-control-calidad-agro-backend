@@ -273,6 +273,108 @@ export class LotesRepository {
         });
     }
 
+    /**
+     * Metricas agregadas de los pesajes activos del lote (SPEC 27).
+     *
+     * UNA consulta fija, no una por pesaje: el tamano del prompt no depende del
+     * tamano del lote, asi que un lote de 5 pesajes y uno de 500 producen el
+     * mismo numero de tokens. Y el modelo recibe cifras ya calculadas, que es
+     * lo que hace el resumen verificable.
+     *
+     * `SUM(aprobado = 1)` y `SUM(aprobado = 0)` cuentan por separado y NO suman
+     * `activos` cuando hay pesajes sin revisar. En un lote finalizado eso no
+     * puede pasar —el SPEC 20 lo exige para finalizar— pero el SQL no lo asume.
+     */
+    private async getMetricasLote(loteId: number) {
+        const fila = await this.db
+            .selectFrom('pesajes')
+            .select([
+                sql<number | string>`COUNT(*)`.as('activos'),
+                sql<number | string>`COALESCE(SUM(peso_neto), 0)`.as(
+                    'peso_neto_total',
+                ),
+                sql<number | string>`COALESCE(AVG(peso_neto), 0)`.as(
+                    'peso_neto_promedio',
+                ),
+                sql<number | string>`COALESCE(MIN(peso_neto), 0)`.as(
+                    'peso_neto_minimo',
+                ),
+                sql<number | string>`COALESCE(MAX(peso_neto), 0)`.as(
+                    'peso_neto_maximo',
+                ),
+                sql<number | string>`COALESCE(SUM(fuera_de_rango = 1), 0)`.as(
+                    'fuera_de_rango',
+                ),
+                sql<number | string>`COALESCE(SUM(aprobado = 1), 0)`.as(
+                    'aprobados_por_aprobador',
+                ),
+                sql<number | string>`COALESCE(SUM(aprobado = 0), 0)`.as(
+                    'rechazados_por_aprobador',
+                ),
+            ])
+            .where('lote_id', '=', loteId)
+            .where('isActive', '=', 1)
+            .executeTakeFirstOrThrow();
+
+        // Todo con Number(): las columnas DECIMAL de MySQL vuelven como
+        // `string | number` y SUM()/AVG()/COUNT() tambien.
+        const activos = Number(fila.activos);
+        const fueraDeRango = Number(fila.fuera_de_rango);
+
+        return {
+            activos,
+            peso_neto_total: this.dosDecimales(fila.peso_neto_total),
+            // El AVG llega con la precision de MySQL —22.557142857— y el modelo
+            // tendria que redondearlo. Se redondea aqui para que no calcule.
+            peso_neto_promedio: this.dosDecimales(fila.peso_neto_promedio),
+            peso_neto_minimo: this.dosDecimales(fila.peso_neto_minimo),
+            peso_neto_maximo: this.dosDecimales(fila.peso_neto_maximo),
+            fuera_de_rango: fueraDeRango,
+            // Se calcula aqui, no en el prompt: la instruccion pide decir que
+            // proporcion representan y a la vez prohibe calcular. Sin este
+            // campo el modelo desobedece una de las dos, y cuando se probo
+            // devolvio 21.42 donde 3 de 14 son 21.43.
+            porcentaje_fuera_de_rango:
+                activos === 0 ? 0 : this.dosDecimales((fueraDeRango * 100) / activos),
+            aprobados_por_aprobador: Number(fila.aprobados_por_aprobador),
+            rechazados_por_aprobador: Number(fila.rechazados_por_aprobador),
+        };
+    }
+
+    /**
+     * Conteo de pesajes activos por estado de calidad, el mas frecuente primero.
+     * Segunda y ultima consulta de agregados: tampoco depende del numero de
+     * pesajes, solo del numero de estados distintos.
+     */
+    private async getEstadosCalidadLote(loteId: number) {
+        const filas = await this.db
+            .selectFrom('pesajes')
+            .innerJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .select([
+                'estados_calidad.nombre as estado',
+                sql<number | string>`COUNT(*)`.as('cantidad'),
+            ])
+            .where('pesajes.lote_id', '=', loteId)
+            .where('pesajes.isActive', '=', 1)
+            .groupBy('estados_calidad.nombre')
+            .orderBy('cantidad', 'desc')
+            .execute();
+
+        return filas.map((f) => ({
+            estado: f.estado,
+            cantidad: Number(f.cantidad),
+        }));
+    }
+
+    /** Redondeo a dos decimales, la precision con la que se pesa. */
+    private dosDecimales(valor: number | string): number {
+        return Math.round(Number(valor) * 100) / 100;
+    }
+
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {
         const lote = await db
             .selectFrom('lotes')
