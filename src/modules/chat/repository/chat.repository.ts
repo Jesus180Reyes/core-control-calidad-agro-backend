@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { RawBuilder, SelectQueryBuilder, sql } from 'kysely';
 import { DatabaseService } from 'src/database/database.service';
 import { GeminiService, LlamadaHerramienta } from 'src/ia/gemini.service';
@@ -130,9 +131,17 @@ export class ChatRepository {
     private static readonly TEXTO_NO_CONVERGE =
         'Me enrede consultando los datos y no llegue a una respuesta. Prueba a preguntarlo de otra forma, nombrando el lote, el cliente o la persona.';
 
+    /**
+     * Turnos por usuario y por dia. Es un tope de FACTURA, no de abuso: el rate
+     * limiting por IP y por minuto es del SPEC 23 y va por otro eje, asi que los
+     * dos pueden convivir sin estorbarse.
+     */
+    private static readonly LIMITE_DIARIO_POR_DEFECTO = 20;
+
     constructor(
         private readonly dbService: DatabaseService,
         private readonly gemini: GeminiService,
+        private readonly config: ConfigService,
     ) { }
 
     get db() {
@@ -160,9 +169,22 @@ export class ChatRepository {
      * acaban en un texto de disculpa. El unico codigo que este endpoint sabe
      * devolver es 200.
      *
-     * TODO(SPEC 28, paso 12): tope diario y registro en `chat_log`.
+     * El tope diario se comprueba ANTES que nada y corta el turno sin llamar a
+     * Gemini. El registro en `chat_log` va al final y no puede tumbar el turno.
      */
     async responder(dto: PreguntarDto, usuarioId: number): Promise<string> {
+        // 0. El tope del dia. Va primero porque el objetivo es no gastar: si se
+        // agoto, no hay contexto que resolver ni llamada que hacer.
+        const limite = this.limiteDiario();
+        const gastados = await this.turnosDeHoy(usuarioId);
+
+        if (gastados >= limite) {
+            this.logger.warn(
+                `El usuario ${usuarioId} agoto su limite diario de ${limite} consultas`,
+            );
+            return `Has alcanzado el limite de ${limite} consultas por dia. El contador se reinicia manana.`;
+        }
+
         // 1. El contexto, por SQL y sin IA.
         const contexto = await this.contextoDe(usuarioId);
 
@@ -219,13 +241,95 @@ export class ChatRepository {
             respuesta = ChatRepository.TEXTO_DISCULPA;
         }
 
-        this.logger.debug(
-            usadas.length === 0
-                ? `Turno sin herramientas (usuario ${usuarioId})`
-                : `Herramientas usadas (usuario ${usuarioId}): ${usadas.map((u) => u.nombre).join(', ')}`,
-        );
+        // 4. La bitacora. Nunca puede tumbar el turno.
+        await this.registrar(dto, usuarioId, respuesta, usadas);
 
         return respuesta;
+    }
+
+    /**
+     * Una fila por turno en `chat_log`.
+     *
+     * **Envuelto en su propio try/catch**: la bitacora no puede tumbar una
+     * respuesta que ya esta calculada y pagada. Si el INSERT falla, se registra
+     * el fallo en el log de la aplicacion y el turno responde igual.
+     *
+     * **Se espera, aunque el spec lo llame fire-and-forget**, y la razon es
+     * local a este proyecto: `DatabaseMiddleware` destruye el pool de la
+     * peticion en `res.on('finish')`, asi que un INSERT lanzado sin esperar
+     * corre contra ese cierre y se pierde la fila o revienta despues de haber
+     * respondido. Esperar cuesta una consulta en una conexion que ya tenemos
+     * abierta; no esperar cuesta el unico registro que existe de quien pregunto
+     * que.
+     *
+     * `herramientas` guarda `[{ nombre, argumentos }]` o **NULL** si no se uso
+     * ninguna, y esa columna es lo que vuelve estructuralmente detectable un
+     * turno sin dato detras: un saludo, una negativa o una respuesta inventada.
+     * Revisar esas filas es la mitigacion que el spec pone contra lo tercero.
+     */
+    private async registrar(
+        dto: PreguntarDto,
+        usuarioId: number,
+        respuesta: string,
+        usadas: LlamadaHerramienta[],
+    ): Promise<void> {
+        try {
+            await this.db
+                .insertInto('chat_log')
+                .values({
+                    usuario_id: usuarioId,
+                    conversacion: dto.conversacion ?? null,
+                    mensaje: dto.mensaje,
+                    herramientas:
+                        usadas.length === 0 ? null : JSON.stringify(usadas),
+                    respuesta,
+                })
+                .execute();
+        } catch (error) {
+            this.logger.error(
+                `No se pudo registrar el turno en chat_log (usuario ${usuarioId}): ${(error as Error)?.message}`,
+            );
+        }
+    }
+
+    /**
+     * Turnos que este usuario lleva hoy.
+     *
+     * `created_at >= CURDATE()` se resuelve en MySQL, con el mismo reloj que
+     * escribio esas filas; calcular el inicio del dia en Node partiria el
+     * contador en cuanto el proceso y la base estuvieran en zonas distintas.
+     * Recorre exactamente el indice `(usuario_id, created_at)`, que existe para
+     * esto y solo para esto.
+     *
+     * El turno rechazado por tope NO se registra, asi que este contador no crece
+     * solo: un frontend en bucle de reintentos llenaria la bitacora de filas que
+     * no cuentan nada nuevo, sobre una tabla que nada borra.
+     */
+    private async turnosDeHoy(usuarioId: number): Promise<number> {
+        const fila = await this.db
+            .selectFrom('chat_log')
+            .select((eb) => eb.fn.countAll().as('total'))
+            .where('usuario_id', '=', usuarioId)
+            .where('created_at', '>=', sql<Date>`CURDATE()`)
+            .executeTakeFirst();
+
+        return Number(fila?.total ?? 0);
+    }
+
+    /**
+     * `CHAT_LIMITE_DIARIO` es opcional. Un valor no numerico, cero o negativo
+     * cae al defecto, igual que `GEMINI_TIMEOUT_MS` en `GeminiService`. Eso
+     * significa que **no hay forma de apagar el tope por configuracion**: es
+     * deliberado, porque la variable protege la factura y un `0` suelto en un
+     * `.env` la dejaria sin techo sin que nadie lo notara.
+     */
+    private limiteDiario(): number {
+        const crudo = this.config.get<string>('CHAT_LIMITE_DIARIO');
+        const valor = Number(crudo);
+
+        return Number.isInteger(valor) && valor > 0
+            ? valor
+            : ChatRepository.LIMITE_DIARIO_POR_DEFECTO;
     }
 
     /**
