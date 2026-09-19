@@ -3,15 +3,22 @@ import {
     BadRequestException,
     ForbiddenException,
     Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
 import { CreateLoteDto } from '../dto/create-lote.dto';
 import { RechazarLoteDto } from '../dto/rechazar-lote.dto';
+import { FinalizarLoteDto } from '../dto/finalizar-lote.dto';
+import { GeminiService } from 'src/ia/gemini.service';
+import { ResumenLotePayload } from 'src/ia/prompts/resumen-lote.prompt';
 
 @Injectable()
 export class LotesRepository {
-    constructor(private readonly dbService: DatabaseService) { }
+    constructor(
+        private readonly dbService: DatabaseService,
+        private readonly gemini: GeminiService,
+    ) { }
 
     get db() {
         return this.dbService.client;
@@ -245,7 +252,11 @@ export class LotesRepository {
         });
     }
 
-    async finalizarLote(loteId: number, userId: number) {
+    async finalizarLote(
+        loteId: number,
+        dto: FinalizarLoteDto,
+        userId: number,
+    ) {
         return await this.db.transaction().execute(async (trx) => {
             await this.validateLoteNoFinalizado(loteId, trx);
             const lote = await this.validateLoteEnClienteFinal(loteId, trx);
@@ -259,12 +270,357 @@ export class LotesRepository {
                     etapa_id: etapa.id,
                     finalizado_por: userId,
                     finalizado_en: sql<Date>`NOW()`,
+                    firma_aprobador: dto.firma_aprobador,
                 })
                 .where('id', '=', loteId)
                 .execute();
 
             return true;
         });
+    }
+
+    /**
+     * Genera el resumen de un lote finalizado y lo guarda (SPEC 27).
+     *
+     * **El orden importa y define donde vive la transaccion.** La llamada HTTP
+     * ocurre FUERA de toda transaccion: `DatabaseMiddleware` abre un pool de UNA
+     * conexion por peticion, y retenerla mientras responde Google es la regla
+     * que este spec no puede romper. La transaccion envuelve solo la
+     * revalidacion y el UPDATE de una columna.
+     */
+    async generarResumenLote(loteId: number) {
+        // 1. Validaciones, fuera de transaccion.
+        const lote = await this.validateLoteExiste(loteId, this.db);
+        this.validateLoteFinalizado(lote);
+        await this.validateResumenDisponible(loteId, this.db);
+        await this.validateLoteTienePesajesActivos(lote, this.db);
+
+        // 2. Las cifras, fuera de transaccion. El modelo redacta, no calcula.
+        const datos = await this.getDatosLote(loteId);
+        const pesajes = await this.getMetricasLote(loteId);
+        const estados_calidad = await this.getEstadosCalidadLote(loteId);
+
+        const payload: ResumenLotePayload = {
+            lote: datos.nombre_lote,
+            cliente: datos.cliente,
+            producto: datos.producto,
+            variedad_o_talla: datos.variedad_o_talla,
+            unidad_medida: datos.unidad_medida,
+            rango_peso: {
+                minimo: Number(datos.peso_minimo),
+                ideal: Number(datos.peso_ideal),
+                maximo: Number(datos.peso_maximo),
+            },
+            pesajes,
+            estados_calidad,
+            aprobado_en: this.fechaEnLetra(datos.aprobado_en),
+            finalizado_en: this.fechaEnLetra(datos.finalizado_en),
+        };
+
+        // 3. El fetch. Fuera de transaccion, insisto.
+        const resumen = await this.gemini.generarResumenDeLote(payload);
+
+        // 4. Ahora si: revalidar con el trx y escribir.
+        return await this.db.transaction().execute(async (trx) => {
+            // Segunda pasada. Cierra la ventana de carrera que abren los
+            // segundos del paso 3: dos peticiones simultaneas sobre el mismo
+            // lote pasan las dos el paso 1, y la segunda en llegar aqui
+            // responde 400 en vez de pisar el resumen de la primera.
+            await this.validateResumenDisponible(loteId, trx);
+
+            await trx
+                .updateTable('lotes')
+                .set({ resumen_ia: resumen })
+                .where('id', '=', loteId)
+                .execute();
+
+            return resumen;
+        });
+    }
+
+    /**
+     * Lectura del resumen ya escrito (SPEC 27).
+     *
+     * Dos condiciones y nada mas: 404 si el lote no existe, y `null` si existe
+     * y nadie le pidio el resumen. NO valida el estado del lote —uno abierto o
+     * rechazado responde 200 con null— porque una lectura no tiene que explicar
+     * por que un campo esta vacio; eso es trabajo del POST. Mismo criterio que
+     * `GET /pesajes/:id` del SPEC 21, cuya unica condicion es el id.
+     */
+    async getResumenLote(loteId: number) {
+        const lote = await this.validateLoteExiste(loteId, this.db);
+        return lote.resumen_ia;
+    }
+
+    /**
+     * Los datos del lote que viajan al prompt, con cliente, producto y unidad
+     * resueltos a nombre.
+     *
+     * Consulta aparte de `validateLoteExiste` a proposito: aquel se queda en lo
+     * minimo para poder reutilizarse desde la lectura sin arrastrar tres joins.
+     * **Nada de `selectAll()`**: `firma_aprobador` son cientos de KB y
+     * `resumen_ia` no pinta nada en su propio prompt.
+     */
+    private async getDatosLote(loteId: number) {
+        return await this.db
+            .selectFrom('lotes')
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .select([
+                'lotes.nombre_lote',
+                'lotes.variedad_o_talla',
+                'lotes.peso_minimo',
+                'lotes.peso_ideal',
+                'lotes.peso_maximo',
+                'lotes.aprobado_en',
+                'lotes.finalizado_en',
+                'clientes.nombre as cliente',
+                'productos.nombre as producto',
+                'unidades_medida.nombre as unidad_medida',
+            ])
+            .where('lotes.id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new NotFoundException(`El lote con id '${loteId}' no existe`),
+            );
+    }
+
+    private static readonly MESES = [
+        'enero',
+        'febrero',
+        'marzo',
+        'abril',
+        'mayo',
+        'junio',
+        'julio',
+        'agosto',
+        'septiembre',
+        'octubre',
+        'noviembre',
+        'diciembre',
+    ];
+
+    /**
+     * '11 de septiembre de 2026'. Se formatea aqui, no en el prompt: dejar que
+     * el modelo traduzca un ISO a un nombre de mes es una cifra mas que podria
+     * equivocar, a cambio de nada. La instruccion de sistema le manda copiar
+     * las fechas tal como llegan.
+     */
+    private fechaEnLetra(valor: Date | string | null): string | null {
+        if (valor === null) return null;
+
+        const fecha = valor instanceof Date ? valor : new Date(valor);
+        if (Number.isNaN(fecha.getTime())) return null;
+
+        return `${fecha.getDate()} de ${LotesRepository.MESES[fecha.getMonth()]} de ${fecha.getFullYear()}`;
+    }
+
+    /**
+     * Existencia del lote (SPEC 27). **Responde 404, no 400.**
+     *
+     * Es el unico validador de escritura del proyecto que lanza `NotFound`: los
+     * cuatro `PATCH` de este mismo archivo usan 400 para "no existe". La
+     * distincion es deliberada y es la que establecio el SPEC 21 —el recurso no
+     * esta ahi, frente a su estado no sirve— y por eso los otros tres
+     * validadores de abajo si son 400.
+     *
+     * Devuelve lo minimo para validar, sin joins, para que la lectura
+     * `GET /lotes/:id/resumen` pueda reutilizarlo sin arrastrar nada mas.
+     */
+    private async validateLoteExiste(loteId: number, db: Kysely<Database>) {
+        return await db
+            .selectFrom('lotes')
+            .select(['id', 'nombre_lote', 'resumen_ia', 'finalizado_por'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new NotFoundException(`El lote con id '${loteId}' no existe`),
+            );
+    }
+
+    /**
+     * Solo se resume un lote FINALIZADO: es el unico punto del ciclo donde el
+     * dato esta completo —el SPEC 20 exige todos los pesajes revisados para
+     * finalizar— y congelado, porque a partir de ahi el lote no admite ninguna
+     * escritura mas.
+     *
+     * Se comprueba con `finalizado_por IS NOT NULL`, la senal canonica de la
+     * tabla discriminadora de CLAUDE.md, y NO resolviendo la fila FINALIZADO de
+     * `etapas`: ahorra una consulta y evita el 400 por "la etapa no existe" que
+     * arrastra `resolveEtapa`.
+     */
+    private validateLoteFinalizado(lote: {
+        nombre_lote: string;
+        finalizado_por: number | null;
+    }) {
+        if (lote.finalizado_por === null) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no esta finalizado. Solo se puede resumir un lote finalizado`,
+            );
+        }
+    }
+
+    /**
+     * Un resumen se escribe UNA vez y no se sobrescribe, igual que
+     * `completarDocumentoFiscal` del SPEC 25. Corregirlo es un UPDATE a mano.
+     *
+     * Consulta la base en vez de mirar una fila ya leida a proposito: corre dos
+     * veces —antes de llamar a Gemini y otra vez dentro de la transaccion con
+     * el `trx`— y es la segunda pasada la que cierra la ventana de carrera que
+     * abren los segundos de la llamada. Dos peticiones simultaneas sobre el
+     * mismo lote pasan las dos la primera, y la segunda en llegar responde 400
+     * en lugar de pisar el resumen de la primera.
+     */
+    private async validateResumenDisponible(
+        loteId: number,
+        db: Kysely<Database>,
+    ) {
+        const lote = await db
+            .selectFrom('lotes')
+            .select(['nombre_lote', 'resumen_ia'])
+            .where('id', '=', loteId)
+            .executeTakeFirstOrThrow(
+                () => new NotFoundException(`El lote con id '${loteId}' no existe`),
+            );
+
+        if (lote.resumen_ia !== null) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' ya tiene un resumen generado`,
+            );
+        }
+    }
+
+    /**
+     * Sin pesajes activos no hay nada que resumir, y los agregados saldrian
+     * todos en cero.
+     *
+     * Es casi gemelo de `validateLoteTienePesajes`, que usan `aprobarLote` y
+     * `finalizarLote`; se separa porque el mensaje es otro —aquel habla de
+     * pesajes registrados y este de pesajes que resumir— y unificarlos
+     * cambiaria el texto de un error ya publicado por el SPEC 13.
+     */
+    private async validateLoteTienePesajesActivos(
+        lote: { id: number; nombre_lote: string },
+        db: Kysely<Database>,
+    ) {
+        const pesaje = await db
+            .selectFrom('pesajes')
+            .select('id')
+            .where('lote_id', '=', lote.id)
+            .where('isActive', '=', 1)
+            .limit(1)
+            .executeTakeFirst();
+
+        if (!pesaje) {
+            throw new BadRequestException(
+                `El lote '${lote.nombre_lote}' no tiene pesajes activos que resumir`,
+            );
+        }
+    }
+
+    /**
+     * Metricas agregadas de los pesajes activos del lote (SPEC 27).
+     *
+     * UNA consulta fija, no una por pesaje: el tamano del prompt no depende del
+     * tamano del lote, asi que un lote de 5 pesajes y uno de 500 producen el
+     * mismo numero de tokens. Y el modelo recibe cifras ya calculadas, que es
+     * lo que hace el resumen verificable.
+     *
+     * `SUM(aprobado = 1)` y `SUM(aprobado = 0)` cuentan por separado y NO suman
+     * `activos` cuando hay pesajes sin revisar. En un lote finalizado eso no
+     * puede pasar —el SPEC 20 lo exige para finalizar— pero el SQL no lo asume.
+     */
+    private async getMetricasLote(loteId: number) {
+        const fila = await this.db
+            .selectFrom('pesajes')
+            .select([
+                sql<number | string>`COUNT(*)`.as('activos'),
+                sql<number | string>`COALESCE(SUM(peso_neto), 0)`.as(
+                    'peso_neto_total',
+                ),
+                sql<number | string>`COALESCE(AVG(peso_neto), 0)`.as(
+                    'peso_neto_promedio',
+                ),
+                sql<number | string>`COALESCE(MIN(peso_neto), 0)`.as(
+                    'peso_neto_minimo',
+                ),
+                sql<number | string>`COALESCE(MAX(peso_neto), 0)`.as(
+                    'peso_neto_maximo',
+                ),
+                sql<number | string>`COALESCE(SUM(fuera_de_rango = 1), 0)`.as(
+                    'fuera_de_rango',
+                ),
+                sql<number | string>`COALESCE(SUM(aprobado = 1), 0)`.as(
+                    'aprobados_por_aprobador',
+                ),
+                sql<number | string>`COALESCE(SUM(aprobado = 0), 0)`.as(
+                    'rechazados_por_aprobador',
+                ),
+            ])
+            .where('lote_id', '=', loteId)
+            .where('isActive', '=', 1)
+            .executeTakeFirstOrThrow();
+
+        // Todo con Number(): las columnas DECIMAL de MySQL vuelven como
+        // `string | number` y SUM()/AVG()/COUNT() tambien.
+        const activos = Number(fila.activos);
+        const fueraDeRango = Number(fila.fuera_de_rango);
+
+        return {
+            activos,
+            peso_neto_total: this.dosDecimales(fila.peso_neto_total),
+            // El AVG llega con la precision de MySQL —22.557142857— y el modelo
+            // tendria que redondearlo. Se redondea aqui para que no calcule.
+            peso_neto_promedio: this.dosDecimales(fila.peso_neto_promedio),
+            peso_neto_minimo: this.dosDecimales(fila.peso_neto_minimo),
+            peso_neto_maximo: this.dosDecimales(fila.peso_neto_maximo),
+            fuera_de_rango: fueraDeRango,
+            // Se calcula aqui, no en el prompt: la instruccion pide decir que
+            // proporcion representan y a la vez prohibe calcular. Sin este
+            // campo el modelo desobedece una de las dos, y cuando se probo
+            // devolvio 21.42 donde 3 de 14 son 21.43.
+            porcentaje_fuera_de_rango:
+                activos === 0 ? 0 : this.dosDecimales((fueraDeRango * 100) / activos),
+            aprobados_por_aprobador: Number(fila.aprobados_por_aprobador),
+            rechazados_por_aprobador: Number(fila.rechazados_por_aprobador),
+        };
+    }
+
+    /**
+     * Conteo de pesajes activos por estado de calidad, el mas frecuente primero.
+     * Segunda y ultima consulta de agregados: tampoco depende del numero de
+     * pesajes, solo del numero de estados distintos.
+     */
+    private async getEstadosCalidadLote(loteId: number) {
+        const filas = await this.db
+            .selectFrom('pesajes')
+            .innerJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .select([
+                'estados_calidad.nombre as estado',
+                sql<number | string>`COUNT(*)`.as('cantidad'),
+            ])
+            .where('pesajes.lote_id', '=', loteId)
+            .where('pesajes.isActive', '=', 1)
+            .groupBy('estados_calidad.nombre')
+            .orderBy('cantidad', 'desc')
+            .execute();
+
+        return filas.map((f) => ({
+            estado: f.estado,
+            cantidad: Number(f.cantidad),
+        }));
+    }
+
+    /** Redondeo a dos decimales, la precision con la que se pesa. */
+    private dosDecimales(valor: number | string): number {
+        return Math.round(Number(valor) * 100) / 100;
     }
 
     private async validateLoteAbierto(loteId: number, db: Kysely<Database>) {

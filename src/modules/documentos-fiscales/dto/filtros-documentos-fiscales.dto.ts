@@ -7,9 +7,9 @@ import { fechaISO } from "src/schemas/fecha.schema";
 // produce 400. z.coerce.number() es la unica transformacion y es idempotente,
 // que es lo que exige el ZodValidationPipe registrado dos veces.
 const filtrosDocumentosFiscalesSchema = z.object({
-    cliente_id: z.coerce.number().int().positive().optional().catch(undefined),
-    desde: fechaISO().optional().catch(undefined),
-    hasta: fechaISO().optional().catch(undefined),
+    cliente_id: z.coerce.number().int().positive().optional(),
+    desde: fechaISO().optional(),
+    hasta: fechaISO().optional(),
 });
 
 export class FiltrosDocumentosFiscalesDto extends createZodDto(filtrosDocumentosFiscalesSchema) { }

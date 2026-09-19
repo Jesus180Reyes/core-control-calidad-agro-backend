@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { LotesRepository } from './repository/lotes.repository';
 import { CreateLoteDto } from './dto/create-lote.dto';
 import { RechazarLoteDto } from './dto/rechazar-lote.dto';
+import { FinalizarLoteDto } from './dto/finalizar-lote.dto';
 
 @Injectable()
 export class LotesService {
@@ -44,8 +45,16 @@ export class LotesService {
         return await this.lotesRepository.aprobarLote(loteId, userId);
     }
 
-    async finalizar(loteId: number, userId: number) {
-        return await this.lotesRepository.finalizarLote(loteId, userId);
+    async finalizar(loteId: number, dto: FinalizarLoteDto, userId: number) {
+        return await this.lotesRepository.finalizarLote(loteId, dto, userId);
+    }
+
+    async generarResumen(loteId: number) {
+        return await this.lotesRepository.generarResumenLote(loteId);
+    }
+
+    async obtenerResumen(loteId: number) {
+        return await this.lotesRepository.getResumenLote(loteId);
     }
 
 }

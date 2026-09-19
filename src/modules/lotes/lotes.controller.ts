@@ -14,6 +14,7 @@ import type { Request } from 'express';
 import { LotesService } from './lotes.service';
 import { CreateLoteDto } from './dto/create-lote.dto';
 import { RechazarLoteDto } from './dto/rechazar-lote.dto';
+import { FinalizarLoteDto } from './dto/finalizar-lote.dto';
 
 @ApiTags('lotes')
 @ApiBearerAuth()
@@ -122,6 +123,38 @@ export class LotesController {
         };
     }
 
+    // Declarado DESPUES de las cuatro rutas cliente/... por costumbre del
+    // proyecto, aunque aqui el orden no es load-bearing: ':id/resumen' lleva un
+    // segmento literal detras del parametro, asi que es disjunto de
+    // 'cliente/:clienteId' y ninguno se traga al otro. La trampa del :id que
+    // documenta CLAUDE.md necesita un @Get(':id') pelado, y este no lo es.
+    @Get(':id/resumen')
+    @ApiOperation({
+        summary: 'Resumen IA de un lote',
+        description:
+            'Devuelve el resumen de cierre que genero POST /lotes/{id}/resumen, o null si ' +
+            'todavia no se ha generado. ' +
+            'El resumen viaja EN MARKDOWN CRUDO: una cadena con saltos de linea reales y ' +
+            'negritas con **, que el cliente debe renderizar con su paquete de markdown. El ' +
+            'backend no produce HTML en ningun punto. El formato es un subconjunto cerrado: ' +
+            'un parrafo de apertura, una linea en blanco y entre 3 y 5 vinetas que empiezan ' +
+            'por "- ". No trae titulos, enlaces, tablas ni HTML. ' +
+            'Al renderizarlo, el cliente NO debe habilitar el HTML crudo de su paquete. ' +
+            'Solo dos respuestas: 404 si el lote no existe, y 200 en cualquier otro caso. NO ' +
+            'valida el estado del lote, asi que uno abierto, rechazado o sin finalizar ' +
+            'responde 200 con resumen en null, porque no tiene resumen, no porque se prohiba ' +
+            'leerlo. NO valida el vinculo cliente_operador.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del lote', example: 33 })
+    async obtenerResumen(@Param('id', ParseIntPipe) id: number) {
+        const resumen = await this.lotesService.obtenerResumen(id);
+        return {
+            ok: true,
+            msg: 'Resumen obtenido correctamente',
+            resumen,
+        };
+    }
+
     @Post()
     @HttpCode(201)
     @ApiOperation({
@@ -140,6 +173,38 @@ export class LotesController {
         return {
             ok: !!lote,
             msg: 'Lote creado correctamente',
+        };
+    }
+
+    @Post(':id/resumen')
+    @HttpCode(200)
+    @ApiOperation({
+        summary: 'Generar el resumen IA de un lote finalizado',
+        description:
+            'Arma las metricas del lote en SQL, se las manda a Gemini y guarda el markdown ' +
+            'que devuelve en lotes.resumen_ia, que hasta este spec nunca se escribia. ' +
+            'SIN CUERPO DE PETICION y sin DTO. Responde 200 con { ok, msg, resumen }. ' +
+            'El resumen viaja EN MARKDOWN CRUDO —saltos de linea reales y negritas con **— y ' +
+            'lo renderiza el cliente con su paquete de markdown, sin habilitar el HTML crudo. ' +
+            'El backend no produce HTML en ningun punto. ' +
+            'Solo admite lotes FINALIZADOS: es el unico punto del ciclo donde el dato esta ' +
+            'completo y congelado. Se escribe UNA vez y no se sobrescribe, de modo que un lote ' +
+            'que ya tiene resumen responde 400; corregirlo es un UPDATE a mano. ' +
+            'El modelo redacta, no calcula: todas las cifras salen de dos consultas agregadas ' +
+            'y viajan ya resueltas en el prompt. ' +
+            '404 si el lote no existe —el unico 404 en una escritura del proyecto—. 400 si no ' +
+            'esta finalizado, si ya tiene resumen o si no tiene pesajes activos. 503 si falta ' +
+            'GEMINI_API_KEY. 502 si Gemini no responde, tarda mas de GEMINI_TIMEOUT_MS o ' +
+            'devuelve algo que no pasa la validacion; en todos esos casos no se guarda nada. ' +
+            'NO valida el vinculo cliente_operador.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del lote finalizado', example: 33 })
+    async generarResumen(@Param('id', ParseIntPipe) id: number) {
+        const resumen = await this.lotesService.generarResumen(id);
+        return {
+            ok: !!resumen,
+            msg: 'Resumen generado correctamente',
+            resumen,
         };
     }
 
@@ -227,7 +292,12 @@ export class LotesController {
         summary: 'Finalizar un lote, como aprobador',
         description:
             'Ultimo paso del flujo: mueve el lote a la etapa FINALIZADO. Es lo unico en el proyecto ' +
-            'que escribe esa etapa. Sin cuerpo de peticion. ' +
+            'que escribe esa etapa. ' +
+            'EXIGE un cuerpo con firma_aprobador: la firma manuscrita del aprobador como data URL ' +
+            'de PNG en base64, es decir una cadena que empieza por "data:image/png;base64,". Es ' +
+            'obligatoria, de modo que una llamada sin cuerpo responde 400; solo se acepta PNG, y el ' +
+            'maximo son 500000 caracteres. La firma se guarda y NO la devuelve ninguna lectura de ' +
+            'la API, ni siquiera el listado de lotes finalizados. ' +
             'Exige que el lote este cerrado en CLIENTE_FINAL, que no haya sido finalizado ya y que ' +
             'TODOS sus pesajes activos esten revisados, es decir con aprobado distinto de null. Pide ' +
             'revisados, no aprobados: un lote cuyos pesajes el aprobador rechazo todos finaliza bien. ' +
@@ -239,10 +309,11 @@ export class LotesController {
     @ApiParam({ name: 'id', description: 'Id del lote a finalizar', example: 1 })
     async finalizarByApprover(
         @Param('id', ParseIntPipe) id: number,
+        @Body() dto: FinalizarLoteDto,
         @Req() req: Request,
     ) {
         const { userId } = req.user as { userId: number };
-        const finalizado = await this.lotesService.finalizar(id, userId);
+        const finalizado = await this.lotesService.finalizar(id, dto, userId);
         return {
             ok: finalizado,
             msg: 'Lote finalizado correctamente',
