@@ -9,4 +9,8 @@ export class ChatService {
     async preguntar(dto: PreguntarDto, userId: number) {
         return await this.chatRepository.responder(dto, userId);
     }
+
+    async sugerencias(userId: number) {
+        return await this.chatRepository.sugerencias(userId);
+    }
 }

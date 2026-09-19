@@ -229,6 +229,54 @@ export class ChatRepository {
     }
 
     /**
+     * Tres ejemplos para la pantalla vacia del chat (SPEC 28).
+     *
+     * **Una consulta y ninguna IA.** Es lo que hace que la pantalla pinte al
+     * instante y que abrir el chat no cueste una llamada a Gemini. Por eso es
+     * ruta propia y no el primer turno de `POST /chat`: gastar un turno para
+     * pintar una pantalla vacia es exactamente lo que el spec rechaza.
+     *
+     * Con cartera, los ejemplos llevan nombres reales, que es lo que los vuelve
+     * utiles —un supervisor ve su cliente y entiende de que puede preguntar—.
+     * Sin cartera devuelve tres ejemplos genericos, que es el caso de un
+     * aprobador o un ADMIN, no un error.
+     */
+    async sugerencias(usuarioId: number): Promise<string[]> {
+        const clientes = await this.db
+            .selectFrom('clientes')
+            .innerJoin(
+                'cliente_operador',
+                'cliente_operador.cliente_id',
+                'clientes.id',
+            )
+            .select(['clientes.nombre'])
+            .where('cliente_operador.usuario_id', '=', usuarioId)
+            .where('clientes.isActive', '=', 1)
+            .orderBy('clientes.nombre', 'asc')
+            .limit(2)
+            .execute();
+
+        if (clientes.length === 0) {
+            return [
+                'Busca los lotes abiertos de un cliente por su nombre',
+                'Cuantos pesajes registro una persona esta semana',
+                'Dame el detalle del pesaje numero 1234',
+            ];
+        }
+
+        const primero = clientes[0].nombre;
+        // Con un solo cliente los tres ejemplos hablan de el; con dos o mas se
+        // reparten, para que se vea que el chat no esta atado a uno.
+        const segundo = clientes[1]?.nombre ?? primero;
+
+        return [
+            `Como van los lotes abiertos de ${primero}`,
+            `Pesajes de hoy de ${segundo}`,
+            `Que lotes de ${primero} estan esperando al aprobador`,
+        ];
+    }
+
+    /**
      * Lo que el servidor sabe antes de hablar con nadie: quien pregunta y que
      * clientes tiene en su cartera.
      *
