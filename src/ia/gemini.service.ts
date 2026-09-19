@@ -83,6 +83,53 @@ export class GeminiService {
             (this.config.get<string>('GEMINI_MODEL') ?? '').trim() ||
             GeminiService.MODELO_POR_DEFECTO;
 
+        const cuerpo = await this.generateContent<RespuestaGemini>(
+            modelo,
+            apiKey,
+            construirPeticionResumen(payload),
+        );
+
+        const candidato = cuerpo?.candidates?.[0];
+
+        // Septima regla, fuera de las seis del SPEC 27: si el modelo agoto
+        // maxOutputTokens, el markdown viene cortado a media vineta. Pasaria
+        // las otras seis —no esta vacio, no excede 2000 y no trae HTML— y se
+        // guardaria truncado como registro permanente, que es justo lo que el
+        // spec dice querer evitar cuando rechaza truncar por longitud.
+        if (candidato?.finishReason === 'MAX_TOKENS') {
+            this.logger.error(
+                'Gemini corto la respuesta por maxOutputTokens; el markdown vendria truncado',
+            );
+            throw new BadGatewayException(GeminiService.MSG_NO_VALIDA);
+        }
+
+        const partes = candidato?.content?.parts ?? [];
+        const crudo = partes.map((parte) => parte?.text ?? '').join('');
+
+        return this.validarSalida(crudo);
+    }
+
+    /**
+     * El POST a `:generateContent` y nada mas: timeout, red, estado y parseo.
+     *
+     * Extraido en el SPEC 28 sin cambiar una sola condicion, porque lo comparten
+     * el resumen y el chat. Lo que NO hace es interpretar la respuesta: quien
+     * llama decide que es una salida valida, que hacer con `finishReason` y si
+     * lo que viene es texto o una llamada a funcion.
+     *
+     * Siempre falla con 502 y el mismo mensaje. El chat del SPEC 28 no quiere
+     * ese codigo —un supervisor lee un 502 como que la aplicacion esta caida—,
+     * asi que lo atrapa arriba y responde 200 con un texto de disculpa. La
+     * traduccion es de quien llama, no de aqui.
+     *
+     * @throws BadGatewayException 502 si Gemini no responde, responde != 2xx o
+     * responde algo que no es JSON.
+     */
+    private async generateContent<T>(
+        modelo: string,
+        apiKey: string,
+        cuerpoPeticion: unknown,
+    ): Promise<T> {
         const timeoutMs = this.resolverTimeout();
 
         // La clave viaja en cabecera y no como ?key= para que no acabe en logs
@@ -100,7 +147,7 @@ export class GeminiService {
                     'Content-Type': 'application/json',
                     'x-goog-api-key': apiKey,
                 },
-                body: JSON.stringify(construirPeticionResumen(payload)),
+                body: JSON.stringify(cuerpoPeticion),
                 signal: controlador.signal,
             });
         } catch (error) {
@@ -123,32 +170,12 @@ export class GeminiService {
             throw new BadGatewayException(GeminiService.MSG_NO_RESPONDIO);
         }
 
-        let cuerpo: RespuestaGemini;
         try {
-            cuerpo = (await respuesta.json()) as RespuestaGemini;
+            return (await respuesta.json()) as T;
         } catch {
             this.logger.error('Gemini respondio 200 con un cuerpo que no es JSON');
             throw new BadGatewayException(GeminiService.MSG_NO_RESPONDIO);
         }
-
-        const candidato = cuerpo?.candidates?.[0];
-
-        // Septima regla, fuera de las seis del SPEC 27: si el modelo agoto
-        // maxOutputTokens, el markdown viene cortado a media vineta. Pasaria
-        // las otras seis —no esta vacio, no excede 2000 y no trae HTML— y se
-        // guardaria truncado como registro permanente, que es justo lo que el
-        // spec dice querer evitar cuando rechaza truncar por longitud.
-        if (candidato?.finishReason === 'MAX_TOKENS') {
-            this.logger.error(
-                'Gemini corto la respuesta por maxOutputTokens; el markdown vendria truncado',
-            );
-            throw new BadGatewayException(GeminiService.MSG_NO_VALIDA);
-        }
-
-        const partes = candidato?.content?.parts ?? [];
-        const crudo = partes.map((parte) => parte?.text ?? '').join('');
-
-        return this.validarSalida(crudo);
     }
 
     /**
