@@ -149,7 +149,7 @@ export class GeminiService {
         }
 
         const modelo =
-            (this.config.get<string>('GEMINI_MODEL') ?? '').trim() ||
+            (this.config.get<string>('GEMINI_CHAT_MODEL') ?? '').trim() ||
             GeminiService.MODELO_POR_DEFECTO;
 
         const cuerpo = await this.generateContent<RespuestaGemini>(
