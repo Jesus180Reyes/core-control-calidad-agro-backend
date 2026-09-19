@@ -1,6 +1,6 @@
 # SPEC 27 — Resumen IA de lotes finalizados con Gemini
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02 (crea el módulo `lotes` y declara `resumen_ia` como diferido), SPEC 13 (escribe `aprobado_por`/`aprobado_en`), SPEC 19 (escribe `pesajes.aprobado`, que este spec cuenta), SPEC 20 (crea la etapa `FINALIZADO` y `finalizado_por`/`finalizado_en`), SPEC 22 (Swagger, donde hay que documentar las dos rutas nuevas), SPEC 24 (el listado de lotes finalizados, que este spec deja **intacto** en sus 14 campos)
 > **Date:** 2026-09-18
 > **Objective:** Crear `POST /lotes/:id/resumen`, que arma las métricas de un lote finalizado en SQL, se las manda a Gemini y guarda el **markdown** resultante en `lotes.resumen_ia`, que hasta hoy nunca se escribió.
