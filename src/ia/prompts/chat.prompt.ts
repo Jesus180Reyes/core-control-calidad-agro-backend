@@ -392,6 +392,25 @@ const GENERATION_CONFIG_CHAT = {
  */
 const TOOL_CONFIG_CHAT = { functionCallingConfig: { mode: 'AUTO' } };
 
+/**
+ * El modo de la vuelta de cierre: el modelo NO puede pedir nada mas y no le
+ * queda otra que redactar con lo que ya tiene en `contents`.
+ *
+ * Existe por un fallo concreto y reproducible: el bucle cuenta llamadas a
+ * Gemini, no rondas de herramientas, y solo sale con respuesta cuando una vuelve
+ * como texto. Una cadena de tres consultas —resolver la persona, resolver el
+ * cliente, pedir los pesajes— gastaba las tres vueltas pidiendo datos y el turno
+ * moria con los datos ya consultados y pagados dentro de `contents`. Con esta
+ * vuelta, esa informacion se aprovecha en vez de tirarse.
+ *
+ * Las declaraciones siguen viajando aunque no se puedan llamar: el historial de
+ * este turno lleva `functionResponse` de vueltas anteriores y el modelo necesita
+ * las firmas para interpretarlos.
+ */
+const TOOL_CONFIG_SIN_HERRAMIENTAS = {
+    functionCallingConfig: { mode: 'NONE' },
+};
+
 /** Una parte cualquiera del protocolo: texto, functionCall o functionResponse. */
 export type ParteGemini = Record<string, unknown>;
 
@@ -432,10 +451,15 @@ export const construirContents = (
  * el SPEC 27 aplica al payload del resumen, y la segunda barrera es que el
  * despachador valida cada argumento contra ese mismo contexto, asi que una
  * instruccion incrustada en un nombre no puede ampliar lo que el turno alcanza.
+ *
+ * `sinHerramientas` es la vuelta de cierre descrita arriba: mismo prompt, mismo
+ * contexto y mismas declaraciones, pero con el modelo impedido de pedir nada
+ * mas. Lo unico que cambia es `toolConfig`.
  */
 export const construirPeticionChat = (
     contexto: ContextoChat,
     contents: ContenidoGemini[],
+    sinHerramientas = false,
 ) => ({
     systemInstruction: {
         parts: [
@@ -445,6 +469,8 @@ export const construirPeticionChat = (
     },
     contents,
     tools: [{ functionDeclarations: HERRAMIENTAS_CHAT }],
-    toolConfig: TOOL_CONFIG_CHAT,
+    toolConfig: sinHerramientas
+        ? TOOL_CONFIG_SIN_HERRAMIENTAS
+        : TOOL_CONFIG_CHAT,
     generationConfig: GENERATION_CONFIG_CHAT,
 });

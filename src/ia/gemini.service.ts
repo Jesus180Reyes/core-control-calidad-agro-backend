@@ -188,6 +188,14 @@ export class GeminiService {
      *   lo hace legitimo.
      * - `tipo: 'texto'` — la respuesta final, ya en markdown.
      *
+     * `sinHerramientas` es la vuelta de cierre del bucle: el modelo queda
+     * impedido de pedir nada mas y tiene que redactar con lo que ya hay en
+     * `contents`. Quien llama la usa cuando se le acabo el presupuesto de
+     * vueltas y la ultima siguio pidiendo datos, para no tirar unas consultas
+     * que ya se hicieron y ya se pagaron. Devuelve `tipo: 'texto'` en la
+     * practica siempre, pero el contrato no cambia y quien llama sigue teniendo
+     * que contemplar el otro caso.
+     *
      * Quien llama debe hacerlo FUERA de cualquier transaccion, por la misma
      * razon que el resumen: el `DatabaseMiddleware` abre un pool de UNA conexion
      * por peticion y retenerla durante la latencia de Google la deja bloqueada.
@@ -204,6 +212,7 @@ export class GeminiService {
     async conversar(
         contexto: ContextoChat,
         contents: ContenidoGemini[],
+        sinHerramientas = false,
     ): Promise<TurnoGemini> {
         const apiKey = (this.config.get<string>('GEMINI_API_KEY') ?? '').trim();
         if (!apiKey) {
@@ -220,7 +229,7 @@ export class GeminiService {
         const cuerpo = await this.generateContent<RespuestaGemini>(
             modelo,
             apiKey,
-            construirPeticionChat(contexto, contents),
+            construirPeticionChat(contexto, contents, sinHerramientas),
             GeminiService.MSG_CHAT_NO_RESPONDIO,
         );
 

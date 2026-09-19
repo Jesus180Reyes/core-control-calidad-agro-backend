@@ -430,7 +430,32 @@ describe('ChatRepository / el turno', () => {
         );
     });
 
-    it('se rinde tras tres vueltas y responde 200 con texto', async () => {
+    it('agotadas las vueltas, redacta con lo ya consultado en vez de tirarlo', async () => {
+        // El fallo que motivo la vuelta de cierre: las tres vueltas se van en
+        // pedir datos —resolver la persona, resolver el cliente, pedir los
+        // pesajes— y el turno moria con esos datos dentro de `contents`, ya
+        // consultados y ya pagados. La cuarta llamada va sin herramientas.
+        const conversar = jest
+            .fn()
+            .mockResolvedValueOnce(turnoDeHerramienta('mis_clientes'))
+            .mockResolvedValueOnce(turnoDeHerramienta('mis_clientes'))
+            .mockResolvedValueOnce(turnoDeHerramienta('mis_clientes'))
+            .mockResolvedValueOnce(turnoDeTexto('Son 2 clientes.'));
+        const { repo } = crearRepositorio(
+            [...colaDeArranque(), [], [], [], undefined],
+            conversar,
+        );
+
+        const respuesta = await repo.responder(pregunta('dame algo'), 7);
+
+        expect(conversar).toHaveBeenCalledTimes(4);
+        // Las tres del bucle con herramientas; la de cierre sin ellas.
+        expect(conversar.mock.calls[2][2]).toBeFalsy();
+        expect(conversar.mock.calls[3][2]).toBe(true);
+        expect(respuesta).toBe('Son 2 clientes.');
+    });
+
+    it('se rinde si la vuelta de cierre tampoco redacta', async () => {
         const conversar = jest
             .fn()
             .mockResolvedValue(turnoDeHerramienta('mis_clientes'));
@@ -441,7 +466,7 @@ describe('ChatRepository / el turno', () => {
 
         const respuesta = await repo.responder(pregunta('dame algo'), 7);
 
-        expect(conversar).toHaveBeenCalledTimes(3);
+        expect(conversar).toHaveBeenCalledTimes(4);
         expect(respuesta).toContain('no llegue a una respuesta');
     });
 

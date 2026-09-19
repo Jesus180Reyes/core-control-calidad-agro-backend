@@ -108,12 +108,25 @@ export class ChatRepository {
     private static readonly MAX_COINCIDENCIAS = 10;
 
     /**
-     * Vueltas del bucle, es decir llamadas a Gemini por turno.
+     * Vueltas del bucle, es decir llamadas a Gemini que pueden pedir datos.
      *
-     * Tres alcanzan para la cadena mas larga que el chat necesita —resolver un
-     * nombre, consultar con el id, redactar— y son a la vez el tope de gasto de
-     * un turno. Un modelo que se atasca pidiendo la misma funcion una y otra vez
-     * se para aqui, no cuando se acaba la paciencia de quien pregunta.
+     * Son el tope de gasto de un turno: un modelo que se atasca pidiendo la
+     * misma funcion una y otra vez se para aqui, no cuando se acaba la paciencia
+     * de quien pregunta.
+     *
+     * **Cuentan llamadas, no rondas de herramientas, y esa distincion costo un
+     * fallo.** Se penso que tres alcanzaban para la cadena mas larga —resolver un
+     * nombre, consultar con el id, redactar— pero como del bucle solo se sale
+     * por un turno de texto, tres llamadas son dos rondas de datos y una de
+     * redaccion. Una cadena de tres consultas, que es de las mas naturales del
+     * dominio —"los pesajes de <persona> de <cliente>": resolver la persona,
+     * resolver el cliente, pedir los pesajes— gastaba las tres pidiendo datos y
+     * el turno moria con esos datos ya consultados dentro de `contents`.
+     *
+     * Por eso existe la vuelta de cierre de `redactarConLoQueHay`, que va
+     * APARTE de este tope: subirlo a cuatro solo habria movido la pared un paso
+     * y encarecido el peor caso de todos los turnos, incluidos los que ya
+     * funcionaban.
      */
     private static readonly MAX_VUELTAS = 3;
 
@@ -157,7 +170,9 @@ export class ChatRepository {
      *    despues para no creerse lo que proponga el modelo.
      * 2. El bucle, con tope de tres vueltas. Cada vuelta es una llamada a
      *    Gemini que o pide herramientas o entrega el texto final.
-     * 3. Ese texto es la respuesta.
+     * 3. Ese texto es la respuesta. Si las tres vueltas se fueron en pedir
+     *    datos, una cuarta llamada SIN herramientas redacta con lo que ya se
+     *    consulto, en vez de tirarlo; ver `redactarConLoQueHay`.
      *
      * **Nada de esto ocurre dentro de una transaccion.** El `DatabaseMiddleware`
      * abre un pool de UNA conexion por peticion y retenerla durante la latencia
@@ -225,9 +240,15 @@ export class ChatRepository {
                 contents.push({ role: 'user', parts: respuestas });
             }
 
+            // Se acabaron las vueltas y la ultima seguia pidiendo datos. Esos
+            // datos ya estan en `contents`, ya se consultaron y ya se pagaron:
+            // rendirse aqui seria tirarlos. Se le da una vuelta mas sin
+            // herramientas, donde lo unico que puede hacer es redactarlos.
             if (respuesta === ChatRepository.TEXTO_NO_CONVERGE) {
-                this.logger.warn(
-                    `El turno no convergio en ${ChatRepository.MAX_VUELTAS} vueltas (usuario ${usuarioId})`,
+                respuesta = await this.redactarConLoQueHay(
+                    contexto,
+                    contents,
+                    usuarioId,
                 );
             }
         } catch (error) {
@@ -245,6 +266,47 @@ export class ChatRepository {
         await this.registrar(dto, usuarioId, respuesta, usadas);
 
         return respuesta;
+    }
+
+    /**
+     * La vuelta de cierre: una llamada mas, con las herramientas apagadas.
+     *
+     * Se usa cuando el bucle agoto sus vueltas y la ultima siguio pidiendo
+     * datos. En ese punto `contents` ya lleva los resultados de todo lo que se
+     * consulto en el turno —consultas hechas, latencia pagada y tokens
+     * gastados—, y el unico motivo por el que no hay respuesta es que no quedo
+     * ninguna llamada para escribirla. Con `mode: 'NONE'` el modelo no puede
+     * pedir nada mas, asi que redacta con lo que tiene.
+     *
+     * **No es una cuarta vuelta disfrazada.** No puede encadenar otra consulta,
+     * asi que no abre la puerta a un turno que gasta sin fin; y solo ocurre en
+     * el caso que hoy acababa en disculpa, de modo que ningun turno de los que
+     * ya funcionaban se encarece.
+     *
+     * Si aun asi vuelve pidiendo herramientas —no deberia, con `NONE`— se acepta
+     * la derrota con el texto de siempre. Lo que lance se propaga al `catch` de
+     * `responder`, que es quien traduce cualquier fallo de Gemini a la disculpa.
+     */
+    private async redactarConLoQueHay(
+        contexto: ContextoChat,
+        contents: ContenidoGemini[],
+        usuarioId: number,
+    ): Promise<string> {
+        this.logger.warn(
+            `El turno agoto sus ${ChatRepository.MAX_VUELTAS} vueltas pidiendo datos (usuario ${usuarioId}); se redacta con lo ya consultado`,
+        );
+
+        const turno = await this.gemini.conversar(contexto, contents, true);
+
+        if (turno.tipo === 'texto') {
+            return turno.texto;
+        }
+
+        this.logger.warn(
+            `La vuelta de cierre siguio pidiendo herramientas pese a mode NONE (usuario ${usuarioId})`,
+        );
+
+        return ChatRepository.TEXTO_NO_CONVERGE;
     }
 
     /**
