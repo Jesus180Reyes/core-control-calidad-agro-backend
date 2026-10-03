@@ -36,11 +36,13 @@ export class ClientesController {
             'devuelve 400. Nunca lista clientes rechazados. Ordena por created_at ASC.',
     })
     async findAllGlobal(@Query() filtros: FiltrosClientesDto) {
-        const clientes = await this.clientesService.findAllGlobal(filtros);
+        const { clientes, paginacion } =
+            await this.clientesService.findAllGlobal(filtros);
         return {
             ok: true,
             msg: 'Clientes obtenidos correctamente',
             clientes,
+            ...(paginacion && { paginacion }),
         };
     }
 
