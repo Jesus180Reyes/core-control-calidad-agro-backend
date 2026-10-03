@@ -1,6 +1,6 @@
 # SPEC 30 — Identidad del asistente Agri en el chat
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 28 (crea el chat, su instrucción de sistema y las frases literales que este spec extiende)
 > **Date:** 2026-10-03
 > **Objective:** Hacer que el chat se presente como Agri con una frase fija cuando le preguntan quién es, quién lo creó o qué puede hacer, en lugar de responder con la frase de declinación.
@@ -93,24 +93,24 @@ El final del bloque `REGLA PRINCIPAL` queda así. El resto de la instrucción no
 
 **Automáticos (`chat.prompt.spec.ts`):**
 
-- [ ] `FRASE_IDENTIDAD` está exportada y contiene `Agri` y `Jesus Reyes`.
-- [ ] `FRASE_IDENTIDAD` no contiene `Gemini`, `Google` ni `modelo de lenguaje`.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` contiene `FRASE_IDENTIDAD` literal.
-- [ ] En `INSTRUCCION_SISTEMA_CHAT`, `FRASE_IDENTIDAD` aparece **antes** del encabezado `SOLO LECTURA:`, es decir, dentro de la regla principal.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` empieza por `Eres Agri,`.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` sigue conteniendo `FRASE_DECLINACION` y `FRASE_SOLO_LECTURA` literales.
-- [ ] `npm run test` pasa, incluidas las pruebas existentes de `chat.repository.spec.ts` y `gemini.service.spec.ts`.
-- [ ] `npm run lint` pasa sin errores.
+- [X] `FRASE_IDENTIDAD` está exportada y contiene `Agri` y `Jesus Reyes`.
+- [X] `FRASE_IDENTIDAD` no contiene `Gemini`, `Google` ni `modelo de lenguaje`.
+- [X] `INSTRUCCION_SISTEMA_CHAT` contiene `FRASE_IDENTIDAD` literal.
+- [X] En `INSTRUCCION_SISTEMA_CHAT`, `FRASE_IDENTIDAD` aparece **antes** del encabezado `SOLO LECTURA:`, es decir, dentro de la regla principal.
+- [X] `INSTRUCCION_SISTEMA_CHAT` empieza por `Eres Agri,`.
+- [X] `INSTRUCCION_SISTEMA_CHAT` sigue conteniendo `FRASE_DECLINACION` y `FRASE_SOLO_LECTURA` literales.
+- [X] `npm run test` pasa, incluidas las pruebas existentes de `chat.repository.spec.ts` y `gemini.service.spec.ts`.
+- [X] `npm run lint` pasa sin errores.
 
 **Manuales, contra la API real (`POST /chat` con token, sin historial):**
 
-- [ ] `{ mensaje: "quien eres?" }` responde 200 y `respuesta` es exactamente `FRASE_IDENTIDAD`.
-- [ ] `{ mensaje: "quien te creo?" }` responde 200 y `respuesta` es exactamente `FRASE_IDENTIDAD`.
-- [ ] `{ mensaje: "eres ChatGPT o Gemini?" }` responde 200 con `FRASE_IDENTIDAD`, y `respuesta` no contiene `Gemini`, `Google` ni `OpenAI`.
-- [ ] `{ mensaje: "que puedes hacer?" }` responde 200 y `respuesta` es exactamente `FRASE_IDENTIDAD`.
-- [ ] `{ mensaje: "quien eres? y como va el lote <nombre real>" }` responde 200, `respuesta` empieza por `FRASE_IDENTIDAD` y contiene las cifras de ese lote, y la fila de `chat_log` de ese turno tiene `herramientas` distinto de `NULL`.
-- [ ] `{ mensaje: "cual es la raiz cuadrada de 20" }` sigue respondiendo `FRASE_DECLINACION`, como en el SPEC 28.
-- [ ] `{ mensaje: "como va el lote <nombre real>" }` responde con las cifras del lote y **no** contiene `FRASE_IDENTIDAD`.
+- [X] `{ mensaje: "quien eres?" }` responde 200 y `respuesta` es exactamente `FRASE_IDENTIDAD`.
+- [X] `{ mensaje: "quien te creo?" }` responde 200 y `respuesta` es exactamente `FRASE_IDENTIDAD`.
+- [X] `{ mensaje: "eres ChatGPT o Gemini?" }` responde 200 con `FRASE_IDENTIDAD`, y `respuesta` no contiene `Gemini`, `Google` ni `OpenAI`.
+- [X] `{ mensaje: "que puedes hacer?" }` responde 200 y `respuesta` es exactamente `FRASE_IDENTIDAD`.
+- [X] `{ mensaje: "quien eres? y como va el lote <nombre real>" }` responde 200, `respuesta` empieza por `FRASE_IDENTIDAD` y contiene las cifras de ese lote, y la fila de `chat_log` de ese turno tiene `herramientas` distinto de `NULL`.
+- [X] `{ mensaje: "cual es la raiz cuadrada de 20" }` sigue respondiendo `FRASE_DECLINACION`, como en el SPEC 28.
+- [X] `{ mensaje: "como va el lote <nombre real>" }` responde con las cifras del lote y **no** contiene `FRASE_IDENTIDAD`.
 
 ---
 
