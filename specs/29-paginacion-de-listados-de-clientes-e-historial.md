@@ -1,6 +1,6 @@
 # SPEC 29 — Paginación de listados de clientes e historial
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01 (crea `GET /clientes`), SPEC 08 (crea `GET /clientes/all`), SPEC 15 (crea `GET /pesajes/historial`), SPEC 16 (define la convención de query params que la paginación sigue), SPEC 17 (filtros de `GET /clientes/all`, que conviven con la paginación), SPEC 22 (Swagger, donde hay que actualizar dos descripciones)
 > **Date:** 2026-10-03
 > **Objective:** Agregar paginación opcional por `?pagina` y `?limite` a `GET /clientes/all`, `GET /clientes` y `GET /pesajes/historial`, devolviendo una clave hermana `paginacion` solo cuando se pagina.
@@ -130,27 +130,27 @@ Una página por encima de la última responde **200** con el array vacío y la `
 
 ## Acceptance criteria
 
-- [ ] `GET /clientes/all` sin params responde byte-idéntico a antes de este spec y sin clave `paginacion`.
-- [ ] `GET /clientes` sin params responde byte-idéntico a antes de este spec y sin clave `paginacion`.
-- [ ] `GET /pesajes/historial` sin params responde byte-idéntico a antes de este spec y sin clave `paginacion`.
-- [ ] `?pagina=1&limite=5` en cada una de las tres rutas devuelve como máximo 5 filas y una clave `paginacion` con `pagina: 1` y `limite: 5`.
-- [ ] `paginacion.total` coincide con la cantidad de filas que devuelve la misma ruta sin paginar y con los mismos filtros.
-- [ ] La concatenación de todas las páginas de `?limite=5` contiene la misma cantidad de filas que la respuesta sin paginar.
-- [ ] `?pagina=2` sin `limite` pagina con `limite: 20`.
-- [ ] `?limite=10` sin `pagina` devuelve la página 1.
-- [ ] `?limite=500` responde 200 con `paginacion.limite: 100`.
-- [ ] `?pagina=abc`, `?pagina=0`, `?pagina=-1` y `?limite=0` responden 200, nunca 400, en las tres rutas.
-- [ ] `?pagina=abc&limite=abc` responde igual que sin params: sin clave `paginacion`.
-- [ ] `?pagina=99` sobre una lista de menos de 99 páginas responde 200 con el array vacío y `total`/`total_paginas` reales.
-- [ ] Una lista vacía paginada responde `total: 0` y `total_paginas: 0`.
-- [ ] `GET /clientes/all?producto_id=abc&pagina=1` sigue respondiendo 400 por `producto_id`.
-- [ ] `GET /clientes/all?nombre=x&pagina=1&limite=5` aplica el filtro y la paginación a la vez, y `total` cuenta solo las filas filtradas.
-- [ ] `GET /pesajes/historial?pagina=1&usuario_id=<otro>` sigue devolviendo solo los pesajes del usuario del token.
-- [ ] `GET /clientes?nombre=agro&pagina=1` ignora `nombre` y pagina la cartera completa.
-- [ ] Las tres rutas muestran `pagina` y `limite` como query params en `/docs`.
-- [ ] Las herramientas del chat (`POST /chat`) devuelven lo mismo que antes de este spec.
-- [ ] `npm run lint` pasa sin errores.
-- [ ] `npm run test` pasa.
+- [X] `GET /clientes/all` sin params responde byte-idéntico a antes de este spec y sin clave `paginacion`.
+- [X] `GET /clientes` sin params responde byte-idéntico a antes de este spec y sin clave `paginacion`.
+- [X] `GET /pesajes/historial` sin params responde byte-idéntico a antes de este spec y sin clave `paginacion`.
+- [X] `?pagina=1&limite=5` en cada una de las tres rutas devuelve como máximo 5 filas y una clave `paginacion` con `pagina: 1` y `limite: 5`.
+- [X] `paginacion.total` coincide con la cantidad de filas que devuelve la misma ruta sin paginar y con los mismos filtros.
+- [X] La concatenación de todas las páginas de `?limite=5` contiene la misma cantidad de filas que la respuesta sin paginar.
+- [X] `?pagina=2` sin `limite` pagina con `limite: 20`.
+- [X] `?limite=10` sin `pagina` devuelve la página 1.
+- [X] `?limite=500` responde 200 con `paginacion.limite: 100`.
+- [X] `?pagina=abc`, `?pagina=0`, `?pagina=-1` y `?limite=0` responden 200, nunca 400, en las tres rutas.
+- [X] `?pagina=abc&limite=abc` responde igual que sin params: sin clave `paginacion`.
+- [X] `?pagina=99` sobre una lista de menos de 99 páginas responde 200 con el array vacío y `total`/`total_paginas` reales.
+- [X] Una lista vacía paginada responde `total: 0` y `total_paginas: 0`.
+- [X] `GET /clientes/all?producto_id=abc&pagina=1` sigue respondiendo 400 por `producto_id`.
+- [X] `GET /clientes/all?nombre=x&pagina=1&limite=5` aplica el filtro y la paginación a la vez, y `total` cuenta solo las filas filtradas.
+- [X] `GET /pesajes/historial?pagina=1&usuario_id=<otro>` sigue devolviendo solo los pesajes del usuario del token.
+- [X] `GET /clientes?nombre=agro&pagina=1` ignora `nombre` y pagina la cartera completa.
+- [X] Las tres rutas muestran `pagina` y `limite` como query params en `/docs`.
+- [X] Las herramientas del chat (`POST /chat`) devuelven lo mismo que antes de este spec.
+- [X] `npm run lint` pasa sin errores.
+- [X] `npm run test` pasa.
 
 ---
 
