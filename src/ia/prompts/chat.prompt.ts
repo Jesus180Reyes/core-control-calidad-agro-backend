@@ -55,6 +55,10 @@ export const FRASE_DECLINACION =
 export const FRASE_SOLO_LECTURA =
     'Solo puedo consultar informacion: no puedo aprobar, rechazar, finalizar ni registrar nada desde aqui.';
 
+/** La respuesta a cualquier pregunta sobre quien es el asistente. Tambien literal. */
+export const FRASE_IDENTIDAD =
+    'Soy Agri, el asistente de consultas del sistema de control de calidad, desarrollado por Jesus Reyes. Puedo ayudarte con lotes, pesajes, clientes y operadores.';
+
 /**
  * Instruccion de sistema.
  *
