@@ -27,3 +27,46 @@ export const paginacionShape = {
         .optional()
         .catch(undefined),
 };
+
+/** Lo que devuelve la clave `paginacion` de la respuesta. */
+export interface Paginacion {
+    pagina: number;
+    limite: number;
+    total: number;
+    total_paginas: number;
+}
+
+/**
+ * Decide si una peticion se pagina y con que valores. Basta con que uno de
+ * los dos params haya sobrevivido al pipe; el que falte toma su default.
+ * Devuelve `null` si no llego ninguno, y entonces la lectura se comporta
+ * exactamente como antes del SPEC 29: sin `COUNT`, sin `LIMIT` y sin clave
+ * `paginacion`.
+ */
+export const resolverPaginacion = (params: {
+    pagina?: number;
+    limite?: number;
+}) => {
+    if (params.pagina === undefined && params.limite === undefined) {
+        return null;
+    }
+
+    const pagina = params.pagina ?? 1;
+    const limite = params.limite ?? LIMITE_POR_DEFECTO;
+
+    return { pagina, limite, offset: (pagina - 1) * limite };
+};
+
+/**
+ * Arma la clave `paginacion`. `pagina` es la pedida aunque este fuera de
+ * rango, para que el frontend vea su error contra `total_paginas`.
+ */
+export const construirPaginacion = (
+    { pagina, limite }: { pagina: number; limite: number },
+    total: number,
+): Paginacion => ({
+    pagina,
+    limite,
+    total,
+    total_paginas: Math.ceil(total / limite),
+});

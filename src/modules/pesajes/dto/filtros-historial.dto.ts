@@ -1,5 +1,6 @@
 import { createZodDto } from "nestjs-zod";
 import z from "zod";
+import { paginacionShape } from "src/schemas/paginacion.schema";
 
 const fechaSchema = z
     .string()
@@ -22,6 +23,7 @@ const filtrosHistorialSchema = z.object({
     nombre: z.string().trim().min(1).optional().catch(undefined),
     desde: fechaSchema,
     hasta: fechaSchema,
+    ...paginacionShape,
 });
 
 export class FiltrosHistorialDto extends createZodDto(filtrosHistorialSchema) { }

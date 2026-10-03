@@ -44,11 +44,15 @@ export class PesajesController {
         @Req() req: Request,
     ) {
         const { userId } = req.user as { userId: number };
-        const pesajes = await this.pesajesService.findHistorial(userId, filtros);
+        const { pesajes, paginacion } = await this.pesajesService.findHistorial(
+            userId,
+            filtros,
+        );
         return {
             ok: !!pesajes,
             msg: 'Historial de pesajes obtenido correctamente',
             pesajes,
+            ...(paginacion && { paginacion }),
         };
     }
 
