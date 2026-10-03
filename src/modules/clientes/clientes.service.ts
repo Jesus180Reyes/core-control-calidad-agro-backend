@@ -3,13 +3,17 @@ import { ClientesRepository } from './repository/clientes.repository';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
 import { FiltrosClientesDto } from './dto/filtros-clientes.dto';
+import { PaginacionClientesDto } from './dto/paginacion-clientes.dto';
 
 @Injectable()
 export class ClientesService {
     constructor(private readonly clientesRepository: ClientesRepository) { }
 
-    async findAll(userId: number) {
-        return await this.clientesRepository.getAllClientesByOperador(userId);
+    async findAll(userId: number, params: PaginacionClientesDto) {
+        return await this.clientesRepository.getAllClientesByOperador(
+            userId,
+            params,
+        );
     }
 
     async findAllGlobal(filtros: FiltrosClientesDto) {

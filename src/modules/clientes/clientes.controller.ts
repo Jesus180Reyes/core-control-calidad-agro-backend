@@ -16,6 +16,7 @@ import { ClientesService } from './clientes.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
 import { FiltrosClientesDto } from './dto/filtros-clientes.dto';
+import { PaginacionClientesDto } from './dto/paginacion-clientes.dto';
 
 @ApiTags('clientes')
 @ApiBearerAuth()
@@ -55,13 +56,17 @@ export class ClientesController {
             '?nombre=agro devuelve la cartera completa sin filtrar. Los filtros existen solo en ' +
             'GET /clientes/all. Mismos seis campos que esa ruta, pero ordenados por nombre ASC.',
     })
-    async findAll(@Req() req: Request) {
+    async findAll(@Query() params: PaginacionClientesDto, @Req() req: Request) {
         const { userId } = req.user as { userId: number };
-        const clientes = await this.clientesService.findAll(userId);
+        const { clientes, paginacion } = await this.clientesService.findAll(
+            userId,
+            params,
+        );
         return {
             ok: true,
             msg: 'Clientes obtenidos correctamente',
             clientes,
+            ...(paginacion && { paginacion }),
         };
     }
 
