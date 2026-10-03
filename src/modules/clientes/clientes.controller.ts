@@ -34,7 +34,12 @@ export class ClientesController {
             'parcial (LIKE), mientras que rtn y codigo_exportacion son exactos, asi que un ' +
             'fragmento devuelve una lista vacia. Se puede buscar por rtn pero el rtn no viene en ' +
             'la respuesta. A diferencia de los filtros de pesajes, aqui un valor invalido SI ' +
-            'devuelve 400. Nunca lista clientes rechazados. Ordena por created_at ASC.',
+            'devuelve 400. Nunca lista clientes rechazados. Ordena por created_at ASC. ' +
+            'Paginacion opcional con pagina y limite: sin ellos la respuesta es la lista completa; ' +
+            'con al menos uno valido se agrega la clave paginacion { pagina, limite, total, ' +
+            'total_paginas } y el que falte toma su default (pagina 1, limite 20). limite se topa ' +
+            'en 100. Al contrario que los filtros, un pagina o limite invalido se ignora y nunca ' +
+            'devuelve 400. Una pagina mas alla de la ultima devuelve una lista vacia, no un error.',
     })
     async findAllGlobal(@Query() filtros: FiltrosClientesDto) {
         const { clientes, paginacion } =
@@ -52,9 +57,14 @@ export class ClientesController {
         summary: 'Cartera de clientes del usuario',
         description:
             'Solo los clientes vinculados al usuario del token por cliente_operador. ' +
-            'NO acepta ningun query param: un query string no se rechaza, se ignora, asi que ' +
-            '?nombre=agro devuelve la cartera completa sin filtrar. Los filtros existen solo en ' +
-            'GET /clientes/all. Mismos seis campos que esa ruta, pero ordenados por nombre ASC.',
+            'Los UNICOS query params que acepta son pagina y limite; cualquier otro no se ' +
+            'rechaza, se ignora, asi que ?nombre=agro devuelve la cartera completa sin filtrar. ' +
+            'Los filtros existen solo en GET /clientes/all. Mismos seis campos que esa ruta, pero ' +
+            'ordenados por nombre ASC. Paginacion opcional: sin pagina ni limite la respuesta es ' +
+            'la cartera completa; con al menos uno valido se agrega la clave paginacion { pagina, ' +
+            'limite, total, total_paginas } y el que falte toma su default (pagina 1, limite 20). ' +
+            'limite se topa en 100, un valor invalido se ignora y nunca devuelve 400, y una pagina ' +
+            'mas alla de la ultima devuelve una lista vacia.',
     })
     async findAll(@Query() params: PaginacionClientesDto, @Req() req: Request) {
         const { userId } = req.user as { userId: number };
