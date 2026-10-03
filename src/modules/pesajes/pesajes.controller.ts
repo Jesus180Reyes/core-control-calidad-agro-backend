@@ -36,19 +36,27 @@ export class PesajesController {
             'nombre del lote, no sobre el del cliente. ' +
             'A diferencia del resto de lecturas, no filtra por estado del lote ni por cliente ' +
             'activo: es el unico endpoint que muestra el nombre de un lote cerrado y el de un ' +
-            'cliente rechazado. Sin paginacion. Un token de un usuario que ya no existe recibe una ' +
-            'lista vacia, no un error.',
+            'cliente rechazado. Un token de un usuario que ya no existe recibe una lista vacia, no ' +
+            'un error. Paginacion opcional con pagina y limite: sin ellos la respuesta es el ' +
+            'historial completo; con al menos uno valido se agrega la clave paginacion { pagina, ' +
+            'limite, total, total_paginas } y el que falte toma su default (pagina 1, limite 20). ' +
+            'limite se topa en 100, un valor invalido se ignora como el resto de los filtros, y ' +
+            'una pagina mas alla de la ultima devuelve una lista vacia.',
     })
     async findHistorial(
         @Query() filtros: FiltrosHistorialDto,
         @Req() req: Request,
     ) {
         const { userId } = req.user as { userId: number };
-        const pesajes = await this.pesajesService.findHistorial(userId, filtros);
+        const { pesajes, paginacion } = await this.pesajesService.findHistorial(
+            userId,
+            filtros,
+        );
         return {
             ok: !!pesajes,
             msg: 'Historial de pesajes obtenido correctamente',
             pesajes,
+            ...(paginacion && { paginacion }),
         };
     }
 

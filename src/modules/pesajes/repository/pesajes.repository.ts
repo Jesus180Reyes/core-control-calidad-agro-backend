@@ -11,6 +11,11 @@ import { CreatePesajeDto } from '../dto/create-pesaje.dto';
 import { RechazarPesajeDto } from '../dto/rechazar-pesaje.dto';
 import { FiltrosPesajesLoteDto } from '../dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from '../dto/filtros-historial.dto';
+import {
+    construirPaginacion,
+    Paginacion,
+    resolverPaginacion,
+} from 'src/schemas/paginacion.schema';
 
 @Injectable()
 export class PesajesRepository {
@@ -107,6 +112,8 @@ export class PesajesRepository {
     }
 
     async getHistorialByUsuario(userId: number, filtros: FiltrosHistorialDto) {
+        // Base sin select: de ella salen el COUNT y las filas (SPEC 29), asi
+        // los dos comparten exactamente los mismos JOIN y WHERE.
         let query = this.db
             .selectFrom('pesajes')
             .leftJoin(
@@ -117,23 +124,6 @@ export class PesajesRepository {
             .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
             .leftJoin('clientes', 'clientes.id', 'lotes.cliente_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
-            .select([
-                'pesajes.id',
-                'pesajes.lote_id',
-                'lotes.nombre_lote as nombre_lote',
-                'unidades_medida.nombre as unidad_medida',
-                'clientes.nombre as cliente',
-                'pesajes.peso_bruto',
-                'pesajes.tara',
-                'pesajes.peso_neto',
-                'pesajes.fuera_de_rango',
-                'estados_calidad.codigo as estado_calidad_codigo',
-                'estados_calidad.nombre as estado_calidad',
-                'pesajes.dispositivo_identificador',
-                'pesajes.secuencia_dispositivo',
-                'pesajes.created_at',
-                'pesajes.aprobado',
-            ])
             .where('pesajes.usuario_id', '=', userId)
             .where('pesajes.isActive', '=', 1);
 
@@ -187,11 +177,43 @@ export class PesajesRepository {
             );
         }
 
-        const pesajes = await query
-            .orderBy('pesajes.created_at', 'desc')
-            .execute();
+        const paginar = resolverPaginacion(filtros);
+        let paginacion: Paginacion | undefined;
 
-        return pesajes.map((p) => ({ ...p, aprobado: p.aprobado === null ? null : !!p.aprobado, fuera_de_rango: !!p.fuera_de_rango }));
+        let filas = query
+            .select([
+                'pesajes.id',
+                'pesajes.lote_id',
+                'lotes.nombre_lote as nombre_lote',
+                'unidades_medida.nombre as unidad_medida',
+                'clientes.nombre as cliente',
+                'pesajes.peso_bruto',
+                'pesajes.tara',
+                'pesajes.peso_neto',
+                'pesajes.fuera_de_rango',
+                'estados_calidad.codigo as estado_calidad_codigo',
+                'estados_calidad.nombre as estado_calidad',
+                'pesajes.dispositivo_identificador',
+                'pesajes.secuencia_dispositivo',
+                'pesajes.created_at',
+                'pesajes.aprobado',
+            ])
+            .orderBy('pesajes.created_at', 'desc');
+
+        if (paginar) {
+            const { total } = await query
+                .select((eb) => eb.fn.countAll().as('total'))
+                .executeTakeFirstOrThrow();
+            paginacion = construirPaginacion(paginar, Number(total));
+            filas = filas.limit(paginar.limite).offset(paginar.offset);
+        }
+
+        const pesajes = await filas.execute();
+
+        return {
+            pesajes: pesajes.map((p) => ({ ...p, aprobado: p.aprobado === null ? null : !!p.aprobado, fuera_de_rango: !!p.fuera_de_rango })),
+            paginacion,
+        };
     }
 
     async getPesajeById(pesajeId: number) {

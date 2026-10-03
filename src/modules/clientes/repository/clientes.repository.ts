@@ -3,8 +3,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateClienteDto } from '../dto/create-cliente.dto';
 import { RechazarClienteDto } from '../dto/rechazar-cliente.dto';
 import { FiltrosClientesDto } from '../dto/filtros-clientes.dto';
+import { PaginacionClientesDto } from '../dto/paginacion-clientes.dto';
 import { Kysely, sql } from 'kysely';
 import { Database } from 'src/database/types/types';
+import {
+    construirPaginacion,
+    Paginacion,
+    resolverPaginacion,
+} from 'src/schemas/paginacion.schema';
 
 @Injectable()
 export class ClientesRepository {
@@ -14,8 +20,12 @@ export class ClientesRepository {
         return this.dbService.client;
     }
 
-    async getAllClientesByOperador(usuarioId: number) {
-        const clientes = await this.db
+    async getAllClientesByOperador(
+        usuarioId: number,
+        params: PaginacionClientesDto,
+    ) {
+        // Base sin select: de ella salen el COUNT y las filas (SPEC 29).
+        const query = this.db
             .selectFrom('clientes')
             .innerJoin(
                 'cliente_operador',
@@ -23,6 +33,13 @@ export class ClientesRepository {
                 'clientes.id',
             )
             .leftJoin('productos', 'productos.id', 'clientes.producto_id')
+            .where('cliente_operador.usuario_id', '=', usuarioId)
+            .where('clientes.isActive', '=', 1);
+
+        const paginar = resolverPaginacion(params);
+        let paginacion: Paginacion | undefined;
+
+        let filas = query
             .select([
                 'clientes.id',
                 'clientes.nombre',
@@ -31,25 +48,26 @@ export class ClientesRepository {
                 'clientes.telefono',
                 'clientes.direccion_planta',
             ])
-            .where('cliente_operador.usuario_id', '=', usuarioId)
-            .where('clientes.isActive', '=', 1)
-            .orderBy('clientes.nombre', 'asc')
-            .execute();
-        return clientes;
+            .orderBy('clientes.nombre', 'asc');
+
+        if (paginar) {
+            const { total } = await query
+                .select((eb) => eb.fn.countAll().as('total'))
+                .executeTakeFirstOrThrow();
+            paginacion = construirPaginacion(paginar, Number(total));
+            filas = filas.limit(paginar.limite).offset(paginar.offset);
+        }
+
+        const clientes = await filas.execute();
+
+        return { clientes, paginacion };
     }
 
     async getAllClientes(filtros: FiltrosClientesDto) {
+        // Base sin select: de ella salen el COUNT y las filas (SPEC 29).
         let query = this.db
             .selectFrom('clientes')
             .leftJoin('productos', 'productos.id', 'clientes.producto_id')
-            .select([
-                'clientes.id',
-                'clientes.nombre',
-                'productos.nombre as producto',
-                'clientes.codigo_exportacion',
-                'clientes.telefono',
-                'clientes.direccion_planta',
-            ])
             .where('clientes.isActive', '=', 1);
 
         if (filtros.nombre !== undefined) {
@@ -72,11 +90,31 @@ export class ClientesRepository {
             query = query.where('clientes.rtn', '=', filtros.rtn);
         }
 
-        const clientes = await query
-            .orderBy('clientes.created_at', 'asc')
-            .execute();
+        const paginar = resolverPaginacion(filtros);
+        let paginacion: Paginacion | undefined;
 
-        return clientes;
+        let filas = query
+            .select([
+                'clientes.id',
+                'clientes.nombre',
+                'productos.nombre as producto',
+                'clientes.codigo_exportacion',
+                'clientes.telefono',
+                'clientes.direccion_planta',
+            ])
+            .orderBy('clientes.created_at', 'asc');
+
+        if (paginar) {
+            const { total } = await query
+                .select((eb) => eb.fn.countAll().as('total'))
+                .executeTakeFirstOrThrow();
+            paginacion = construirPaginacion(paginar, Number(total));
+            filas = filas.limit(paginar.limite).offset(paginar.offset);
+        }
+
+        const clientes = await filas.execute();
+
+        return { clientes, paginacion };
     }
 
     async createCliente(data: CreateClienteDto, userId: number) {
