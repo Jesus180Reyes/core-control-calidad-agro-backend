@@ -62,6 +62,10 @@ export const FRASE_SOLO_LECTURA =
 export const FRASE_IDENTIDAD =
     'Soy Agri, el asistente de consultas del sistema de control de calidad, desarrollado por Jesus Reyes. Puedo ayudarte con lotes, pesajes, clientes y operadores.';
 
+/** La respuesta a un agradecimiento, una despedida o un acuse breve. Tambien literal. */
+export const FRASE_CORTESIA =
+    'Con gusto. Aqui sigo, al pie de la bascula, para cuando quieras revisar otro lote, un cliente o un operador.';
+
 /**
  * Instruccion de sistema.
  *
