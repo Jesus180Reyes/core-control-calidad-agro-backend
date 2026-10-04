@@ -395,7 +395,7 @@ export class ChatRepository {
     }
 
     /**
-     * Tres ejemplos para la pantalla vacia del chat (SPEC 28).
+     * Cuatro ejemplos para la pantalla vacia del chat (SPEC 28).
      *
      * **Una consulta y ninguna IA.** Es lo que hace que la pantalla pinte al
      * instante y que abrir el chat no cueste una llamada a Gemini. Por eso es
@@ -404,7 +404,7 @@ export class ChatRepository {
      *
      * Con cartera, los ejemplos llevan nombres reales, que es lo que los vuelve
      * utiles —un supervisor ve su cliente y entiende de que puede preguntar—.
-     * Sin cartera devuelve tres ejemplos genericos, que es el caso de un
+     * Sin cartera devuelve cuatro ejemplos genericos, que es el caso de un
      * aprobador o un ADMIN, no un error.
      */
     async sugerencias(usuarioId: number): Promise<string[]> {
@@ -427,18 +427,31 @@ export class ChatRepository {
                 'Busca los lotes abiertos de un cliente por su nombre',
                 'Cuantos pesajes registro una persona esta semana',
                 'Dame el detalle del pesaje numero 1234',
+                'Que lotes de un cliente ya estan finalizados',
             ];
         }
 
         const primero = clientes[0].nombre;
-        // Con un solo cliente los tres ejemplos hablan de el; con dos o mas se
+        // Con un solo cliente los cuatro ejemplos hablan de el; con dos o mas se
         // reparten, para que se vea que el chat no esta atado a uno.
         const segundo = clientes[1]?.nombre ?? primero;
 
+        // El nombre siempre va precedido de "del cliente": sin esa palabra el
+        // modelo no sabe si `${segundo}` es un cliente o un lote y se enreda.
+        //
+        // La segunda es "MIS pesajes" y no "los pesajes" a proposito: ninguna
+        // herramienta lista los pesajes de un cliente, asi que "pesajes de hoy
+        // del cliente X" obligaba a recorrer sus lotes uno por uno y agotaba las
+        // vueltas (chat_log 96 y 97). Con "mis" se resuelve en UNA llamada a
+        // `pesajes_de_usuario`, con el usuario y el cliente ya en el contexto.
+        //
+        // La cuarta tambien se resuelve en UNA llamada (`lotes_de_cliente` con
+        // `estado: 'finalizado'`) y va con `${segundo}` para repartir los nombres.
         return [
-            `Como van los lotes abiertos de ${primero}`,
-            `Pesajes de hoy de ${segundo}`,
-            `Que lotes de ${primero} estan esperando al aprobador`,
+            `Como van los lotes abiertos del cliente ${primero}`,
+            `Mis pesajes de hoy del cliente ${segundo}`,
+            `Que lotes del cliente ${primero} estan esperando al aprobador`,
+            `Que lotes del cliente ${segundo} ya estan finalizados`,
         ];
     }
 

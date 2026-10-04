@@ -549,17 +549,18 @@ describe('ChatRepository / sugerencias', () => {
 
         const sugerencias = await repo.sugerencias(7);
 
-        expect(sugerencias).toHaveLength(3);
+        expect(sugerencias).toHaveLength(4);
         expect(sugerencias[0]).toContain('Agroexport');
         expect(sugerencias[1]).toContain('Bananera del Sur');
+        expect(sugerencias[3]).toContain('Bananera del Sur');
     });
 
-    it('con la cartera vacia devuelve tres ejemplos genericos', async () => {
+    it('con la cartera vacia devuelve cuatro ejemplos genericos', async () => {
         const { repo } = crearRepositorio([[]], jest.fn());
 
         const sugerencias = await repo.sugerencias(7);
 
-        expect(sugerencias).toHaveLength(3);
+        expect(sugerencias).toHaveLength(4);
         expect(sugerencias.join(' ')).not.toContain('undefined');
     });
 });

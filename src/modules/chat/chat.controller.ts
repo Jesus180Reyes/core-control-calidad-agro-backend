@@ -46,7 +46,7 @@ export class ChatController {
     }
 
     /**
-     * Tres ejemplos para la pantalla vacia, con nombres de la cartera de quien
+     * Cuatro ejemplos para la pantalla vacia, con nombres de la cartera de quien
      * entra. Sin IA y sin llamar a Gemini: abrir el chat no cuesta una llamada.
      *
      * `sugerencias` es una ruta literal y en este controller no hay ningun
@@ -55,14 +55,14 @@ export class ChatController {
      */
     @Get('sugerencias')
     @ApiOperation({
-        summary: 'Tres preguntas de ejemplo para la pantalla vacia del chat',
+        summary: 'Cuatro preguntas de ejemplo para la pantalla vacia del chat',
         description:
-            'Tres frases construidas con una consulta a la cartera del usuario del token. ' +
+            'Cuatro frases construidas con una consulta a la cartera del usuario del token. ' +
             'NO llama a Gemini y no cuesta nada: abrir el chat no consume una consulta ni ' +
             'cuenta contra el limite diario. ' +
             'Con cartera, los ejemplos nombran clientes reales del que llama; con la cartera vacia ' +
             '—el caso normal de un aprobador o un ADMIN, que no tienen filas en cliente_operador— ' +
-            'devuelve tres ejemplos genericos. Nunca responde 404 ni lista vacia: siempre son tres.',
+            'devuelve cuatro ejemplos genericos. Nunca responde 404 ni lista vacia: siempre son cuatro.',
     })
     async sugerencias(@Req() req: Request) {
         const { userId } = req.user as { userId: number };
