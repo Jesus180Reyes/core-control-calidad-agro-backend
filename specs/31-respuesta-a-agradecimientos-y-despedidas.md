@@ -105,25 +105,25 @@ El final del bloque `REGLA PRINCIPAL` queda así. El resto de la instrucción no
 
 **Automáticos (`chat.prompt.spec.ts`):**
 
-- [ ] `FRASE_CORTESIA` está exportada y contiene `Con gusto` y `lote`.
-- [ ] `FRASE_CORTESIA` no contiene `Gemini`, `Google` ni `modelo de lenguaje`.
-- [ ] `FRASE_CORTESIA` es distinta de `FRASE_DECLINACION`, `FRASE_SOLO_LECTURA` y `FRASE_IDENTIDAD`.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` contiene `FRASE_CORTESIA` literal.
-- [ ] En `INSTRUCCION_SISTEMA_CHAT`, `FRASE_CORTESIA` aparece **después** de `FRASE_IDENTIDAD` y **antes** del encabezado `SOLO LECTURA:`, es decir, dentro de la regla principal.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` contiene `Hay solo tres excepciones` y ya no contiene `Hay solo dos excepciones`.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` sigue conteniendo `FRASE_DECLINACION`, `FRASE_SOLO_LECTURA` y `FRASE_IDENTIDAD` literales, y las pruebas del SPEC 30 siguen pasando sin cambios.
-- [ ] `npm run test` pasa, incluidas las pruebas de `chat.repository.spec.ts` y `gemini.service.spec.ts`.
-- [ ] `npm run lint` pasa sin errores.
+- [X] `FRASE_CORTESIA` está exportada y contiene `Con gusto` y `lote`.
+- [X] `FRASE_CORTESIA` no contiene `Gemini`, `Google` ni `modelo de lenguaje`.
+- [X] `FRASE_CORTESIA` es distinta de `FRASE_DECLINACION`, `FRASE_SOLO_LECTURA` y `FRASE_IDENTIDAD`.
+- [X] `INSTRUCCION_SISTEMA_CHAT` contiene `FRASE_CORTESIA` literal.
+- [X] En `INSTRUCCION_SISTEMA_CHAT`, `FRASE_CORTESIA` aparece **después** de `FRASE_IDENTIDAD` y **antes** del encabezado `SOLO LECTURA:`, es decir, dentro de la regla principal.
+- [X] `INSTRUCCION_SISTEMA_CHAT` contiene `Hay solo tres excepciones` y ya no contiene `Hay solo dos excepciones`.
+- [X] `INSTRUCCION_SISTEMA_CHAT` sigue conteniendo `FRASE_DECLINACION`, `FRASE_SOLO_LECTURA` y `FRASE_IDENTIDAD` literales, y las pruebas del SPEC 30 siguen pasando sin cambios.
+- [X] `npm run test` pasa, incluidas las pruebas de `chat.repository.spec.ts` y `gemini.service.spec.ts`.
+- [X] `npm run lint` pasa sin errores.
 
 **Manuales, contra la API real (`POST /chat` con token, sin historial):**
 
-- [ ] `{ mensaje: "gracias" }` responde 200 y `respuesta` es exactamente `FRASE_CORTESIA`.
-- [ ] `{ mensaje: "muchas gracias, eso era todo. hasta luego" }` responde 200 y `respuesta` es exactamente `FRASE_CORTESIA`.
-- [ ] `{ mensaje: "ok" }` responde 200 y `respuesta` es exactamente `FRASE_CORTESIA`.
-- [ ] `{ mensaje: "gracias. y como va el lote <nombre real>" }` responde 200 con las cifras de ese lote, `respuesta` **no** contiene `FRASE_CORTESIA`, y la fila de `chat_log` de ese turno tiene `herramientas` distinto de `NULL`.
-- [ ] `{ mensaje: "hola" }` responde con un saludo breve y **no** contiene `FRASE_CORTESIA`.
-- [ ] `{ mensaje: "cual es la raiz cuadrada de 20" }` sigue respondiendo `FRASE_DECLINACION`, como en el SPEC 28.
-- [ ] `{ mensaje: "como va el lote <nombre real>" }` responde con las cifras del lote y **no** contiene `FRASE_CORTESIA`.
+- [X] `{ mensaje: "gracias" }` responde 200 y `respuesta` es exactamente `FRASE_CORTESIA`.
+- [X] `{ mensaje: "muchas gracias, eso era todo. hasta luego" }` responde 200 y `respuesta` es exactamente `FRASE_CORTESIA`.
+- [X] `{ mensaje: "ok" }` responde 200 y `respuesta` es exactamente `FRASE_CORTESIA`.
+- [X] `{ mensaje: "gracias. y como va el lote <nombre real>" }` responde 200 con las cifras de ese lote, `respuesta` **no** contiene `FRASE_CORTESIA`, y la fila de `chat_log` de ese turno tiene `herramientas` distinto de `NULL`.
+- [X] `{ mensaje: "hola" }` responde con un saludo breve y **no** contiene `FRASE_CORTESIA`.
+- [X] `{ mensaje: "cual es la raiz cuadrada de 20" }` sigue respondiendo `FRASE_DECLINACION`, como en el SPEC 28.
+- [X] `{ mensaje: "como va el lote <nombre real>" }` responde con las cifras del lote y **no** contiene `FRASE_CORTESIA`.
 
 ---
 
