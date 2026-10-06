@@ -118,16 +118,21 @@ export class PlantasRepository {
             });
         }
 
+        const kpis = await this.getKpisHoy();
+        const pesajesHoy = Number(kpis.pesajes_hoy ?? 0);
+
         return {
-            generado_en: null,
+            generado_en: kpis.generado_en,
             kpis: {
-                pesajes_hoy: 0,
-                peso_neto_hoy: 0,
-                pct_en_rango_hoy: null,
+                pesajes_hoy: pesajesHoy,
+                peso_neto_hoy: redondear2(Number(kpis.peso_neto_hoy ?? 0)),
+                pct_en_rango_hoy: pesajesHoy
+                    ? redondear2((100 * Number(kpis.en_rango_hoy ?? 0)) / pesajesHoy)
+                    : null,
                 lotes_activos: lotes.filter(
                     (l) => l.etapa === 'en-pesaje' || l.etapa === 'por-aprobar',
                 ).length,
-                clientes_con_actividad_hoy: 0,
+                clientes_con_actividad_hoy: Number(kpis.clientes_con_actividad_hoy ?? 0),
             },
             clientes,
         };
@@ -235,6 +240,25 @@ export class PlantasRepository {
             .orderBy('p.lote_id', 'asc')
             .orderBy('p.id', 'desc')
             .execute();
+    }
+
+    // Sobre todos los pesajes activos de hoy de la planta, no solo los de la foto.
+    // "Hoy" es la regla de SPEC 28. NOW() viaja en la misma consulta como generado_en.
+    private async getKpisHoy() {
+        return await this.db
+            .selectFrom('pesajes')
+            .leftJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .select([
+                sql<Date | string>`NOW()`.as('generado_en'),
+                sql<number>`COUNT(*)`.as('pesajes_hoy'),
+                sql<number | string | null>`SUM(pesajes.peso_neto)`.as('peso_neto_hoy'),
+                sql<number | string | null>`SUM(pesajes.fuera_de_rango = 0)`.as('en_rango_hoy'),
+                sql<number>`COUNT(DISTINCT lotes.cliente_id)`.as('clientes_con_actividad_hoy'),
+            ])
+            .where('pesajes.isActive', '=', 1)
+            .where('pesajes.created_at', '>=', sql<Date>`CURDATE()`)
+            .where('pesajes.created_at', '<', sql<Date>`DATE_ADD(CURDATE(), INTERVAL 1 DAY)`)
+            .executeTakeFirstOrThrow();
     }
 }
 
