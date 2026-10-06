@@ -15,7 +15,7 @@ El front no anima eventos que le mande el backend. Pide una **foto** de la plant
 
 Tres cosas conviene tener claras antes de leer el resto.
 
-**La primera: "en pesaje" y "por aprobar" no existen en la base.** El tablero tiene tres casillas, pero `lotes.estado` sólo vale `abierto`/`cerrado`, y `EN_PROCESO` no distingue un lote abierto de uno que espera al aprobador. La casilla se **deriva** con la misma tabla de discriminadores que ya usa todo el módulo de lotes (`CLAUDE.md`, "rechazado se revisa primero"). El string `etapa` de la respuesta es vocabulario del tablero, no un código de la base. **No hay casilla de despacho**: `finalizado` es la última casilla y representa el lote listo para salir (decisión del usuario), así que el endpoint no lee documentos fiscales.
+**La primera: "en pesaje" y "por aprobar" no existen en la base.** El tablero tiene tres casillas, y `lotes.estado` sólo vale `abierto`/`cerrado`. La casilla se **deriva** de la etapa del lote en `etapas` (`EN_PROCESO` → en pesaje, `CLIENTE_FINAL` → por aprobar, `FINALIZADO` → finalizado). El string `etapa` de la respuesta es vocabulario del tablero, no un código de la base. **No hay casilla de despacho**: `finalizado` es la última casilla y representa el lote listo para salir (decisión del usuario), así que el endpoint no lee documentos fiscales.
 
 **La segunda: un lote nunca sale de planta en la base.** No hay columna de salida ni de embarque: un lote finalizado queda finalizado para siempre. Sin un corte, el tablero acumularía todos los lotes de la historia. El corte es por **ventanas de tiempo** (decisión del usuario): un finalizado se ve 7 días desde `finalizado_en` y un rechazado se ve 5 minutos. Cuando un lote sale de su ventana, desaparece de la foto, y el front lo anima como "salió de planta".
 
@@ -49,7 +49,7 @@ Tres cosas conviene tener claras antes de leer el resto.
 
 ## Data model
 
-Este spec **no** crea tablas ni columnas. Lee `clientes`, `lotes`, `productos`, `unidades_medida`, `pesajes`, `usuarios` y `estados_calidad`. **No** lee `documentos_fiscales` ni `documento_fiscal_lote`.
+Este spec **no** crea tablas ni columnas. Lee `clientes`, `lotes`, `etapas`, `productos`, `unidades_medida`, `pesajes`, `usuarios` y `estados_calidad`. **No** lee `documentos_fiscales` ni `documento_fiscal_lote`.
 
 ### Archivos
 
@@ -65,17 +65,36 @@ No hay DTO: el endpoint no recibe query params ni body.
 
 ### La casilla de cada lote (`etapa`)
 
-Se evalúa **en este orden**, y la primera regla que se cumple gana. Es la tabla de discriminadores de `CLAUDE.md` más las ventanas.
+Sale de la fila de `etapas` a la que apunta `lotes.etapa_id`, leída por `codigo` con un `LEFT JOIN`. Cada lote está en una sola etapa, así que las reglas no compiten y **el orden no importa**: es un `CASE etapas.codigo` directo, más las ventanas.
 
-| # | Condición | `etapa` | Ventana para entrar en la foto |
-| --- | --- | --- | --- |
-| 1 | `motivo_rechazo IS NOT NULL` | `rechazado` | `rechazado_en >= NOW() - INTERVAL 5 MINUTE` |
-| 2 | `finalizado_por IS NOT NULL` | `finalizado` | `finalizado_en >= NOW() - INTERVAL 7 DAY` |
-| 3 | `aprobado_por IS NOT NULL` | `por-aprobar` | Siempre |
-| 4 | `estado = 'abierto'` | `en-pesaje` | Siempre |
-| — | Ninguna de las anteriores (un `cerrado` sin marcas, dato viejo) | — | No entra |
+| `etapas.codigo` | `etapa` | Ventana para entrar en la foto |
+| --- | --- | --- |
+| `EN_PROCESO` | `en-pesaje` | Siempre |
+| `CLIENTE_FINAL` | `por-aprobar` | Siempre |
+| `FINALIZADO` | `finalizado` | `finalizado_en >= NOW() - INTERVAL 7 DAY` |
+| `RECHAZADO` | `rechazado` | `rechazado_en >= NOW() - INTERVAL 5 MINUTE` |
+| Otro, o `etapa_id` en `NULL` (dato viejo) | — | No entra |
 
-Un lote que **cumple su regla pero está fuera de su ventana no entra en la foto**. No baja a la regla siguiente: un finalizado de hace 8 días no aparece como `por-aprobar`.
+Se compara siempre **por `codigo`**, nunca por los ids 1 a 4: los ids cambian entre ambientes. Esto se aparta de la tabla de discriminadores de `CLAUDE.md`, que mira `motivo_rechazo`, `finalizado_por`, `aprobado_por` y `estado`. Para lotes movidos por la API las dos lecturas dan lo mismo, porque cada ruta que cambia la etapa escribe sus columnas de auditoría en el mismo `UPDATE`:
+
+| Etapa | Quién la escribe | Equivale a |
+| --- | --- | --- |
+| `EN_PROCESO` | `POST /lotes` | `estado = 'abierto'` |
+| `CLIENTE_FINAL` | `PATCH /lotes/:id/aprobar` | `aprobado_por IS NOT NULL AND finalizado_por IS NULL AND motivo_rechazo IS NULL` |
+| `FINALIZADO` | `PATCH /lotes/:id/finalizar/byApprover` | `finalizado_por IS NOT NULL` |
+| `RECHAZADO` | `PATCH /lotes/:id/rechazar` y `/rechazar/byApprover` | `motivo_rechazo IS NOT NULL` |
+
+Lo que en la tabla de `CLAUDE.md` exige un orden (revisar el rechazo antes que `aprobado_por`, porque un lote rechazado por el aprobador ya tiene `aprobado_por`) acá no hace falta: ese lote pasa a `RECHAZADO` y deja de estar en `CLIENTE_FINAL`.
+
+Tres casos donde la etapa y las columnas pueden no coincidir:
+
+- **`createLote` escribe `etapa_id: 1` a mano** en vez de resolver `EN_PROCESO` por `codigo` (contraejemplo conocido de `CLAUDE.md`). En un ambiente donde `EN_PROCESO` no sea el id 1, los lotes nuevos no entran en la foto. Este spec no corrige `createLote`.
+- **Un lote con `etapa_id` en `NULL`** (la columna lo admite) no aparece, aunque esté abierto.
+- **Un lote movido de etapa a mano** sin escribir la fecha de su ventana (`finalizado_en` o `rechazado_en`) no entra en la foto, porque la comparación con `NULL` da falso.
+
+El paso 3 del plan verifica los dos primeros.
+
+Un lote cuya etapa tiene ventana y está fuera de ella **no entra en la foto**: un finalizado de hace 8 días simplemente desaparece.
 
 `finalizado` es la última casilla del tablero. Que el lote tenga o no un documento fiscal no cambia nada: no hay casilla de despacho.
 
@@ -197,7 +216,7 @@ Si alguna de estas dos se rompe, la pantalla anima cosas que no pasaron.
 
 Todo en el repository, con Kysely sobre `this.dbService.client`. Son cuatro lecturas, ninguna por lote: nada de N+1, porque el endpoint se llama periódicamente por cada pantalla abierta.
 
-1. **Lotes de la foto.** `lotes` ⨝ `clientes` (`isActive = 1`) ⨝ `productos` ⨝ `unidades_medida`. La `etapa` sale de un `CASE` con el orden de la tabla, y las ventanas van en el `WHERE`. También trae los datos del cliente y `productos.nombre` del cliente (un segundo join a `productos` por `clientes.producto_id`, con alias). **No usar `selectAll()`** sobre `lotes` (arrastra `firma_aprobador`).
+1. **Lotes de la foto.** `lotes` ⨝ `clientes` (`isActive = 1`) ⨝ `productos` ⨝ `unidades_medida`, más un `LEFT JOIN` a `etapas` por `lotes.etapa_id` para la casilla (en la misma consulta, sin un `resolveEtapa` aparte). La `etapa` sale de un `CASE` con el orden de la tabla, y las ventanas van en el `WHERE`. También trae los datos del cliente y `productos.nombre` del cliente (un segundo join a `productos` por `clientes.producto_id`, con alias). **No usar `selectAll()`** sobre `lotes` (arrastra `firma_aprobador`).
 2. **Totales por lote.** `pesajes` con `isActive = 1` y `lote_id IN (ids de 1)`, `GROUP BY lote_id`: `COUNT(*)`, `SUM(fuera_de_rango = 1)`, `SUM(peso_neto)`. Un lote sin pesajes no sale del `GROUP BY` y se completa con ceros en Node.
 3. **Últimos pesajes.** Sobre los mismos ids, `ROW_NUMBER() OVER (PARTITION BY lote_id ORDER BY id DESC)` en una subconsulta, quedándose con `rn <= 10`, más los joins a `usuarios` y `estados_calidad`. Necesita MySQL 8 (ver el paso 1 del plan).
 4. **KPIs del día.** Una sola consulta sobre `pesajes` activos de hoy ⨝ `lotes`, más `SELECT NOW()` para `generado_en`.
@@ -212,7 +231,7 @@ El armado del árbol cliente → lotes → pesajes se hace en Node, agrupando lo
 
 1. **Verificar la versión de MySQL.** `SELECT VERSION()` contra el ambiente de desarrollo y el de producción. Con 8.x, la consulta 3 usa `ROW_NUMBER()`. Con 5.7 se trae todos los pesajes activos de los lotes de la foto, ordenados por `lote_id, id DESC`, y se cortan a 10 en Node; anotarlo en este spec antes de seguir. Verificación: la versión queda escrita en el spec.
 2. **Esqueleto del módulo.** Crear `plantas.module.ts`, `plantas.controller.ts`, `plantas.service.ts` y `repository/plantas.repository.ts`, y registrar el módulo en `app.module.ts`. El controller devuelve `{ ok: true, msg: 'Planta obtenida correctamente', planta }` con una foto vacía (`clientes: []`, KPIs en cero, `pct_en_rango_hoy: null`). Verificación: `GET /plantas/en-vivo` con token responde 200 con esa forma; sin token, 401.
-3. **Consulta 1 y la `etapa`.** Implementar la lectura de lotes con el `CASE`, las ventanas y el agrupado por cliente; `bultos`, totales y `ultimos_pesajes` todavía en cero/`[]`. Verificación: comparar con un `SELECT` a mano que haya un lote de cada casilla en la base de desarrollo, más un finalizado de hace más de 7 días que **no** aparece.
+3. **Consulta 1 y la `etapa`.** Implementar la lectura de lotes con el `CASE`, las ventanas y el agrupado por cliente; `bultos`, totales y `ultimos_pesajes` todavía en cero/`[]`. Verificación: comparar con un `SELECT` a mano que haya un lote de cada casilla en la base de desarrollo, más un finalizado de hace más de 7 días que **no** aparece. Además, confirmar con `SELECT` que no hay lotes con `estado = 'abierto'` cuya etapa no sea `EN_PROCESO` (incluidos los de `etapa_id` en `NULL`); si los hay, anotarlo en este spec antes de seguir.
 4. **Consultas 2 y 3.** Totales por lote y últimos 10 pesajes. Verificación: para un lote, `bultos` coincide con la cantidad de filas de `GET /pesajes/byLote/:loteId`, y `ultimos_pesajes[0].id` es el mayor id de esa lista.
 5. **Consulta 4 y `generado_en`.** Verificación: `pesajes_hoy` coincide con un `COUNT(*)` a mano con `created_at >= CURDATE()` e `isActive = 1`.
 6. **Swagger.** `@ApiTags('Plantas')`, `@ApiBearerAuth()`, `@ApiOperation` con un `summary` y una `description` que explique las casillas y las ventanas. Sin `@ApiResponse`. Verificación: el endpoint aparece en `/docs` con su descripción.
@@ -260,7 +279,8 @@ El armado del árbol cliente → lotes → pesajes se hace en Node, agrupando lo
 - **No:** una columna `lotes.despachado_en` con su `PATCH`. Se descarta para este spec: agrega un paso al flujo de planta que hoy nadie hace. Queda en Out of scope.
 - **Sí:** planta entera, sin filtro de cartera. Decisión explícita del usuario. Aprobadores y ADMIN no tienen filas en `cliente_operador`, y es una vista de planta, como el chat de SPEC 28.
 - **No:** sembrar un permiso `MODULO-MIRADOR`. Decisión explícita del usuario: cualquier usuario autenticado ve el Mirador. Como no hay guard de permisos, el permiso sólo habría servido para esconder el menú en el front.
-- **Sí:** `etapa` como vocabulario del tablero (`en-pesaje`, `por-aprobar`, `finalizado`, `rechazado`), no los códigos de `etapas`. `EN_PROCESO` no distingue "abierto" de "esperando al aprobador" sin mirar `aprobado_por`.
+- **Sí:** `etapa` como vocabulario del tablero (`en-pesaje`, `por-aprobar`, `finalizado`, `rechazado`), no los códigos de `etapas`. El front no tiene por qué conocer los códigos de la base.
+- **Sí:** la casilla sale de `etapas.codigo` (por `lotes.etapa_id`, en un `LEFT JOIN`), no de la tabla de discriminadores de `CLAUDE.md` (`motivo_rechazo`, `finalizado_por`, `aprobado_por`, `estado`). Decisión del usuario. Para lotes movidos por la API las dos lecturas coinciden, y con la etapa el `CASE` no depende del orden de las reglas. El costo es depender del `etapa_id: 1` que `createLote` escribe a mano (ver la nota bajo la tabla de casillas).
 - **Sí:** `fuera_de_rango` boolean y los códigos reales de `estados_calidad`, igual que `GET /pesajes/byLote/:loteId`. El front usa esa misma lectura para el detalle del lote, y el pesaje tiene que tener la misma forma en los dos lados.
 - **Sí:** `ultimos_pesajes` ordenado por `id`, no por `created_at`. El diff del front depende de que los ids crezcan; dos pesajes en el mismo segundo empatarían por `created_at`.
 - **Sí:** KPIs sobre todos los pesajes de hoy, no sólo los de los lotes de la foto. Un lote que se rechazó a la mañana igual pesó.
