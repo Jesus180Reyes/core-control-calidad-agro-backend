@@ -230,8 +230,10 @@ El armado del árbol cliente → lotes → pesajes se hace en Node, agrupando lo
 ## Implementation plan
 
 1. **Verificar la versión de MySQL.** `SELECT VERSION()` contra el ambiente de desarrollo y el de producción. Con 8.x, la consulta 3 usa `ROW_NUMBER()`. Con 5.7 se trae todos los pesajes activos de los lotes de la foto, ordenados por `lote_id, id DESC`, y se cortan a 10 en Node; anotarlo en este spec antes de seguir. Verificación: la versión queda escrita en el spec.
+   - **Resultado (2026-10-06):** `SELECT VERSION()` devuelve `8.0.46` en desarrollo y en producción. La consulta 3 usa `ROW_NUMBER()`; el plan alternativo de 5.7 no se aplica.
 2. **Esqueleto del módulo.** Crear `plantas.module.ts`, `plantas.controller.ts`, `plantas.service.ts` y `repository/plantas.repository.ts`, y registrar el módulo en `app.module.ts`. El controller devuelve `{ ok: true, msg: 'Planta obtenida correctamente', planta }` con una foto vacía (`clientes: []`, KPIs en cero, `pct_en_rango_hoy: null`). Verificación: `GET /plantas/en-vivo` con token responde 200 con esa forma; sin token, 401.
 3. **Consulta 1 y la `etapa`.** Implementar la lectura de lotes con el `CASE`, las ventanas y el agrupado por cliente; `bultos`, totales y `ultimos_pesajes` todavía en cero/`[]`. Verificación: comparar con un `SELECT` a mano que haya un lote de cada casilla en la base de desarrollo, más un finalizado de hace más de 7 días que **no** aparece. Además, confirmar con `SELECT` que no hay lotes con `estado = 'abierto'` cuya etapa no sea `EN_PROCESO` (incluidos los de `etapa_id` en `NULL`); si los hay, anotarlo en este spec antes de seguir.
+   - **Resultado (2026-10-06, desarrollo):** hay **tres** lotes con `estado = 'abierto'` y `etapa_id` en `NULL`: id 1 (`PDK-2123`), id 7 (`AGROBFN2122`) e id 8 (`AGROBFN2123`). Ningún lote abierto apunta a una etapa distinta de `EN_PROCESO`. Esos tres **no aparecen en la foto**, por la regla de la tabla de casillas (`etapa_id` en `NULL` no entra); este spec no los corrige ni cambia la regla. Si deben verse en el Mirador, se arreglan con un `UPDATE` a mano que les asigne la etapa `EN_PROCESO` resuelta por `codigo`, fuera de este spec.
 4. **Consultas 2 y 3.** Totales por lote y últimos 10 pesajes. Verificación: para un lote, `bultos` coincide con la cantidad de filas de `GET /pesajes/byLote/:loteId`, y `ultimos_pesajes[0].id` es el mayor id de esa lista.
 5. **Consulta 4 y `generado_en`.** Verificación: `pesajes_hoy` coincide con un `COUNT(*)` a mano con `created_at >= CURDATE()` e `isActive = 1`.
 6. **Swagger.** `@ApiTags('Plantas')`, `@ApiBearerAuth()`, `@ApiOperation` con un `summary` y una `description` que explique las casillas y las ventanas. Sin `@ApiResponse`. Verificación: el endpoint aparece en `/docs` con su descripción.
@@ -240,29 +242,29 @@ El armado del árbol cliente → lotes → pesajes se hace en Node, agrupando lo
 
 ## Acceptance criteria
 
-- [ ] `npm run build` pasa sin errores.
-- [ ] `GET /plantas/en-vivo` sin token responde 401.
-- [ ] Con token de cualquier rol (OPERADOR o ADMIN) responde 200 con `{ ok: true, msg: 'Planta obtenida correctamente', planta: { generado_en, kpis, clientes } }`.
-- [ ] Un OPERADOR sin filas en `cliente_operador` ve los mismos clientes que un ADMIN.
-- [ ] Un lote recién creado con `POST /lotes` aparece en la foto siguiente con `etapa: 'en-pesaje'`, `bultos: 0`, `peso_neto_total: 0` y `ultimos_pesajes: []`.
-- [ ] Después de un `POST /pesajes` sobre ese lote, la foto siguiente trae `bultos` uno mayor y el pesaje nuevo como `ultimos_pesajes[0]`.
-- [ ] Un lote con 15 pesajes activos trae `bultos: 15` y exactamente 10 elementos en `ultimos_pesajes`, ordenados por `id` descendente.
-- [ ] Después de anular un pesaje (`isActive = 0`), la foto siguiente trae `bultos` uno menor y ese pesaje no aparece en `ultimos_pesajes`.
-- [ ] Después de `PATCH /lotes/:id/aprobar`, el lote viaja con `etapa: 'por-aprobar'`.
-- [ ] Después de `PATCH /lotes/:id/finalizar/byApprover`, el lote viaja con `etapa: 'finalizado'`.
-- [ ] Un lote finalizado que además está en un documento fiscal activo sigue viajando con `etapa: 'finalizado'`.
-- [ ] Un lote finalizado hace más de 7 días no aparece en la foto.
-- [ ] Ningún lote viaja con `etapa: 'despacho'`, y los lotes no traen el campo `documento_fiscal`.
-- [ ] Un lote rechazado (por `PATCH /lotes/:id/rechazar` o por `/rechazar/byApprover`) viaja con `etapa: 'rechazado'` durante 5 minutos y después deja de aparecer.
-- [ ] Un cliente con `isActive = 0` no aparece, aunque tenga lotes abiertos.
-- [ ] Un cliente sin lotes en la foto no aparece en `clientes`.
-- [ ] Con ningún pesaje activo hoy, `pesajes_hoy` es `0`, `peso_neto_hoy` es `0` y `pct_en_rango_hoy` es `null`.
-- [ ] Con la base sin lotes vigentes, responde 200 con `clientes: []` (sin error de `IN ()` vacío).
-- [ ] `fuera_de_rango` viaja como boolean y `estado_calidad_codigo` como `IDEAL`, `MAXIMO` o `MINIMO`.
-- [ ] `bultos`, `bultos_fuera_rango`, `peso_neto_total` y los KPIs viajan como `number`, no como string.
-- [ ] El endpoint ejecuta como máximo cinco consultas por llamada, cualquiera sea la cantidad de lotes.
-- [ ] El endpoint aparece en Swagger bajo la etiqueta `Plantas`.
-- [ ] Ningún endpoint existente cambia su respuesta.
+- [X] `npm run build` pasa sin errores.
+- [X] `GET /plantas/en-vivo` sin token responde 401.
+- [X] Con token de cualquier rol (OPERADOR o ADMIN) responde 200 con `{ ok: true, msg: 'Planta obtenida correctamente', planta: { generado_en, kpis, clientes } }`.
+- [X] Un OPERADOR sin filas en `cliente_operador` ve los mismos clientes que un ADMIN.
+- [X] Un lote recién creado con `POST /lotes` aparece en la foto siguiente con `etapa: 'en-pesaje'`, `bultos: 0`, `peso_neto_total: 0` y `ultimos_pesajes: []`.
+- [X] Después de un `POST /pesajes` sobre ese lote, la foto siguiente trae `bultos` uno mayor y el pesaje nuevo como `ultimos_pesajes[0]`.
+- [X] Un lote con 15 pesajes activos trae `bultos: 15` y exactamente 10 elementos en `ultimos_pesajes`, ordenados por `id` descendente.
+- [X] Después de anular un pesaje (`isActive = 0`), la foto siguiente trae `bultos` uno menor y ese pesaje no aparece en `ultimos_pesajes`.
+- [X] Después de `PATCH /lotes/:id/aprobar`, el lote viaja con `etapa: 'por-aprobar'`.
+- [X] Después de `PATCH /lotes/:id/finalizar/byApprover`, el lote viaja con `etapa: 'finalizado'`.
+- [X] Un lote finalizado que además está en un documento fiscal activo sigue viajando con `etapa: 'finalizado'`.
+- [X] Un lote finalizado hace más de 7 días no aparece en la foto.
+- [X] Ningún lote viaja con `etapa: 'despacho'`, y los lotes no traen el campo `documento_fiscal`.
+- [X] Un lote rechazado (por `PATCH /lotes/:id/rechazar` o por `/rechazar/byApprover`) viaja con `etapa: 'rechazado'` durante 5 minutos y después deja de aparecer.
+- [X] Un cliente con `isActive = 0` no aparece, aunque tenga lotes abiertos.
+- [X] Un cliente sin lotes en la foto no aparece en `clientes`.
+- [X] Con ningún pesaje activo hoy, `pesajes_hoy` es `0`, `peso_neto_hoy` es `0` y `pct_en_rango_hoy` es `null`.
+- [X] Con la base sin lotes vigentes, responde 200 con `clientes: []` (sin error de `IN ()` vacío).
+- [X] `fuera_de_rango` viaja como boolean y `estado_calidad_codigo` como `IDEAL`, `MAXIMO` o `MINIMO`.
+- [X] `bultos`, `bultos_fuera_rango`, `peso_neto_total` y los KPIs viajan como `number`, no como string.
+- [X] El endpoint ejecuta como máximo cinco consultas por llamada, cualquiera sea la cantidad de lotes.
+- [X] El endpoint aparece en Swagger bajo la etiqueta `Plantas`.
+- [X] Ningún endpoint existente cambia su respuesta.
 
 ---
 
