@@ -1,6 +1,6 @@
 # SPEC 32 — Foto de la planta en vivo para el Mirador
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 02 (crea `lotes` y su ciclo `abierto`/`cerrado`), SPEC 03 (crea `pesajes`), SPEC 04 (deriva `fuera_de_rango` y `estados_calidad`), SPEC 10 (anulación de pesajes con `isActive = 0`), SPEC 12 (rechazo de lotes), SPEC 13 (aprobación de lotes), SPEC 20 (finalización de lotes), SPEC 22 (Swagger)
 > **Date:** 2026-10-05
 > **Objective:** Agregar `GET /plantas/en-vivo`, que devuelve en una sola lectura los clientes con sus lotes vigentes (cada uno con su etapa en el tablero, sus totales y sus últimos diez pesajes) más los KPIs del día, para que el Mirador del front la pida cada 1 a 2 minutos.
