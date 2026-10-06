@@ -242,29 +242,29 @@ El armado del árbol cliente → lotes → pesajes se hace en Node, agrupando lo
 
 ## Acceptance criteria
 
-- [ ] `npm run build` pasa sin errores.
-- [ ] `GET /plantas/en-vivo` sin token responde 401.
-- [ ] Con token de cualquier rol (OPERADOR o ADMIN) responde 200 con `{ ok: true, msg: 'Planta obtenida correctamente', planta: { generado_en, kpis, clientes } }`.
-- [ ] Un OPERADOR sin filas en `cliente_operador` ve los mismos clientes que un ADMIN.
-- [ ] Un lote recién creado con `POST /lotes` aparece en la foto siguiente con `etapa: 'en-pesaje'`, `bultos: 0`, `peso_neto_total: 0` y `ultimos_pesajes: []`.
-- [ ] Después de un `POST /pesajes` sobre ese lote, la foto siguiente trae `bultos` uno mayor y el pesaje nuevo como `ultimos_pesajes[0]`.
-- [ ] Un lote con 15 pesajes activos trae `bultos: 15` y exactamente 10 elementos en `ultimos_pesajes`, ordenados por `id` descendente.
-- [ ] Después de anular un pesaje (`isActive = 0`), la foto siguiente trae `bultos` uno menor y ese pesaje no aparece en `ultimos_pesajes`.
-- [ ] Después de `PATCH /lotes/:id/aprobar`, el lote viaja con `etapa: 'por-aprobar'`.
-- [ ] Después de `PATCH /lotes/:id/finalizar/byApprover`, el lote viaja con `etapa: 'finalizado'`.
-- [ ] Un lote finalizado que además está en un documento fiscal activo sigue viajando con `etapa: 'finalizado'`.
-- [ ] Un lote finalizado hace más de 7 días no aparece en la foto.
-- [ ] Ningún lote viaja con `etapa: 'despacho'`, y los lotes no traen el campo `documento_fiscal`.
-- [ ] Un lote rechazado (por `PATCH /lotes/:id/rechazar` o por `/rechazar/byApprover`) viaja con `etapa: 'rechazado'` durante 5 minutos y después deja de aparecer.
-- [ ] Un cliente con `isActive = 0` no aparece, aunque tenga lotes abiertos.
-- [ ] Un cliente sin lotes en la foto no aparece en `clientes`.
-- [ ] Con ningún pesaje activo hoy, `pesajes_hoy` es `0`, `peso_neto_hoy` es `0` y `pct_en_rango_hoy` es `null`.
-- [ ] Con la base sin lotes vigentes, responde 200 con `clientes: []` (sin error de `IN ()` vacío).
-- [ ] `fuera_de_rango` viaja como boolean y `estado_calidad_codigo` como `IDEAL`, `MAXIMO` o `MINIMO`.
-- [ ] `bultos`, `bultos_fuera_rango`, `peso_neto_total` y los KPIs viajan como `number`, no como string.
-- [ ] El endpoint ejecuta como máximo cinco consultas por llamada, cualquiera sea la cantidad de lotes.
-- [ ] El endpoint aparece en Swagger bajo la etiqueta `Plantas`.
-- [ ] Ningún endpoint existente cambia su respuesta.
+- [X] `npm run build` pasa sin errores.
+- [X] `GET /plantas/en-vivo` sin token responde 401.
+- [X] Con token de cualquier rol (OPERADOR o ADMIN) responde 200 con `{ ok: true, msg: 'Planta obtenida correctamente', planta: { generado_en, kpis, clientes } }`.
+- [X] Un OPERADOR sin filas en `cliente_operador` ve los mismos clientes que un ADMIN.
+- [X] Un lote recién creado con `POST /lotes` aparece en la foto siguiente con `etapa: 'en-pesaje'`, `bultos: 0`, `peso_neto_total: 0` y `ultimos_pesajes: []`.
+- [X] Después de un `POST /pesajes` sobre ese lote, la foto siguiente trae `bultos` uno mayor y el pesaje nuevo como `ultimos_pesajes[0]`.
+- [X] Un lote con 15 pesajes activos trae `bultos: 15` y exactamente 10 elementos en `ultimos_pesajes`, ordenados por `id` descendente.
+- [X] Después de anular un pesaje (`isActive = 0`), la foto siguiente trae `bultos` uno menor y ese pesaje no aparece en `ultimos_pesajes`.
+- [X] Después de `PATCH /lotes/:id/aprobar`, el lote viaja con `etapa: 'por-aprobar'`.
+- [X] Después de `PATCH /lotes/:id/finalizar/byApprover`, el lote viaja con `etapa: 'finalizado'`.
+- [X] Un lote finalizado que además está en un documento fiscal activo sigue viajando con `etapa: 'finalizado'`.
+- [X] Un lote finalizado hace más de 7 días no aparece en la foto.
+- [X] Ningún lote viaja con `etapa: 'despacho'`, y los lotes no traen el campo `documento_fiscal`.
+- [X] Un lote rechazado (por `PATCH /lotes/:id/rechazar` o por `/rechazar/byApprover`) viaja con `etapa: 'rechazado'` durante 5 minutos y después deja de aparecer.
+- [X] Un cliente con `isActive = 0` no aparece, aunque tenga lotes abiertos.
+- [X] Un cliente sin lotes en la foto no aparece en `clientes`.
+- [X] Con ningún pesaje activo hoy, `pesajes_hoy` es `0`, `peso_neto_hoy` es `0` y `pct_en_rango_hoy` es `null`.
+- [X] Con la base sin lotes vigentes, responde 200 con `clientes: []` (sin error de `IN ()` vacío).
+- [X] `fuera_de_rango` viaja como boolean y `estado_calidad_codigo` como `IDEAL`, `MAXIMO` o `MINIMO`.
+- [X] `bultos`, `bultos_fuera_rango`, `peso_neto_total` y los KPIs viajan como `number`, no como string.
+- [X] El endpoint ejecuta como máximo cinco consultas por llamada, cualquiera sea la cantidad de lotes.
+- [X] El endpoint aparece en Swagger bajo la etiqueta `Plantas`.
+- [X] Ningún endpoint existente cambia su respuesta.
 
 ---
 
