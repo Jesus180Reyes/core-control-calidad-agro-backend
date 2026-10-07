@@ -21,7 +21,13 @@ export class AuthController {
     description:
       'Unico endpoint que entrega un token. Responde 200, no 201. ' +
       'El accessToken viaja en el primer nivel de la respuesta, no dentro de user. ' +
-      'El token no incluye permisos ni rol: ningun endpoint valida permisos hoy.',
+      'El token no incluye permisos ni rol: ningun endpoint valida permisos hoy. ' +
+      'La respuesta 200 lleva passwordVencida: false. ' +
+      'Si la contraseña es correcta pero ya vencio (password_vence_en <= NOW()), responde 403 ' +
+      'con message "La contraseña ha caducado" y passwordVencida: true, sin token; ' +
+      'se renueva con POST /auth/renovar-password. ' +
+      'Un usuario recien registrado nace vencido y debe renovar en su primer login. ' +
+      'Con una contraseña incorrecta responde 401 sin passwordVencida, este vencida o no.',
   })
   async login(@Body() data: LoginUserDto) {
     const { accessToken, currentUser } = await this.authService.login(data);
