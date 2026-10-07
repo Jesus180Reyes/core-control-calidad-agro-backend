@@ -1,6 +1,6 @@
 # SPEC 33 — Renovación de contraseña vencida
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** — (toca solo el módulo `auth`, que no nació de ningún spec; SPEC 22 aporta la convención de Swagger)
 > **Date:** 2026-10-07
 > **Objective:** Que cada contraseña tenga fecha de vencimiento, que `POST /auth/login` responda 403 con `passwordVencida: true` cuando la contraseña correcta ya venció, y que un nuevo `POST /auth/renovar-password` público permita cambiarla.
@@ -186,29 +186,29 @@ Errores de `POST /auth/renovar-password`:
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE usuarios` muestra `password_vence_en` y `password_actualizada_en`, ambas `datetime`, `NULL`, después de `password`.
-- [ ] La app arranca sin `PASSWORD_VIGENCIA_DIAS` definida.
-- [ ] Un usuario con `password_vence_en = NULL` hace login y recibe 200 con la misma respuesta que antes de este spec más `passwordVencida: false` en el primer nivel, y sin `password_vencida` dentro de `user`.
-- [ ] Un usuario con `password_vence_en` en el futuro hace login y recibe 200 con `passwordVencida: false`.
-- [ ] `passwordVencida` es un booleano (`true`/`false`), nunca `0`/`1`, tanto en el 200 como en el 403.
-- [ ] El 401 del login no lleva la clave `passwordVencida`.
-- [ ] Un usuario con `password_vence_en <= NOW()` y la contraseña correcta recibe **403** con `message: 'La contraseña ha caducado'` y `passwordVencida: true`, sin `accessToken`.
-- [ ] Ese mismo usuario con una contraseña **incorrecta** recibe 401 `Usuario o contraseña incorrectas`, no 403.
-- [ ] Un `username` inexistente sigue recibiendo 401 en el login.
-- [ ] `POST /auth/register` crea el usuario con `password_vence_en` igual a la hora de MySQL del momento de crearlo y `password_actualizada_en = NULL`. Su primer login responde 403.
-- [ ] `POST /auth/renovar-password` funciona sin header `Authorization`.
-- [ ] Con credenciales válidas y una `password_nueva` válida responde 200 `{ ok: true, msg: 'Contraseña actualizada correctamente' }`, sin token.
-- [ ] Después de renovar, el login con la contraseña nueva responde 200 y el login con la contraseña vieja responde 401.
-- [ ] Después de renovar, `password_actualizada_en` tiene la hora de la renovación y `password_vence_en` queda 90 días después (o `PASSWORD_VIGENCIA_DIAS` días, si está definida).
-- [ ] Con `PASSWORD_VIGENCIA_DIAS=abc`, `0` o `-5`, la renovación usa 90 días.
-- [ ] Renovar una contraseña **vigente** también responde 200 y mueve `password_vence_en`.
-- [ ] `password_actual` incorrecta responde 401 `Usuario o contraseña incorrectos`. Un `username` inexistente responde exactamente lo mismo.
-- [ ] `password_nueva` igual a la actual responde 400 `La nueva contraseña debe ser distinta de la actual` y no cambia ninguna columna.
-- [ ] `password_nueva` con menos de 8 caracteres, sin mayúscula o sin número responde 400 desde el DTO.
-- [ ] Ningún error de la renovación modifica la fila de `usuarios`.
-- [ ] `POST /auth/register` sigue aceptando una contraseña de 8 caracteres sin mayúscula ni número.
-- [ ] `/docs` muestra `POST /auth/renovar-password` con su descripción, y la descripción de `POST /auth/login` menciona el 403.
-- [ ] El route log muestra exactamente una ruta más que antes de este spec.
+- [X] `DESCRIBE usuarios` muestra `password_vence_en` y `password_actualizada_en`, ambas `datetime`, `NULL`, después de `password`.
+- [X] La app arranca sin `PASSWORD_VIGENCIA_DIAS` definida.
+- [X] Un usuario con `password_vence_en = NULL` hace login y recibe 200 con la misma respuesta que antes de este spec más `passwordVencida: false` en el primer nivel, y sin `password_vencida` dentro de `user`.
+- [X] Un usuario con `password_vence_en` en el futuro hace login y recibe 200 con `passwordVencida: false`.
+- [X] `passwordVencida` es un booleano (`true`/`false`), nunca `0`/`1`, tanto en el 200 como en el 403.
+- [X] El 401 del login no lleva la clave `passwordVencida`.
+- [X] Un usuario con `password_vence_en <= NOW()` y la contraseña correcta recibe **403** con `message: 'La contraseña ha caducado'` y `passwordVencida: true`, sin `accessToken`.
+- [X] Ese mismo usuario con una contraseña **incorrecta** recibe 401 `Usuario o contraseña incorrectas`, no 403.
+- [X] Un `username` inexistente sigue recibiendo 401 en el login.
+- [X] `POST /auth/register` crea el usuario con `password_vence_en` igual a la hora de MySQL del momento de crearlo y `password_actualizada_en = NULL`. Su primer login responde 403.
+- [X] `POST /auth/renovar-password` funciona sin header `Authorization`.
+- [X] Con credenciales válidas y una `password_nueva` válida responde 200 `{ ok: true, msg: 'Contraseña actualizada correctamente' }`, sin token.
+- [X] Después de renovar, el login con la contraseña nueva responde 200 y el login con la contraseña vieja responde 401.
+- [X] Después de renovar, `password_actualizada_en` tiene la hora de la renovación y `password_vence_en` queda 90 días después (o `PASSWORD_VIGENCIA_DIAS` días, si está definida).
+- [X] Con `PASSWORD_VIGENCIA_DIAS=abc`, `0` o `-5`, la renovación usa 90 días.
+- [X] Renovar una contraseña **vigente** también responde 200 y mueve `password_vence_en`.
+- [X] `password_actual` incorrecta responde 401 `Usuario o contraseña incorrectos`. Un `username` inexistente responde exactamente lo mismo.
+- [x] `password_nueva` igual a la actual responde 400 `La nueva contraseña debe ser distinta de la actual` y no cambia ninguna columna.
+- [x] `password_nueva` con menos de 8 caracteres, sin mayúscula o sin número responde 400 desde el DTO.
+- [x] Ningún error de la renovación modifica la fila de `usuarios`.
+- [x] `POST /auth/register` sigue aceptando una contraseña de 8 caracteres sin mayúscula ni número.
+- [x] `/docs` muestra `POST /auth/renovar-password` con su descripción, y la descripción de `POST /auth/login` menciona el 403.
+- [x] El route log muestra exactamente una ruta más que antes de este spec.
 
 ---
 
