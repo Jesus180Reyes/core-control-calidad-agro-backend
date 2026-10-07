@@ -1,6 +1,6 @@
 import { DatabaseService } from "src/database/database.service";
 import { RegisterUserDto } from "../dto/register.dto";
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { LoginUserDto } from "../dto/login.dto";
 import * as bcrypt from 'bcrypt';
 import { JwtService } from "@nestjs/jwt";
@@ -32,6 +32,15 @@ export class AuthRepository {
         if (!isPasswordValid) {
             throw new UnauthorizedException('Usuario o contraseña incorrectas');
         }
+
+        if (user.password_vencida) {
+            throw new ForbiddenException({
+                statusCode: 403,
+                message: 'La contraseña ha caducado',
+                passwordVencida: true,
+            });
+        }
+
         const payload: JwtPayload = {
             sub: user.id,
             user_id: user.id,
@@ -40,7 +49,7 @@ export class AuthRepository {
         const accessToken = this.jwtService.sign(payload);
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password: _, id: __, cedula: ____, username: _____, ...currentUser } = user;
+        const { password: _, id: __, cedula: ____, username: _____, password_vencida: ______, ...currentUser } = user;
 
         return {
             accessToken,
@@ -94,8 +103,6 @@ export class AuthRepository {
                 'usuarios.complete_name',
                 'usuarios.password',
                 'roles.nombre as rol',
-                // Se compara en SQL y no con un new Date() de Node, para que
-                // comparta reloj con el NOW() que escribe la columna. NULL = no vence.
                 sql<number>`usuarios.password_vence_en IS NOT NULL AND usuarios.password_vence_en <= NOW()`.as('password_vencida'),
             ])
             .where('username', '=', username)

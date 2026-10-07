@@ -29,6 +29,7 @@ export class AuthController {
       msg: 'Usuario logueado correctamente',
       user: currentUser,
       accessToken,
+      passwordVencida: false,
     };
   }
 
