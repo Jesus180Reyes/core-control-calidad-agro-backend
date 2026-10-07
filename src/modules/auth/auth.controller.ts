@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register.dto';
 import { LoginUserDto } from './dto/login.dto';
+import { RenovarPasswordDto } from './dto/renovar-password.dto';
 import { Public } from 'src/decorators/public.decorator';
 
 // Sin @ApiBearerAuth a nivel de clase: login es @Public(). register si exige token
@@ -53,5 +54,27 @@ export class AuthController {
       user,
     };
 
+  }
+
+  @Post('renovar-password')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: 'Renovar la contraseña',
+    description:
+      'Publico: no exige token, porque el login no emite uno cuando la contraseña vencio. ' +
+      'Se autentica con username y password_actual, y sirve tanto para contraseñas vencidas como vigentes. ' +
+      'La nueva debe tener al menos 8 caracteres, una mayuscula y un numero, y ser distinta de la actual. ' +
+      'Deja la contraseña vigente por PASSWORD_VIGENCIA_DIAS dias (90 por defecto). ' +
+      'No devuelve token: despues hay que llamar a POST /auth/login con la contraseña nueva. ' +
+      '401 con un mismo mensaje si el usuario no existe o la contraseña actual no coincide; ' +
+      '400 si la nueva no cumple las reglas o es igual a la actual.',
+  })
+  async renovarPassword(@Body() data: RenovarPasswordDto) {
+    await this.authService.renovarPassword(data);
+    return {
+      ok: true,
+      msg: 'Contraseña actualizada correctamente',
+    };
   }
 }
