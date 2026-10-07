@@ -5,12 +5,15 @@ import { LoginUserDto } from "../dto/login.dto";
 import * as bcrypt from 'bcrypt';
 import { JwtService } from "@nestjs/jwt";
 import { JwtPayload } from "src/strategy/jwt.stategy";
+import { ConfigService } from "@nestjs/config";
 @Injectable()
 export class AuthRepository {
     private readonly SALT_ROUNDS = 10;
+    private static readonly VIGENCIA_POR_DEFECTO_DIAS = 90;
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
+        private readonly config: ConfigService,
     ) { }
 
 
@@ -94,6 +97,20 @@ export class AuthRepository {
             .where('username', '=', username)
             .executeTakeFirst();
         return user;
+    }
+
+    /**
+     * `PASSWORD_VIGENCIA_DIAS` es opcional. Un valor que no sea un entero
+     * positivo cae a 90, igual que `GEMINI_TIMEOUT_MS` en `GeminiService`: no
+     * hay forma de apagar el vencimiento por configuracion. Tiene que ser
+     * entero porque va interpolado en un `INTERVAL ... DAY`.
+     */
+    private resolverVigenciaDias(): number {
+        const crudo = this.config.get<string>('PASSWORD_VIGENCIA_DIAS');
+        const valor = Number(crudo);
+        return Number.isInteger(valor) && valor > 0
+            ? valor
+            : AuthRepository.VIGENCIA_POR_DEFECTO_DIAS;
     }
 
 }
