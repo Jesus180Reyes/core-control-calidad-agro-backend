@@ -6,6 +6,8 @@ export interface UsuariosTable {
   complete_name: string;
   rol_id: number;
   password: string;
+  password_vence_en: Date | string | null;
+  password_actualizada_en: Date | string | null;
   isActive: number | null;
   created_at: Generated<Date | null>;
   updated_at: Generated<Date | null>;
