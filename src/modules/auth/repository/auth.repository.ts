@@ -74,6 +74,7 @@ export class AuthRepository {
                 complete_name,
                 rol_id: rol,
                 password: hashedPassword,
+                password_vence_en: sql`NOW()`,
                 created_by: createdBy,
                 cedula,
             })
