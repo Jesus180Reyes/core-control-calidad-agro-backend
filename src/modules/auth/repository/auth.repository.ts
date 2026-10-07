@@ -1,12 +1,14 @@
 import { DatabaseService } from "src/database/database.service";
 import { RegisterUserDto } from "../dto/register.dto";
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { LoginUserDto } from "../dto/login.dto";
 import * as bcrypt from 'bcrypt';
 import { JwtService } from "@nestjs/jwt";
 import { JwtPayload } from "src/strategy/jwt.stategy";
 import { ConfigService } from "@nestjs/config";
-import { sql } from "kysely";
+import { Kysely, sql } from "kysely";
+import { Database } from "src/database/types/types";
+import { RenovarPasswordDto } from "../dto/renovar-password.dto";
 @Injectable()
 export class AuthRepository {
     private readonly SALT_ROUNDS = 10;
@@ -82,6 +84,51 @@ export class AuthRepository {
 
         return Number(result.insertId);
 
+    }
+
+    async renovarPassword(data: RenovarPasswordDto) {
+        const { username, password_actual, password_nueva } = data;
+        const dias = this.resolverVigenciaDias();
+
+        return await this.db.transaction().execute(async (trx) => {
+            const user = await this.validateCredenciales(username, password_actual, trx);
+            await this.validatePasswordDistinta(password_nueva, user.password);
+
+            const hashedPassword = await bcrypt.hash(password_nueva, this.SALT_ROUNDS);
+
+            await trx
+                .updateTable('usuarios')
+                .set({
+                    password: hashedPassword,
+                    password_actualizada_en: sql`NOW()`,
+                    password_vence_en: sql`DATE_ADD(NOW(), INTERVAL ${dias} DAY)`,
+                })
+                .where('id', '=', user.id)
+                .executeTakeFirstOrThrow();
+
+            return true;
+        });
+    }
+
+    private async validateCredenciales(username: string, password: string, db: Kysely<Database>) {
+        const user = await db
+            .selectFrom('usuarios')
+            .select(['id', 'password'])
+            .where('username', '=', username)
+            .executeTakeFirst();
+
+        const isPasswordValid = user ? await bcrypt.compare(password, user.password) : false;
+        if (!user || !isPasswordValid) {
+            throw new UnauthorizedException('Usuario o contraseña incorrectos');
+        }
+        return user;
+    }
+
+    private async validatePasswordDistinta(passwordNueva: string, hashActual: string) {
+        const esIgual = await bcrypt.compare(passwordNueva, hashActual);
+        if (esIgual) {
+            throw new BadRequestException('La nueva contraseña debe ser distinta de la actual');
+        }
     }
 
     async getUserByCedula(cedula: string) {
