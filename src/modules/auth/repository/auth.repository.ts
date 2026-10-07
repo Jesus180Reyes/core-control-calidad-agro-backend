@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from "@nestjs/jwt";
 import { JwtPayload } from "src/strategy/jwt.stategy";
 import { ConfigService } from "@nestjs/config";
+import { sql } from "kysely";
 @Injectable()
 export class AuthRepository {
     private readonly SALT_ROUNDS = 10;
@@ -93,6 +94,9 @@ export class AuthRepository {
                 'usuarios.complete_name',
                 'usuarios.password',
                 'roles.nombre as rol',
+                // Se compara en SQL y no con un new Date() de Node, para que
+                // comparta reloj con el NOW() que escribe la columna. NULL = no vence.
+                sql<number>`usuarios.password_vence_en IS NOT NULL AND usuarios.password_vence_en <= NOW()`.as('password_vencida'),
             ])
             .where('username', '=', username)
             .executeTakeFirst();
