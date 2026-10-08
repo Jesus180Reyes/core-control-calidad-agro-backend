@@ -136,11 +136,6 @@ export class AuthRepository {
         }
     }
 
-    /**
-     * Primer chequeo de rol del proyecto (spec 34). El rol se lee de la base y
-     * no del JWT, que no lo lleva. 'ADMIN' va en mayusculas porque asi esta en
-     * `roles`. Un userId que ya no existe tambien responde 403.
-     */
     private async validateCallerEsAdmin(userId: number, db: Kysely<Database>) {
         const caller = await db
             .selectFrom('usuarios')
