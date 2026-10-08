@@ -115,6 +115,28 @@ export class AuthRepository {
         });
     }
 
+    async resetearPassword(id: number, userId: number) {
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateCallerEsAdmin(userId, trx);
+            this.validateNoEsMismoUsuario(id, userId);
+            await this.validateUsuarioActivo(id, trx);
+
+            const passwordTemporal = this.generarPasswordTemporal();
+            const hashedPassword = await bcrypt.hash(passwordTemporal, this.SALT_ROUNDS);
+
+            await trx
+                .updateTable('usuarios')
+                .set({
+                    password: hashedPassword,
+                    password_vence_en: sql`NOW()`,
+                })
+                .where('id', '=', id)
+                .executeTakeFirstOrThrow();
+
+            return passwordTemporal;
+        });
+    }
+
     private async validateCredenciales(username: string, password: string, db: Kysely<Database>) {
         const user = await db
             .selectFrom('usuarios')
