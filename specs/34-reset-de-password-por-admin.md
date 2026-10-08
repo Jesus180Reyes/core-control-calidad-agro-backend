@@ -1,6 +1,6 @@
 # SPEC 34 — Reset de contraseña por un admin
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 33 (el reset reusa su flujo de vencimiento y renovación), SPEC 22 (convención de Swagger)
 > **Date:** 2026-10-07
 > **Objective:** Que un usuario con rol `ADMIN` pueda restablecer la contraseña olvidada de otro usuario con `PATCH /auth/usuarios/:id/reset-password`, que genera una contraseña temporal ya vencida para obligarlo a renovarla en su próximo login.
@@ -132,28 +132,28 @@ La autorización va **primero**. Así quien no es admin no puede usar el endpoin
 
 ## Acceptance criteria
 
-- [ ] El route log muestra exactamente una ruta más que antes de este spec: `PATCH /auth/usuarios/:id/reset-password`.
-- [ ] Sin header `Authorization`, responde 401.
-- [ ] Con el token de un `OPERADOR`, responde 403 `No tiene permisos para restablecer contraseñas` y no modifica ninguna fila.
-- [ ] Con el token de un `OPERADOR` y un `:id` inexistente, responde 403, no 400.
-- [ ] Con el token de un `ADMIN` y un `:id` de un operador activo, responde 200 `{ ok: true, msg: 'Contraseña restablecida correctamente', password_temporal }`.
-- [ ] `password_temporal` tiene exactamente 10 caracteres, al menos una mayúscula y al menos un número, y no contiene ninguno de `0 O o 1 l I`.
-- [ ] Dos resets seguidos del mismo usuario devuelven temporales distintas.
-- [ ] Después del reset, `password_vence_en` del usuario es la hora de MySQL del reset y `password_actualizada_en` no cambió.
-- [ ] Después del reset, el login con la contraseña vieja responde 401.
-- [ ] Después del reset, el login con la temporal responde 403 con `passwordVencida: true`.
-- [ ] `POST /auth/renovar-password` con la temporal como `password_actual` responde 200, y el login posterior con la contraseña nueva responde 200.
-- [ ] Un `ADMIN` puede resetear a otro `ADMIN`.
-- [ ] Un `ADMIN` que se resetea a sí mismo recibe 400 `No puede restablecer su propia contraseña. Use POST /auth/renovar-password`, y su contraseña no cambia.
-- [ ] Un `:id` inexistente responde 400 `El usuario con id 'X' no existe`.
-- [ ] Un usuario con `isActive = 0` responde 400 `El usuario con id 'X' esta inactivo` y su fila no cambia.
-- [ ] Un usuario con `isActive = NULL` se resetea con 200.
-- [ ] `:id` no numérico responde 400 desde `ParseIntPipe`.
-- [ ] El endpoint acepta la llamada sin body. Un body enviado se ignora.
-- [ ] Ningún error modifica la fila de `usuarios`.
-- [ ] La temporal en texto plano no se guarda en ninguna columna ni se escribe en ningún log del backend.
-- [ ] `/docs` muestra el endpoint con su descripción, el candado de bearer y el parámetro `id`.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
+- [X] El route log muestra exactamente una ruta más que antes de este spec: `PATCH /auth/usuarios/:id/reset-password`.
+- [X] Sin header `Authorization`, responde 401.
+- [X] Con el token de un `OPERADOR`, responde 403 `No tiene permisos para restablecer contraseñas` y no modifica ninguna fila.
+- [X] Con el token de un `OPERADOR` y un `:id` inexistente, responde 403, no 400.
+- [X] Con el token de un `ADMIN` y un `:id` de un operador activo, responde 200 `{ ok: true, msg: 'Contraseña restablecida correctamente', password_temporal }`.
+- [X] `password_temporal` tiene exactamente 10 caracteres, al menos una mayúscula y al menos un número, y no contiene ninguno de `0 O o 1 l I`.
+- [X] Dos resets seguidos del mismo usuario devuelven temporales distintas.
+- [X] Después del reset, `password_vence_en` del usuario es la hora de MySQL del reset y `password_actualizada_en` no cambió.
+- [X] Después del reset, el login con la contraseña vieja responde 401.
+- [X] Después del reset, el login con la temporal responde 403 con `passwordVencida: true`.
+- [X] `POST /auth/renovar-password` con la temporal como `password_actual` responde 200, y el login posterior con la contraseña nueva responde 200.
+- [X] Un `ADMIN` puede resetear a otro `ADMIN`.
+- [X] Un `ADMIN` que se resetea a sí mismo recibe 400 `No puede restablecer su propia contraseña. Use POST /auth/renovar-password`, y su contraseña no cambia.
+- [X] Un `:id` inexistente responde 400 `El usuario con id 'X' no existe`.
+- [X] Un usuario con `isActive = 0` responde 400 `El usuario con id 'X' esta inactivo` y su fila no cambia.
+- [X] Un usuario con `isActive = NULL` se resetea con 200.
+- [X] `:id` no numérico responde 400 desde `ParseIntPipe`.
+- [X] El endpoint acepta la llamada sin body. Un body enviado se ignora.
+- [X] Ningún error modifica la fila de `usuarios`.
+- [X] La temporal en texto plano no se guarda en ninguna columna ni se escribe en ningún log del backend.
+- [X] `/docs` muestra el endpoint con su descripción, el candado de bearer y el parámetro `id`.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
 
 ---
 
