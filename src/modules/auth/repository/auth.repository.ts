@@ -136,6 +136,45 @@ export class AuthRepository {
         }
     }
 
+    /**
+     * Primer chequeo de rol del proyecto (spec 34). El rol se lee de la base y
+     * no del JWT, que no lo lleva. 'ADMIN' va en mayusculas porque asi esta en
+     * `roles`. Un userId que ya no existe tambien responde 403.
+     */
+    private async validateCallerEsAdmin(userId: number, db: Kysely<Database>) {
+        const caller = await db
+            .selectFrom('usuarios')
+            .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select('roles.nombre as rol')
+            .where('usuarios.id', '=', userId)
+            .executeTakeFirst();
+
+        if (!caller || caller.rol !== 'ADMIN') {
+            throw new ForbiddenException('No tiene permisos para restablecer contraseñas');
+        }
+    }
+
+    private validateNoEsMismoUsuario(id: number, userId: number) {
+        if (id === userId) {
+            throw new BadRequestException('No puede restablecer su propia contraseña.');
+        }
+    }
+
+    private async validateUsuarioActivo(id: number, db: Kysely<Database>) {
+        const user = await db
+            .selectFrom('usuarios')
+            .select(['id', 'isActive'])
+            .where('id', '=', id)
+            .executeTakeFirst();
+
+        if (!user) {
+            throw new BadRequestException(`El usuario con id '${id}' no existe`);
+        }
+        if (user.isActive === 0) {
+            throw new BadRequestException(`El usuario con id '${id}' esta inactivo`);
+        }
+    }
+
     async getUserByCedula(cedula: string) {
         const user = await this.db
             .selectFrom('usuarios')
