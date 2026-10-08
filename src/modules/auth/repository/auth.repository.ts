@@ -3,6 +3,7 @@ import { RegisterUserDto } from "../dto/register.dto";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { LoginUserDto } from "../dto/login.dto";
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
 import { JwtService } from "@nestjs/jwt";
 import { JwtPayload } from "src/strategy/jwt.stategy";
 import { ConfigService } from "@nestjs/config";
@@ -13,6 +14,10 @@ import { RenovarPasswordDto } from "../dto/renovar-password.dto";
 export class AuthRepository {
     private readonly SALT_ROUNDS = 10;
     private static readonly VIGENCIA_POR_DEFECTO_DIAS = 90;
+    private static readonly LARGO_PASSWORD_TEMPORAL = 10;
+    private static readonly MAYUSCULAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    private static readonly NUMEROS = '23456789';
+    private static readonly ALFABETO = `${AuthRepository.MAYUSCULAS}abcdefghijkmnpqrstuvwxyz${AuthRepository.NUMEROS}`;
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
@@ -170,6 +175,27 @@ export class AuthRepository {
         return Number.isInteger(valor) && valor > 0
             ? valor
             : AuthRepository.VIGENCIA_POR_DEFECTO_DIAS;
+    }
+
+    /**
+     * Contraseña temporal del reset por admin (spec 34). Sin caracteres
+     * ambiguos (0 O o 1 l I) para que se pueda dictar, y con al menos una
+     * mayuscula y un numero garantizados: se toman primero, se completa con el
+     * alfabeto entero y se mezclan las posiciones con Fisher-Yates.
+     */
+    private generarPasswordTemporal(): string {
+        const caracteres = [
+            AuthRepository.MAYUSCULAS[randomInt(AuthRepository.MAYUSCULAS.length)],
+            AuthRepository.NUMEROS[randomInt(AuthRepository.NUMEROS.length)],
+        ];
+        while (caracteres.length < AuthRepository.LARGO_PASSWORD_TEMPORAL) {
+            caracteres.push(AuthRepository.ALFABETO[randomInt(AuthRepository.ALFABETO.length)]);
+        }
+        for (let i = caracteres.length - 1; i > 0; i--) {
+            const j = randomInt(i + 1);
+            [caracteres[i], caracteres[j]] = [caracteres[j], caracteres[i]];
+        }
+        return caracteres.join('');
     }
 
 }
