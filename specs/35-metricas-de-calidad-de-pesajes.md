@@ -235,33 +235,33 @@ La base se arma una sola vez en un helper privado del repositorio, que aplica el
 
 ## Acceptance criteria
 
-- [ ] El route log muestra exactamente una ruta más que antes de este spec: `GET /metricas/calidad`.
-- [ ] Sin header `Authorization`, responde 401.
-- [ ] Con el token de un `OPERADOR` sin ninguna fila en `cliente_operador`, responde 200 con las métricas de todos los clientes.
-- [ ] Sin params, `metricas.periodo.hasta` es la `CURDATE()` de MySQL y `metricas.periodo.desde` es 29 días antes.
-- [ ] Con `?desde=2026-09-01&hasta=2026-09-30`, `periodo` devuelve exactamente esas dos fechas.
-- [ ] Con solo `?hasta=2026-09-30`, `periodo.desde` es `2026-09-01`.
-- [ ] Un pesaje creado a las 23:59:59 del día `hasta` cuenta en el período.
-- [ ] `resumen.total_pesajes` coincide con un `SELECT COUNT(*)` a mano de pesajes `isActive = 1` con `lote_id` no nulo en el rango.
-- [ ] `resumen.anulados` coincide con el mismo conteo con `isActive = 0`.
-- [ ] Los pesajes de un lote rechazado y los de un cliente rechazado cuentan en el resumen y aparecen en `por_cliente`.
-- [ ] Un pesaje con `lote_id NULL` no cuenta en ningún indicador.
-- [ ] `porcentaje_fuera_de_rango` es igual a `fuera_de_rango / total_pesajes × 100` redondeado a 2 decimales.
-- [ ] `desviacion_promedio_pct` es positiva en un lote cuyos pesajes están todos por encima de `peso_ideal`, y negativa en uno con todos por debajo.
-- [ ] Un período sin pesajes responde 200 con `total_pesajes: 0`, todos los porcentajes y desviaciones en `null`, `por_cliente: []` y `por_estado_calidad` con todas las filas del catálogo en `total: 0`.
-- [ ] `por_estado_calidad` trae una fila por cada fila de `estados_calidad`, ordenadas por id.
-- [ ] La suma de `total_pesajes` de `por_cliente` es igual a `resumen.total_pesajes`, y la suma de `anulados` es igual a `resumen.anulados`.
-- [ ] `por_cliente` está ordenado por `total_pesajes` DESC.
-- [ ] `?cliente_id=X` deja `por_cliente` con un solo elemento, el de `X`, y el resumen coincide con ese elemento.
-- [ ] `?usuario_id=Y` solo cuenta pesajes con `pesajes.usuario_id = Y`.
-- [ ] `?cliente_id=999999` (inexistente) responde 200 con todo en cero.
-- [ ] `?cliente_id=abc`, `?cliente_id=0`, `?cliente_id=-1`, `?usuario_id=abc`, `?desde=2026-02-30`, `?desde=` y `?hasta=hoy` responden 400.
-- [ ] `?desde=2026-10-01&hasta=2026-09-01` responde 400 `La fecha desde no puede ser posterior a la fecha hasta`.
-- [ ] `?producto_id=3` y `?foo=bar` responden 200, ignorados.
-- [ ] La respuesta tiene la forma `{ ok, msg, metricas: { periodo, filtros, resumen, por_estado_calidad, por_cliente } }`.
-- [ ] Ningún campo de la respuesta es un string numérico: todos los conteos y porcentajes son `number` o `null`.
-- [ ] `/docs` muestra el endpoint bajo el tag `metricas` con su descripción, el candado de bearer y los cuatro query params.
-- [ ] No se aplicó DDL y no se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
+- [X] El route log muestra exactamente una ruta más que antes de este spec: `GET /metricas/calidad`.
+- [X] Sin header `Authorization`, responde 401.
+- [X] Con el token de un `OPERADOR` sin ninguna fila en `cliente_operador`, responde 200 con las métricas de todos los clientes.
+- [X] Sin params, `metricas.periodo.hasta` es la `CURDATE()` de MySQL y `metricas.periodo.desde` es 29 días antes.
+- [X] Con `?desde=2026-09-01&hasta=2026-09-30`, `periodo` devuelve exactamente esas dos fechas.
+- [X] Con solo `?hasta=2026-09-30`, `periodo.desde` es `2026-09-01`.
+- [X] Un pesaje creado a las 23:59:59 del día `hasta` cuenta en el período.
+- [X] `resumen.total_pesajes` coincide con un `SELECT COUNT(*)` a mano de pesajes `isActive = 1` con `lote_id` no nulo en el rango.
+- [X] `resumen.anulados` coincide con el mismo conteo con `isActive = 0`.
+- [X] Los pesajes de un lote rechazado y los de un cliente rechazado cuentan en el resumen y aparecen en `por_cliente`.
+- [X] Un pesaje con `lote_id NULL` no cuenta en ningún indicador.
+- [X] `porcentaje_fuera_de_rango` es igual a `fuera_de_rango / total_pesajes × 100` redondeado a 2 decimales.
+- [X] `desviacion_promedio_pct` es positiva en un lote cuyos pesajes están todos por encima de `peso_ideal`, y negativa en uno con todos por debajo.
+- [X] Un período sin pesajes responde 200 con `total_pesajes: 0`, todos los porcentajes y desviaciones en `null`, `por_cliente: []` y `por_estado_calidad` con todas las filas del catálogo en `total: 0`.
+- [X] `por_estado_calidad` trae una fila por cada fila de `estados_calidad`, ordenadas por id.
+- [X] La suma de `total_pesajes` de `por_cliente` es igual a `resumen.total_pesajes`, y la suma de `anulados` es igual a `resumen.anulados`.
+- [X] `por_cliente` está ordenado por `total_pesajes` DESC.
+- [X] `?cliente_id=X` deja `por_cliente` con un solo elemento, el de `X`, y el resumen coincide con ese elemento.
+- [X] `?usuario_id=Y` solo cuenta pesajes con `pesajes.usuario_id = Y`.
+- [X] `?cliente_id=999999` (inexistente) responde 200 con todo en cero.
+- [X] `?cliente_id=abc`, `?cliente_id=0`, `?cliente_id=-1`, `?usuario_id=abc`, `?desde=2026-02-30`, `?desde=` y `?hasta=hoy` responden 400.
+- [X] `?desde=2026-10-01&hasta=2026-09-01` responde 400 `La fecha desde no puede ser posterior a la fecha hasta`.
+- [X] `?producto_id=3` y `?foo=bar` responden 200, ignorados.
+- [X] La respuesta tiene la forma `{ ok, msg, metricas: { periodo, filtros, resumen, por_estado_calidad, por_cliente } }`.
+- [X] Ningún campo de la respuesta es un string numérico: todos los conteos y porcentajes son `number` o `null`.
+- [X] `/docs` muestra el endpoint bajo el tag `metricas` con su descripción, el candado de bearer y los cuatro query params.
+- [X] No se aplicó DDL y no se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
 
 ---
 
