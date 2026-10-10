@@ -18,6 +18,7 @@ export class AuthRepository {
     private static readonly MAYUSCULAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
     private static readonly NUMEROS = '23456789';
     private static readonly ALFABETO = `${AuthRepository.MAYUSCULAS}abcdefghijkmnpqrstuvwxyz${AuthRepository.NUMEROS}`;
+    private static readonly INTENTOS_PIN = 20;
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
