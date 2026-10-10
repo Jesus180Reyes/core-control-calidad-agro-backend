@@ -290,6 +290,7 @@ export class PesajesRepository {
             tara,
             dispositivo_identificador,
             secuencia_dispositivo,
+            autorizacion_token,
         } = data;
 
         return await this.db.transaction().execute(async (trx) => {
@@ -307,6 +308,13 @@ export class PesajesRepository {
                 trx,
             );
 
+            // Spec 38: el token es opcional y el backend no bloquea. Solo se
+            // consume sobre el maximo; con cualquier otro peso se ignora.
+            const autorizacion =
+                autorizacion_token && peso_neto > Number(lote.peso_maximo)
+                    ? await this.validateAutorizacionDisponible(autorizacion_token, trx)
+                    : null;
+
             const result = await trx
                 .insertInto('pesajes')
                 .values({
@@ -319,10 +327,23 @@ export class PesajesRepository {
                     dispositivo_identificador,
                     secuencia_dispositivo,
                     fuera_de_rango,
+                    aprobado_con_excepcion_por: autorizacion?.supervisor_id ?? null,
                 })
                 .executeTakeFirstOrThrow(
                     () => new BadRequestException('Error al guardar el pesaje'),
                 );
+
+            if (autorizacion) {
+                await trx
+                    .updateTable('autorizaciones_pin')
+                    .set({
+                        usada_por: userId,
+                        usada_en: sql`NOW()`,
+                        pesaje_id: Number(result.insertId),
+                    })
+                    .where('id', '=', autorizacion.id)
+                    .executeTakeFirstOrThrow();
+            }
 
             return {
                 id: Number(result.insertId),
@@ -476,6 +497,27 @@ export class PesajesRepository {
 
             return true;
         });
+    }
+
+    /**
+     * `FOR UPDATE` bloquea la fila hasta el fin de la transaccion: dos pesajes
+     * simultaneos con el mismo token no pueden consumirlo los dos.
+     */
+    private async validateAutorizacionDisponible(token: string, db: Kysely<Database>) {
+        const autorizacion = await db
+            .selectFrom('autorizaciones_pin')
+            .select(['id', 'supervisor_id', 'usada_en'])
+            .where('token', '=', token)
+            .forUpdate()
+            .executeTakeFirst();
+
+        if (!autorizacion) {
+            throw new BadRequestException('La autorizacion no existe');
+        }
+        if (autorizacion.usada_en !== null) {
+            throw new BadRequestException('La autorizacion ya fue utilizada');
+        }
+        return autorizacion;
     }
 
     private async validateLote(loteId: number, db: Kysely<Database>) {

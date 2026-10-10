@@ -7,6 +7,7 @@ const createPesajeSchema = z.object({
     tara: z.number({ error: 'La tara debe ser un numero' }).nonnegative('La tara no puede ser negativa').default(0),
     dispositivo_identificador: z.string().optional(),
     secuencia_dispositivo: z.number({ error: 'La secuencia del dispositivo debe ser un numero' }).int().positive('La secuencia del dispositivo debe ser mayor a 0').optional(),
+    autorizacion_token: z.string().uuid('La autorizacion no es valida').optional(),
 });
 
 export class CreatePesajeDto extends createZodDto(createPesajeSchema) { }

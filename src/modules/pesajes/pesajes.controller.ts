@@ -96,6 +96,13 @@ export class PesajesController {
             'Exige que el lote este abierto, de modo que un lote aprobado, rechazado o finalizado ya ' +
             'no admite pesajes. Valida el vinculo cliente_operador, resolviendo el cliente desde el ' +
             'lote: responde 403 si el usuario no esta vinculado. ' +
+            'Acepta un autorizacion_token OPCIONAL, el que devuelve POST /pesajes/validar-pin. ' +
+            'El backend NO bloquea: un pesaje sobre el peso maximo sin token se guarda igual, sin ' +
+            'supervisor registrado; el bloqueo por PIN vive en el front. Si el peso neto supera el ' +
+            'maximo y llega el token, el pesaje registra al supervisor que lo aprobo con excepcion ' +
+            'y el token se consume; 400 si el token no existe o ya fue utilizado, y entonces no se ' +
+            'guarda nada. Con un peso que no supera el maximo el token se ignora y no se consume. ' +
+            'El estado de calidad sigue siendo MAXIMO en ambos casos. ' +
             'Devuelve solo el id, el peso neto y el indicador de fuera de rango.',
     })
     async create(@Body() dto: CreatePesajeDto, @Req() req: Request) {
