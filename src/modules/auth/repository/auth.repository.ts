@@ -117,7 +117,7 @@ export class AuthRepository {
 
     async resetearPassword(id: number, userId: number) {
         return await this.db.transaction().execute(async (trx) => {
-            await this.validateCallerEsAdmin(userId, trx);
+            await this.validateCallerEsAdmin(userId, 'No tiene permisos para restablecer contraseñas', trx);
             this.validateNoEsMismoUsuario(id, userId);
             await this.validateUsuarioActivo(id, trx);
 
@@ -158,7 +158,7 @@ export class AuthRepository {
         }
     }
 
-    private async validateCallerEsAdmin(userId: number, db: Kysely<Database>) {
+    private async validateCallerEsAdmin(userId: number, mensaje: string, db: Kysely<Database>) {
         const caller = await db
             .selectFrom('usuarios')
             .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
@@ -167,7 +167,7 @@ export class AuthRepository {
             .executeTakeFirst();
 
         if (!caller || caller.rol !== 'ADMIN') {
-            throw new ForbiddenException('No tiene permisos para restablecer contraseñas');
+            throw new ForbiddenException(mensaje);
         }
     }
 
