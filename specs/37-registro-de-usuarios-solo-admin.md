@@ -173,26 +173,26 @@ validateCallerEsAdmin(userId: number, mensaje: string, db: Kysely<Database>)
 
 ## Acceptance criteria
 
-- [ ] El route log muestra las mismas 40 rutas que antes de este spec.
-- [ ] Sin header `Authorization`, `POST /auth/register` responde 401.
-- [ ] Con el token de un `OPERADOR`, responde 403 `No tiene permisos para registrar usuarios` y no inserta ninguna fila.
-- [ ] Con el token de un `OPERADOR` y un `rol` inexistente, responde 403, no 400.
-- [ ] Con el token de un `ADMIN` y un body válido, responde 201 `{ ok: true, msg: 'Usuario registrado correctamente', user, password_temporal }`, y `user` es el id de la fila insertada.
-- [ ] `password_temporal` tiene exactamente 10 caracteres, al menos una mayúscula y al menos un número, y no contiene ninguno de `0 O o 1 l I`.
-- [ ] La fila insertada tiene `created_by` igual al `userId` del admin, `password_vence_en` igual a la hora de MySQL del registro y `password_actualizada_en` en `NULL`.
-- [ ] El login con la temporal responde 403 con `passwordVencida: true`.
-- [ ] `POST /auth/renovar-password` con la temporal como `password_actual` responde 200, y el login posterior con la contraseña nueva responde 200.
-- [ ] Un body que incluye `password` responde 201, y la contraseña guardada es la temporal, no la enviada: el login con la enviada responde 401.
-- [ ] Un admin puede crear un usuario con `rol` = id de `ADMIN`.
-- [ ] Un `rol` que no existe en `roles` responde 400 `El rol con id 'X' no existe`, no 500, y no agrega ninguna fila a `log_errores`.
-- [ ] Una `cedula` ya registrada responde 409 con el mismo mensaje de antes de este spec.
-- [ ] Un `username` ya registrado responde 400 `El nombre de usuario 'X' ya esta en uso`, aunque difiera solo en mayúsculas y minúsculas.
-- [ ] Un `username` de 21 caracteres responde 400 desde Zod, no 500.
-- [ ] Ningún error inserta una fila en `usuarios`.
-- [ ] `PATCH /auth/usuarios/:id/reset-password` con un token de `OPERADOR` sigue respondiendo 403 `No tiene permisos para restablecer contraseñas`.
-- [ ] La temporal en texto plano no se guarda en ninguna columna ni se escribe en ningún log del backend.
-- [ ] `/docs` muestra `POST /auth/register` sin `password` en el schema del body y con la descripción nueva.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
+- [X] El route log muestra las mismas 40 rutas que antes de este spec.
+- [X] Sin header `Authorization`, `POST /auth/register` responde 401.
+- [X] Con el token de un `OPERADOR`, responde 403 `No tiene permisos para registrar usuarios` y no inserta ninguna fila.
+- [X] Con el token de un `OPERADOR` y un `rol` inexistente, responde 403, no 400.
+- [X] Con el token de un `ADMIN` y un body válido, responde 201 `{ ok: true, msg: 'Usuario registrado correctamente', user, password_temporal }`, y `user` es el id de la fila insertada.
+- [X] `password_temporal` tiene exactamente 10 caracteres, al menos una mayúscula y al menos un número, y no contiene ninguno de `0 O o 1 l I`.
+- [X] La fila insertada tiene `created_by` igual al `userId` del admin, `password_vence_en` igual a la hora de MySQL del registro y `password_actualizada_en` en `NULL`.
+- [X] El login con la temporal responde 403 con `passwordVencida: true`.
+- [X] `POST /auth/renovar-password` con la temporal como `password_actual` responde 200, y el login posterior con la contraseña nueva responde 200.
+- [X] Un body que incluye `password` responde 201, y la contraseña guardada es la temporal, no la enviada: el login con la enviada responde 401.
+- [X] Un admin puede crear un usuario con `rol` = id de `ADMIN`.
+- [X] Un `rol` que no existe en `roles` responde 400 `El rol con id 'X' no existe`, no 500, y no agrega ninguna fila a `log_errores`.
+- [X] Una `cedula` ya registrada responde 409 con el mismo mensaje de antes de este spec.
+- [X] Un `username` ya registrado responde 400 `El nombre de usuario 'X' ya esta en uso`, aunque difiera solo en mayúsculas y minúsculas.
+- [X] Un `username` de 21 caracteres responde 400 desde Zod, no 500.
+- [X] Ningún error inserta una fila en `usuarios`.
+- [X] `PATCH /auth/usuarios/:id/reset-password` con un token de `OPERADOR` sigue respondiendo 403 `No tiene permisos para restablecer contraseñas`.
+- [X] La temporal en texto plano no se guarda en ninguna columna ni se escribe en ningún log del backend.
+- [X] `/docs` muestra `POST /auth/register` sin `password` en el schema del body y con la descripción nueva.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
 
 ---
 
