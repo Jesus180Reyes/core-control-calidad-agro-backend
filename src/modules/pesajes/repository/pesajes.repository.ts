@@ -6,8 +6,10 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
+import { randomUUID } from 'crypto';
 import { Database } from 'src/database/types/types';
 import { CreatePesajeDto } from '../dto/create-pesaje.dto';
+import { ValidarPinDto } from '../dto/validar-pin.dto';
 import { RechazarPesajeDto } from '../dto/rechazar-pesaje.dto';
 import { FiltrosPesajesLoteDto } from '../dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from '../dto/filtros-historial.dto';
@@ -326,6 +328,56 @@ export class PesajesRepository {
                 id: Number(result.insertId),
                 peso_neto,
                 fuera_de_rango,
+            };
+        });
+    }
+
+    /**
+     * Spec 38. El PIN identifica al supervisor. PIN inexistente, supervisor
+     * inactivo o usuario que ya no tiene el rol dan el mismo 400 (no 401, que
+     * el front leeria como sesion vencida). La autorizacion que se crea no
+     * vence ni esta atada al operador, al lote ni al peso: sirve una vez.
+     */
+    async validarPin(data: ValidarPinDto, userId: number) {
+        const { pin } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            const supervisor = await trx
+                .selectFrom('pines_supervisor')
+                .innerJoin('usuarios', 'usuarios.id', 'pines_supervisor.usuario_id')
+                .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+                .select([
+                    'pines_supervisor.usuario_id',
+                    'usuarios.complete_name',
+                ])
+                .where('pines_supervisor.pin', '=', pin)
+                .where('roles.nombre', '=', 'SUPERVISOR')
+                .where((eb) =>
+                    eb.or([
+                        eb('usuarios.isActive', 'is', null),
+                        eb('usuarios.isActive', '<>', 0),
+                    ]),
+                )
+                .executeTakeFirst();
+
+            if (!supervisor) {
+                throw new BadRequestException('PIN incorrecto');
+            }
+
+            const token = randomUUID();
+
+            await trx
+                .insertInto('autorizaciones_pin')
+                .values({
+                    token,
+                    supervisor_id: supervisor.usuario_id,
+                    solicitado_por: userId,
+                })
+                .executeTakeFirstOrThrow();
+
+            return {
+                token,
+                supervisor: supervisor.complete_name,
             };
         });
     }

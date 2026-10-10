@@ -17,6 +17,7 @@ import { CreatePesajeDto } from './dto/create-pesaje.dto';
 import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
 import { FiltrosPesajesLoteDto } from './dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from './dto/filtros-historial.dto';
+import { ValidarPinDto } from './dto/validar-pin.dto';
 
 @ApiTags('pesajes')
 @ApiBearerAuth()
@@ -104,6 +105,32 @@ export class PesajesController {
             ok: !!pesaje,
             msg: 'Pesaje guardado correctamente',
             pesaje,
+        };
+    }
+
+    @Post('validar-pin')
+    @HttpCode(200)
+    @ApiOperation({
+        summary: 'Validar el PIN de un supervisor',
+        description:
+            'Primer paso de la autorizacion de un pesaje sobre el peso maximo. Cualquier usuario ' +
+            'autenticado manda un PIN de 4 digitos; el PIN identifica al supervisor, no hay ' +
+            'selector de nombre. Si corresponde a un usuario activo con rol SUPERVISOR, devuelve ' +
+            'una autorizacion con un token de un solo uso y el nombre del supervisor, para que el ' +
+            'front lo muestre. El token se manda despues en autorizacion_token de POST /pesajes. ' +
+            'La autorizacion no vence y no esta atada al operador, al lote ni al peso. ' +
+            'Responde 400 "PIN incorrecto" con el mismo mensaje si el PIN no existe, el supervisor ' +
+            'esta inactivo o ya no tiene el rol; es 400 y no 401 para que el front no cierre la ' +
+            'sesion. No hay limite de intentos. ' +
+            'NO valida el vinculo cliente_operador.',
+    })
+    async validarPin(@Body() dto: ValidarPinDto, @Req() req: Request) {
+        const { userId } = req.user as { userId: number };
+        const autorizacion = await this.pesajesService.validarPin(dto, userId);
+        return {
+            ok: true,
+            msg: 'PIN valido',
+            autorizacion,
         };
     }
 
