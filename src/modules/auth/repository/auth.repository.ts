@@ -64,31 +64,37 @@ export class AuthRepository {
         };
     }
     async registerUser(data: RegisterUserDto, createdBy: number) {
+        const { complete_name, rol, username, cedula } = data;
 
-        const { complete_name, password, rol, username, cedula } = data;
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateCallerEsAdmin(createdBy, 'No tiene permisos para registrar usuarios', trx);
+            await this.validateRolExiste(rol, trx);
 
-        const user = await this.getUserByCedula(cedula);
-        const hashedPassword = await bcrypt.hash(password, this.SALT_ROUNDS);
+            const user = await this.getUserByCedula(cedula, trx);
+            if (user) {
+                throw new ConflictException(`El usuario con '${cedula}' ya existe registrado`);
+            }
 
-        if (user) {
-            throw new ConflictException(`El usuario con '${cedula}' ya existe registrado`);
-        }
+            await this.validateUsernameDisponible(username, trx);
 
-        const result = await this.db
-            .insertInto('usuarios')
-            .values({
-                username,
-                complete_name,
-                rol_id: rol,
-                password: hashedPassword,
-                password_vence_en: sql`NOW()`,
-                created_by: createdBy,
-                cedula,
-            })
-            .executeTakeFirstOrThrow();
+            const passwordTemporal = this.generarPasswordTemporal();
+            const hashedPassword = await bcrypt.hash(passwordTemporal, this.SALT_ROUNDS);
 
-        return Number(result.insertId);
+            const result = await trx
+                .insertInto('usuarios')
+                .values({
+                    username,
+                    complete_name,
+                    rol_id: rol,
+                    password: hashedPassword,
+                    password_vence_en: sql`NOW()`,
+                    created_by: createdBy,
+                    cedula,
+                })
+                .executeTakeFirstOrThrow();
 
+            return { id: Number(result.insertId), passwordTemporal };
+        });
     }
 
     async renovarPassword(data: RenovarPasswordDto) {
@@ -220,8 +226,8 @@ export class AuthRepository {
         }
     }
 
-    async getUserByCedula(cedula: string) {
-        const user = await this.db
+    async getUserByCedula(cedula: string, db: Kysely<Database> = this.db) {
+        const user = await db
             .selectFrom('usuarios')
             .selectAll()
             .where('cedula', '=', cedula)
