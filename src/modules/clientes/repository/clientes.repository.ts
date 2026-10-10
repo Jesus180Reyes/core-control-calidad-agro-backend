@@ -224,13 +224,16 @@ export class ClientesRepository {
     private async validateRtnDisponible(rtn: string, db: Kysely<Database>) {
         const existente = await db
             .selectFrom('clientes')
-            .select('id')
+            .select(['id', 'isActive'])
             .where('rtn', '=', rtn)
-            .where('isActive', '=', 1)
             .executeTakeFirst();
 
         if (existente) {
-            throw new BadRequestException(`El RTN '${rtn}' ya esta registrado`);
+            throw new BadRequestException(
+                existente.isActive === 0
+                    ? `El RTN '${rtn}' pertenece a un cliente rechazado`
+                    : `El RTN '${rtn}' ya esta registrado`,
+            );
         }
     }
 
@@ -240,14 +243,16 @@ export class ClientesRepository {
     ) {
         const existente = await db
             .selectFrom('clientes')
-            .select('id')
+            .select(['id', 'isActive'])
             .where('codigo_exportacion', '=', codigoExportacion)
-            .where('isActive', '=', 1)
             .executeTakeFirst();
 
+        // Sin filtro de isActive: MySQL tiene UNIQUE (codigo_exportacion).
         if (existente) {
             throw new BadRequestException(
-                `El codigo de exportacion '${codigoExportacion}' ya esta registrado`,
+                existente.isActive === 0
+                    ? `El codigo de exportacion '${codigoExportacion}' pertenece a un cliente rechazado`
+                    : `El codigo de exportacion '${codigoExportacion}' ya esta registrado`,
             );
         }
     }

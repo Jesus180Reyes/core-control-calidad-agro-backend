@@ -98,7 +98,7 @@ Los dos órdenes son **distintos entre sí** hoy —`nombre` ASC contra `created
 
 ### El duplicado de RTN que SPEC 11 dejó posible
 
-`CLAUDE.md` lo advierte: como los validadores de unicidad filtran `isActive = 1`, rechazar un cliente **libera** su `rtn` y su `codigo_exportacion`, y la tabla puede acabar con dos filas compartiendo un RTN — una activa y una rechazada. La consecuencia para este spec es tranquila: `?rtn=X` filtra además por `isActive = 1`, así que **devuelve como mucho la fila activa**, nunca la rechazada. El duplicado no se ve.
+`CLAUDE.md` lo advierte: como los validadores de unicidad filtran `isActive = 1`, rechazar un cliente **libera** su `rtn` y su `codigo_exportacion`, y la tabla puede acabar con dos filas compartiendo un RTN — una activa y una rechazada. La consecuencia para este spec es tranquila: `?rtn=X` filtra además por `isActive = 1`, así que **devuelve como mucho la fila activa**, nunca la rechazada. El duplicado no se ve. *(Corrección del 2026-10-08: el duplicado no puede existir. MySQL tiene `UNIQUE` sobre `rtn` y `codigo_exportacion`, y los validadores ya no filtran `isActive`; ver la enmienda del SPEC 11.)*
 
 ### Peticiones y respuestas
 

@@ -12,6 +12,7 @@ import { CatalogosModule } from './modules/catalogos/catalogos.module';
 import { DocumentosFiscalesModule } from './modules/documentos-fiscales/documentos-fiscales.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PlantasModule } from './modules/plantas/plantas.module';
+import { MetricasModule } from './modules/metricas/metricas.module';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -32,6 +33,7 @@ import { JwtModule } from '@nestjs/jwt';
     DocumentosFiscalesModule,
     ChatModule,
     PlantasModule,
+    MetricasModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       global: true,

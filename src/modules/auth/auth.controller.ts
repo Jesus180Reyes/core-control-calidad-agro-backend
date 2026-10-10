@@ -1,5 +1,5 @@
-import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, HttpCode, Param, ParseIntPipe, Patch, Post, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register.dto';
@@ -7,8 +7,6 @@ import { LoginUserDto } from './dto/login.dto';
 import { RenovarPasswordDto } from './dto/renovar-password.dto';
 import { Public } from 'src/decorators/public.decorator';
 
-// Sin @ApiBearerAuth a nivel de clase: login es @Public(). register si exige token
-// y lo declara por metodo.
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -81,6 +79,32 @@ export class AuthController {
     return {
       ok: true,
       msg: 'Contraseña actualizada correctamente',
+    };
+  }
+
+  @Patch('usuarios/:id/reset-password')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Id del usuario cuya contraseña se restablece', example: 1 })
+  @ApiOperation({
+    summary: 'Restablecer la contraseña de un usuario',
+    description:
+      'Exige rol ADMIN, leido de la base en cada request: es el unico endpoint del proyecto que discrimina por rol. ' +
+      'Cualquier otro rol, o un token cuyo usuario ya no existe, responde 403. ' +
+      'Genera una contraseña temporal de 10 caracteres y la devuelve en password_temporal una sola vez; no se guarda en texto plano. ' +
+      'La temporal nace vencida: el login con ella responde 403 con passwordVencida: true, ' +
+      'y el usuario debe renovarla con POST /auth/renovar-password. ' +
+      'No acepta body. Un admin puede resetear a otro admin pero no a si mismo (400). ' +
+      '400 si el usuario no existe o esta inactivo. ' +
+      'No revoca los tokens vigentes del usuario reseteado.',
+  })
+  async resetearPassword(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const { userId } = req.user as { userId: number };
+    const passwordTemporal = await this.authService.resetearPassword(id, userId);
+    return {
+      ok: true,
+      msg: 'Contraseña restablecida correctamente',
+      password_temporal: passwordTemporal,
     };
   }
 }

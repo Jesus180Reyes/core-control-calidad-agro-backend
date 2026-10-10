@@ -1,9 +1,21 @@
 # SPEC 11 — Rechazo de clientes
 
-> **Status:** Implemented
+> **Status:** Implemented (con la enmienda del 2026-10-08, ver abajo)
 > **Depends on:** SPEC 01, SPEC 08, SPEC 10
 > **Date:** 2026-09-01
 > **Objective:** Agregar `PATCH /clientes/:id/rechazar`, que da de baja lógica a un cliente poniendo `isActive = 0` y guardando el motivo, el usuario y la fecha del rechazo en tres columnas nuevas de `clientes`.
+
+---
+
+## Enmienda del 2026-10-08 — el rechazo **no** libera el RTN ni el código de exportación
+
+La cuarta decisión de abajo nunca se cumplió contra esta base. La tabla `clientes` tiene `UNIQUE KEY rtn (rtn)` y `UNIQUE KEY codigo_exportacion (codigo_exportacion)` reales en MySQL (verificado con `SHOW CREATE TABLE`), y ningún spec registra quién los agregó ni cuándo. El "no hay constraint de MySQL" de Risks era falso.
+
+El síntoma: como `validateRtnDisponible` y `validateCodigoExportacionDisponible` filtraban `isActive = 1`, el RTN de un cliente rechazado pasaba la validación y el `INSERT` moría en MySQL con `Duplicate entry '...' for key 'clientes.rtn'`, en vez de un 400 legible. Se reprodujo con el RTN `06012001033153`, que pertenece al cliente 1, rechazado.
+
+La corrección deja ganar a la base: los dos validadores **ya no filtran `isActive`**. Si el valor lo tiene un cliente activo, responden 400 `ya esta registrado`. Si lo tiene un cliente rechazado, responden 400 con un mensaje propio, `pertenece a un cliente rechazado`. En consecuencia, **rechazar un cliente no libera su RTN ni su código de exportación**, y la tabla no puede tener dos filas con el mismo RTN. Las frases marcadas *(enmienda)* más abajo se conservan como registro de lo que se decidió en su momento.
+
+Quitar los dos `UNIQUE` para cumplir la decisión original se descartó: dejaría la unicidad de un dato fiscal en manos de una validación en código con ventana de carrera.
 
 ---
 
@@ -19,7 +31,7 @@ Hay que ser explícito con cuatro cosas.
 
 **La tercera: no hay cascada.** Los lotes abiertos del cliente rechazado siguen abiertos, sus pesajes siguen ahí y sus filas de `cliente_operador` quedan intactas. Eso deja dos incoherencias reales, no teóricas: `GET /lotes/cliente/:clienteId` no valida `clientes.isActive`, así que sigue devolviendo los lotes de un cliente rechazado; y `POST /pesajes` valida el lote y el vínculo pero tampoco el cliente, así que se pueden seguir guardando pesajes contra esos lotes. Están en Risks y no se mitigan en este spec.
 
-**La cuarta: el rechazo libera el RTN y el código de exportación.** `validateRtnDisponible` y `validateCodigoExportacionDisponible` filtran `isActive = 1` desde el commit `c60e9dc`, así que después de rechazar un cliente se puede registrar otro con el mismo RTN. Es el comportamiento existente y este spec **no** lo cambia.
+**La cuarta: el rechazo libera el RTN y el código de exportación.** `validateRtnDisponible` y `validateCodigoExportacionDisponible` filtran `isActive = 1` desde el commit `c60e9dc`, así que después de rechazar un cliente se puede registrar otro con el mismo RTN. Es el comportamiento existente y este spec **no** lo cambia. *(Enmienda: falso. Los `UNIQUE` de MySQL lo impiden; desde el 2026-10-08 los validadores no filtran `isActive` y el RTN de un cliente rechazado responde 400.)*
 
 ---
 
@@ -43,7 +55,7 @@ Hay que ser explícito con cuatro cosas.
 **Out of scope (for future specs):**
 
 - Cualquier flujo de aprobación de clientes: no se agrega `clientes.estado` ni los valores `pendiente` / `aprobado` / `rechazado`.
-- Cambios a `POST /clientes`, que sigue creando clientes activos y sigue liberando el RTN de un cliente rechazado.
+- Cambios a `POST /clientes`, que sigue creando clientes activos y sigue liberando el RTN de un cliente rechazado. *(Enmienda: la enmienda del 2026-10-08 sí cambió `POST /clientes`, que ya no acepta el RTN ni el código de exportación de un cliente rechazado.)*
 - Deshacer un rechazo. No hay endpoint de reactivación y no lo habrá en este spec.
 - Rechazar en lote (varios `cliente_id` en una sola llamada).
 - Cascada sobre `lotes`: no se cierran, no se desactivan, no se tocan.
@@ -197,7 +209,7 @@ Las tres últimas filas son las incoherencias asumidas por este spec y están en
 10. Verificación manual del efecto en `lotes`: intentar `POST /lotes` con el `cliente_id` rechazado y confirmar 400 con `El cliente 'X' no esta activo`.
 11. Verificación manual de los errores: rechazar el mismo cliente otra vez y confirmar 400 sin que el `motivo_rechazo` ni el `rechazado_en` originales cambien; rechazar un `id` inexistente y confirmar 400; mandar un `motivo` de tres caracteres y confirmar el error de Zod; llamar a `PATCH /clientes/abc/rechazar` y confirmar 400; llamar sin header `Authorization` y confirmar 401.
 12. Verificación manual de la ausencia de control de acceso: login con un `Operador` **no** vinculado al cliente y confirmar que lo rechaza igual, con **200 y no 403**. Es el resultado esperado de este spec y el criterio que documenta que el vínculo no se valida.
-13. Actualizar `CLAUDE.md`: agregar `PATCH /clientes/:id/rechazar` a la fila `clientes` de la tabla de endpoints; corregir la frase que afirma que `PATCH /pesajes/:id/rechazar` es el único `PATCH`, el único `UPDATE` y el único `:id` del proyecto; agregar este endpoint a la lista de rutas que se saltan `validateVinculoOperador`, que pasa de cuatro a cinco; anotar las tres columnas nuevas de `clientes` y su FK; anotar que el rechazo libera el RTN y el `codigo_exportacion`; y anotar que `GET /lotes/cliente/:clienteId` y `POST /pesajes` no validan `clientes.isActive`.
+13. Actualizar `CLAUDE.md`: agregar `PATCH /clientes/:id/rechazar` a la fila `clientes` de la tabla de endpoints; corregir la frase que afirma que `PATCH /pesajes/:id/rechazar` es el único `PATCH`, el único `UPDATE` y el único `:id` del proyecto; agregar este endpoint a la lista de rutas que se saltan `validateVinculoOperador`, que pasa de cuatro a cinco; anotar las tres columnas nuevas de `clientes` y su FK; anotar que el rechazo libera el RTN y el `codigo_exportacion` *(enmienda: ya no lo hace)*; y anotar que `GET /lotes/cliente/:clienteId` y `POST /pesajes` no validan `clientes.isActive`.
 
 ---
 
@@ -283,7 +295,7 @@ Las tres últimas filas son las incoherencias asumidas por este spec y están en
 - **No:** bloquear el rechazo si el cliente tiene lotes abiertos. Se descarta: hoy nada puede cerrar un lote (`lotes.cerrado_en` no lo escribe ningún endpoint), así que un cliente con un lote abierto quedaría imposible de rechazar para siempre.
 - **No:** cerrar en cascada los lotes abiertos del cliente. Se descarta: implicaría implementar el cierre de lote, que todos los specs anteriores dejaron fuera de alcance. Sería un spec de dos features.
 - **No:** borrar las filas de `cliente_operador` del cliente. Se descarta: sería el primer borrado físico del proyecto y perdería información que no se puede reconstruir.
-- **Sí:** el rechazo libera el `rtn` y el `codigo_exportacion` para que otro cliente los use. Decisión explícita del usuario, tomada después de que se le señalara el efecto. `validateRtnDisponible` y `validateCodigoExportacionDisponible` filtran `isActive = 1` desde el commit `c60e9dc`, y ese comportamiento se mantiene.
+- **Sí:** el rechazo libera el `rtn` y el `codigo_exportacion` para que otro cliente los use. Decisión explícita del usuario, tomada después de que se le señalara el efecto. `validateRtnDisponible` y `validateCodigoExportacionDisponible` filtran `isActive = 1` desde el commit `c60e9dc`, y ese comportamiento se mantiene. *(Enmienda: revertido el 2026-10-08. La decisión chocaba con los `UNIQUE` de MySQL y producía un error de SQL en vez de un 400.)*
 - **No:** quitar el filtro `isActive = 1` de esos dos validadores para que un RTN rechazado siga ocupado. Se descarta: cambiaría el contrato de `POST /clientes` dentro de este spec y revertiría una decisión reciente. Consecuencia asumida: la tabla `clientes` puede terminar con dos filas del mismo RTN, una activa y una rechazada.
 - **Sí:** el rechazo es irreversible. Decisión explícita del usuario. La fila no se borra, así que el dato se puede recuperar por SQL a mano si hace falta.
 - **No:** un endpoint de reactivación que devuelva `isActive = 1`. Se descarta: duplica el trabajo y abre la pregunta de qué pasa con el rastro del rechazo anterior. Va en su propio spec, junto con el resto de la administración de clientes.
@@ -308,7 +320,7 @@ Las tres últimas filas son las incoherencias asumidas por este spec y están en
 | `ClientesRepository` queda con dos criterios de acceso: `createCliente` no valida vínculo porque crea, y `rechazarCliente` tampoco lo valida aunque destruye. Nada en el módulo `clientes` valida `cliente_operador` en el camino de escritura. | Sin mitigar en el código. Está en Decisions con la consecuencia escrita y en la nota de `CLAUDE.md` del paso 13, donde la lista de rutas que se saltan la convención pasa de cuatro a cinco. |
 | `GET /lotes/cliente/:clienteId` **sigue devolviendo los lotes de un cliente rechazado**: no valida `clientes.isActive`. La app puede mostrar lotes de un cliente que ya no aparece en ningún listado de clientes. | Sin mitigar por decisión explícita (sin cascada). Hay un criterio de aceptación que lo verifica como comportamiento esperado. Corregirlo es un cambio a un endpoint de SPEC 02 y va en su propio spec. |
 | `POST /pesajes` **sigue aceptando pesajes** contra los lotes abiertos de un cliente rechazado: valida el lote y el vínculo, no el cliente. Se pueden seguir generando datos para un cliente dado de baja. | Sin mitigar por decisión explícita. Es la consecuencia más incómoda de no tener cascada y de que nada pueda cerrar un lote todavía. Queda anotada en `CLAUDE.md` en el paso 13. |
-| El rechazo libera el `rtn` y el `codigo_exportacion`, así que la tabla `clientes` puede terminar con dos filas del mismo RTN: una activa y una rechazada. | Asumido por decisión explícita. No hay constraint de MySQL que lo impida (la unicidad es solo de código, por decisión de SPEC 01), y ningún endpoint expone el `rtn`, así que la colisión no es visible por API. |
+| El rechazo libera el `rtn` y el `codigo_exportacion`, así que la tabla `clientes` puede terminar con dos filas del mismo RTN: una activa y una rechazada. | Asumido por decisión explícita. No hay constraint de MySQL que lo impida (la unicidad es solo de código, por decisión de SPEC 01), y ningún endpoint expone el `rtn`, así que la colisión no es visible por API. *(Enmienda: el riesgo no existe. MySQL tiene `UNIQUE` sobre `rtn` y `codigo_exportacion`, y desde el 2026-10-08 los validadores lo respetan.)* |
 | El rechazo es irreversible y no hay endpoint para deshacerlo: un rechazo por error deja al cliente inaccesible por API para siempre, y con él la creación de lotes nuevos. | Parcialmente mitigado: la fila no se borra, así que se puede reactivar por SQL a mano. El motivo obligatorio y el `rechazado_por` reducen los rechazos accidentales al obligar a escribir algo. |
 | Un cliente rechazado desaparece de los dos listados y no hay ningún endpoint que lo liste, así que la app no puede mostrar qué se dio de baja ni por qué. | Sin mitigar por decisión explícita. Las tres columnas quedan escritas en la base desde el día uno, así que cuando llegue el endpoint de lectura el dato histórico ya existe. |
 | El DDL se aplica en un ambiente y no en otro, y el `UPDATE` falla por columna inexistente. Es el riesgo heredado de no tener migraciones. | Sin mitigación automática. El paso 1 del plan verifica con `DESCRIBE clientes;` y `SHOW CREATE TABLE clientes;`. El DDL queda escrito en este spec, que es la única fuente. |

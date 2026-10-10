@@ -19,4 +19,8 @@ export class AuthService {
     async renovarPassword(data: RenovarPasswordDto) {
         return await this.authRepository.renovarPassword(data);
     }
+
+    async resetearPassword(id: number, userId: number) {
+        return await this.authRepository.resetearPassword(id, userId);
+    }
 }
