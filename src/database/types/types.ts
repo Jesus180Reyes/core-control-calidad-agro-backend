@@ -208,6 +208,18 @@ export interface ChatLogTable {
   created_at: Generated<Date | string | null>;
 }
 
+export interface LogErroresTable {
+  id: Generated<number>;
+  status: number;
+  metodo: string;
+  ruta: string;
+  mensaje: string;
+  stack: string | null;
+  usuario_id: number | null;
+  entorno: string | null;
+  created_at: Generated<Date>;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -240,5 +252,6 @@ export interface Database {
   documento_fiscal_impuesto: DocumentoFiscalImpuestoTable;
   documento_fiscal_lote: DocumentoFiscalLoteTable;
   chat_log: ChatLogTable;
+  log_errores: LogErroresTable;
   bitacora: BitacoraView;
 }
