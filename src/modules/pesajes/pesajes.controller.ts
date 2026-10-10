@@ -17,6 +17,7 @@ import { CreatePesajeDto } from './dto/create-pesaje.dto';
 import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
 import { FiltrosPesajesLoteDto } from './dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from './dto/filtros-historial.dto';
+import { ValidarPinDto } from './dto/validar-pin.dto';
 
 @ApiTags('pesajes')
 @ApiBearerAuth()
@@ -95,6 +96,13 @@ export class PesajesController {
             'Exige que el lote este abierto, de modo que un lote aprobado, rechazado o finalizado ya ' +
             'no admite pesajes. Valida el vinculo cliente_operador, resolviendo el cliente desde el ' +
             'lote: responde 403 si el usuario no esta vinculado. ' +
+            'Acepta un autorizacion_token OPCIONAL, el que devuelve POST /pesajes/validar-pin. ' +
+            'El backend NO bloquea: un pesaje sobre el peso maximo sin token se guarda igual, sin ' +
+            'supervisor registrado; el bloqueo por PIN vive en el front. Si el peso neto supera el ' +
+            'maximo y llega el token, el pesaje registra al supervisor que lo aprobo con excepcion ' +
+            'y el token se consume; 400 si el token no existe o ya fue utilizado, y entonces no se ' +
+            'guarda nada. Con un peso que no supera el maximo el token se ignora y no se consume. ' +
+            'El estado de calidad sigue siendo MAXIMO en ambos casos. ' +
             'Devuelve solo el id, el peso neto y el indicador de fuera de rango.',
     })
     async create(@Body() dto: CreatePesajeDto, @Req() req: Request) {
@@ -104,6 +112,32 @@ export class PesajesController {
             ok: !!pesaje,
             msg: 'Pesaje guardado correctamente',
             pesaje,
+        };
+    }
+
+    @Post('validar-pin')
+    @HttpCode(200)
+    @ApiOperation({
+        summary: 'Validar el PIN de un supervisor',
+        description:
+            'Primer paso de la autorizacion de un pesaje sobre el peso maximo. Cualquier usuario ' +
+            'autenticado manda un PIN de 4 digitos; el PIN identifica al supervisor, no hay ' +
+            'selector de nombre. Si corresponde a un usuario activo con rol SUPERVISOR, devuelve ' +
+            'una autorizacion con un token de un solo uso y el nombre del supervisor, para que el ' +
+            'front lo muestre. El token se manda despues en autorizacion_token de POST /pesajes. ' +
+            'La autorizacion no vence y no esta atada al operador, al lote ni al peso. ' +
+            'Responde 400 "PIN incorrecto" con el mismo mensaje si el PIN no existe, el supervisor ' +
+            'esta inactivo o ya no tiene el rol; es 400 y no 401 para que el front no cierre la ' +
+            'sesion. No hay limite de intentos. ' +
+            'NO valida el vinculo cliente_operador.',
+    })
+    async validarPin(@Body() dto: ValidarPinDto, @Req() req: Request) {
+        const { userId } = req.user as { userId: number };
+        const autorizacion = await this.pesajesService.validarPin(dto, userId);
+        return {
+            ok: true,
+            msg: 'PIN valido',
+            autorizacion,
         };
     }
 

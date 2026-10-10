@@ -18,6 +18,7 @@ export class AuthRepository {
     private static readonly MAYUSCULAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
     private static readonly NUMEROS = '23456789';
     private static readonly ALFABETO = `${AuthRepository.MAYUSCULAS}abcdefghijkmnpqrstuvwxyz${AuthRepository.NUMEROS}`;
+    private static readonly INTENTOS_PIN = 20;
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
@@ -141,6 +142,75 @@ export class AuthRepository {
 
             return passwordTemporal;
         });
+    }
+
+    async asignarPinSupervisor(id: number, userId: number) {
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateCallerEsAdmin(userId, 'No tiene permisos para asignar PINs de supervisor', trx);
+            await this.validateUsuarioActivo(id, trx);
+            await this.validateUsuarioEsSupervisor(id, trx);
+            await this.validateSinPin(id, trx);
+
+            const pin = await this.generarPinUnico(trx);
+
+            await trx
+                .insertInto('pines_supervisor')
+                .values({
+                    usuario_id: id,
+                    pin,
+                    created_by: userId,
+                })
+                .executeTakeFirstOrThrow();
+
+            return pin;
+        });
+    }
+
+    private async validateUsuarioEsSupervisor(id: number, db: Kysely<Database>) {
+        const user = await db
+            .selectFrom('usuarios')
+            .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select('roles.nombre as rol')
+            .where('usuarios.id', '=', id)
+            .executeTakeFirst();
+
+        if (!user || user.rol !== 'SUPERVISOR') {
+            throw new BadRequestException(`El usuario con id '${id}' no tiene el rol SUPERVISOR`);
+        }
+    }
+
+    private async validateSinPin(id: number, db: Kysely<Database>) {
+        const pin = await db
+            .selectFrom('pines_supervisor')
+            .select('id')
+            .where('usuario_id', '=', id)
+            .executeTakeFirst();
+
+        if (pin) {
+            throw new BadRequestException(`El usuario con id '${id}' ya tiene un PIN asignado`);
+        }
+    }
+
+    /**
+     * PIN de supervisor (spec 38): 4 digitos, en claro y unico en todo el
+     * sistema, porque el PIN es la identidad del supervisor. Se reintenta
+     * hasta 20 veces; el `UNIQUE` de `pines_supervisor.pin` es la ultima
+     * barrera ante una carrera entre este `SELECT` y el `INSERT`.
+     */
+    private async generarPinUnico(db: Kysely<Database>): Promise<string> {
+        for (let intento = 0; intento < AuthRepository.INTENTOS_PIN; intento++) {
+            const pin = String(randomInt(0, 10000)).padStart(4, '0');
+            const existente = await db
+                .selectFrom('pines_supervisor')
+                .select('id')
+                .where('pin', '=', pin)
+                .executeTakeFirst();
+
+            if (!existente) {
+                return pin;
+            }
+        }
+        throw new BadRequestException('No se pudo generar un PIN unico, intente de nuevo');
     }
 
     private async validateCredenciales(username: string, password: string, db: Kysely<Database>) {

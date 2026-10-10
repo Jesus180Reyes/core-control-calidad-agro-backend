@@ -65,6 +65,7 @@ export interface PesajesTable {
   aprobado: boolean | null;
   aprobado_por: number | null;
   aprobado_en: Date | string | null;
+  aprobado_con_excepcion_por: number | null;
 }
 export interface ProductosTable {
   id: Generated<number>;
@@ -220,6 +221,25 @@ export interface LogErroresTable {
   created_at: Generated<Date>;
 }
 
+export interface PinesSupervisorTable {
+  id: Generated<number>;
+  usuario_id: number;
+  pin: string;
+  created_by: number;
+  created_at: Generated<Date | string | null>;
+}
+
+export interface AutorizacionesPinTable {
+  id: Generated<number>;
+  token: string;
+  supervisor_id: number;
+  solicitado_por: number;
+  created_at: Generated<Date | string | null>;
+  usada_por: number | null;
+  usada_en: Date | string | null;
+  pesaje_id: string | number | null;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -253,5 +273,7 @@ export interface Database {
   documento_fiscal_lote: DocumentoFiscalLoteTable;
   chat_log: ChatLogTable;
   log_errores: LogErroresTable;
+  pines_supervisor: PinesSupervisorTable;
+  autorizaciones_pin: AutorizacionesPinTable;
   bitacora: BitacoraView;
 }

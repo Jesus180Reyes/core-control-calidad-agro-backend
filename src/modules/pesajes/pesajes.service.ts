@@ -4,6 +4,7 @@ import { CreatePesajeDto } from './dto/create-pesaje.dto';
 import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
 import { FiltrosPesajesLoteDto } from './dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from './dto/filtros-historial.dto';
+import { ValidarPinDto } from './dto/validar-pin.dto';
 
 @Injectable()
 export class PesajesService {
@@ -26,6 +27,10 @@ export class PesajesService {
 
     async create(dto: CreatePesajeDto, userId: number) {
         return await this.pesajesRepository.createPesaje(dto, userId);
+    }
+
+    async validarPin(dto: ValidarPinDto, userId: number) {
+        return await this.pesajesRepository.validarPin(dto, userId);
     }
 
     async rechazar(pesajeId: number, dto: RechazarPesajeDto, userId: number) {
