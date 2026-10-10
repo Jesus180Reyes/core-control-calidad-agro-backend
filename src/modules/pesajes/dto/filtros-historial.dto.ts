@@ -1,16 +1,9 @@
 import { createZodDto } from "nestjs-zod";
 import z from "zod";
 import { paginacionShape } from "src/schemas/paginacion.schema";
+import { fechaISO } from "src/schemas/fecha.schema";
 
-const fechaSchema = z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .refine((v) => {
-        const fecha = new Date(`${v}T00:00:00Z`);
-        return !Number.isNaN(fecha.getTime()) && fecha.toISOString().startsWith(v);
-    })
-    .optional()
-    .catch(undefined);
+const fechaSchema = fechaISO().optional().catch(undefined);
 
 const filtrosHistorialSchema = z.object({
     lote_id: z.coerce.number().int().positive().optional().catch(undefined),

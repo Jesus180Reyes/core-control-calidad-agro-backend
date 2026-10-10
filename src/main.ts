@@ -1,13 +1,11 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
-import { ZodValidationPipe, cleanupOpenApiDoc } from 'nestjs-zod';
+import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
-  const reflector = app.get(Reflector);
   // app.setGlobalPrefix('api/v1');
 
   app.enableCors();
@@ -39,8 +37,9 @@ async function bootstrap() {
     logger.log('📚 Swagger disponible en /docs');
   }
 
-  app.useGlobalPipes(new ZodValidationPipe());
-  app.useGlobalGuards(new JwtAuthGuard(reflector)); // Guard global en la instancia
+  // El ZodValidationPipe y el JwtAuthGuard globales se registran solo en
+  // AppModule (APP_PIPE / APP_GUARD). Registrarlos tambien aqui validaba cada
+  // DTO dos veces y rompia cualquier .transform() que cambie el tipo.
   app.enableShutdownHooks();
   const port = process.env.PORT ?? 4000;
   await app.listen(port);
