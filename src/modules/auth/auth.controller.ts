@@ -112,4 +112,29 @@ export class AuthController {
       password_temporal: passwordTemporal,
     };
   }
+
+  @Patch('usuarios/:id/pin')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Id del usuario SUPERVISOR al que se asigna el PIN', example: 1 })
+  @ApiOperation({
+    summary: 'Asignar el PIN de un supervisor',
+    description:
+      'Exige rol ADMIN, leido de la base en cada request; cualquier otro rol, o un token cuyo usuario ya no existe, responde 403, ' +
+      'y se valida antes que el id, asi que no revela que usuarios son supervisores. ' +
+      'El usuario destino debe tener rol SUPERVISOR. ' +
+      'El sistema genera un PIN de 4 digitos unico en todo el sistema y lo devuelve en pin una sola vez; ninguna otra respuesta lo devuelve. ' +
+      'El PIN se guarda en claro. Se asigna una vez y para siempre: no se regenera, cambia ni revoca por API. ' +
+      'No acepta body. ' +
+      '400 si el usuario no existe, esta inactivo, no tiene el rol SUPERVISOR o ya tiene un PIN asignado.',
+  })
+  async asignarPinSupervisor(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const { userId } = req.user as { userId: number };
+    const pin = await this.authService.asignarPinSupervisor(id, userId);
+    return {
+      ok: true,
+      msg: 'PIN asignado correctamente',
+      pin,
+    };
+  }
 }

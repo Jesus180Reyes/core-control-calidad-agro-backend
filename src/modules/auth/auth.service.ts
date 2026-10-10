@@ -23,4 +23,8 @@ export class AuthService {
     async resetearPassword(id: number, userId: number) {
         return await this.authRepository.resetearPassword(id, userId);
     }
+
+    async asignarPinSupervisor(id: number, userId: number) {
+        return await this.authRepository.asignarPinSupervisor(id, userId);
+    }
 }
