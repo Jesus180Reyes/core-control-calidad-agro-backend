@@ -1,6 +1,6 @@
 # SPEC 36 — Registro de errores del API
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** Ninguno
 > **Date:** 2026-10-10
 > **Objective:** Registrar en una tabla nueva, `log_errores`, cada respuesta 5xx que produce el API, con un filtro de excepciones global que escribe por su propia conexión y no cambia la respuesta que recibe el cliente.
@@ -153,20 +153,20 @@ El filtro no inyecta `DatabaseService`. Así sigue siendo un singleton y no here
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE log_errores` muestra las nueve columnas con los tipos del DDL.
-- [ ] El route log muestra las mismas rutas que antes de este spec.
-- [ ] Un 400 de validación, un 401 sin token, un 403 de `PATCH /auth/usuarios/:id/reset-password` y un 404 de `GET /pesajes/:id` responden igual que antes y **no** insertan ninguna fila.
-- [ ] Con `GEMINI_API_KEY` vacía, `POST /lotes/:id/resumen` de un lote finalizado sin resumen responde el mismo 503 que antes e inserta una fila con `status = 503`, `metodo = 'POST'`, `ruta = '/lotes/<id>/resumen'`, el mensaje de la excepción y el `usuario_id` del token.
-- [ ] Un `throw new Error('prueba')` temporal en un handler (que no se commitea) responde el 500 por defecto de Nest (`{ statusCode: 500, message: 'Internal server error' }`) e inserta una fila con `status = 500`, `mensaje = 'prueba'` y un `stack` no nulo.
-- [ ] Una ruta con query string guarda la `ruta` con el query incluido.
-- [ ] Un 5xx en una ruta `@Public()` guarda `usuario_id = NULL`.
-- [ ] `entorno` guarda el valor de `NODE_ENV`, o `NULL` si no está definido.
-- [ ] `created_at` es la hora de MySQL del error.
-- [ ] Con un `stack` o un `mensaje` más largo que su columna, la fila se inserta truncada y no falla.
-- [ ] Si el `INSERT` falla (por ejemplo, con la tabla renombrada temporalmente), el cliente recibe el mismo 5xx y la consola muestra un `Logger.error` del filtro. El proceso no se cae.
-- [ ] Ninguna fila guarda el body del request.
-- [ ] El filtro está registrado solo como `APP_FILTER`. `src/main.ts` no cambió.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
+- [X] `DESCRIBE log_errores` muestra las nueve columnas con los tipos del DDL.
+- [X] El route log muestra las mismas rutas que antes de este spec.
+- [X] Un 400 de validación, un 401 sin token, un 403 de `PATCH /auth/usuarios/:id/reset-password` y un 404 de `GET /pesajes/:id` responden igual que antes y **no** insertan ninguna fila.
+- [X] Con `GEMINI_API_KEY` vacía, `POST /lotes/:id/resumen` de un lote finalizado sin resumen responde el mismo 503 que antes e inserta una fila con `status = 503`, `metodo = 'POST'`, `ruta = '/lotes/<id>/resumen'`, el mensaje de la excepción y el `usuario_id` del token.
+- [X] Un `throw new Error('prueba')` temporal en un handler (que no se commitea) responde el 500 por defecto de Nest (`{ statusCode: 500, message: 'Internal server error' }`) e inserta una fila con `status = 500`, `mensaje = 'prueba'` y un `stack` no nulo.
+- [X] Una ruta con query string guarda la `ruta` con el query incluido.
+- [X] Un 5xx en una ruta `@Public()` guarda `usuario_id = NULL`.
+- [X] `entorno` guarda el valor de `NODE_ENV`, o `NULL` si no está definido.
+- [X] `created_at` es la hora de MySQL del error.
+- [X] Con un `stack` o un `mensaje` más largo que su columna, la fila se inserta truncada y no falla.
+- [X] Si el `INSERT` falla (por ejemplo, con la tabla renombrada temporalmente), el cliente recibe el mismo 5xx y la consola muestra un `Logger.error` del filtro. El proceso no se cae.
+- [X] Ninguna fila guarda el body del request.
+- [X] El filtro está registrado solo como `APP_FILTER`. `src/main.ts` no cambió.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
 
 ---
 

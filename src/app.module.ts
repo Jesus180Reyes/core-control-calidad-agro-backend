@@ -14,8 +14,9 @@ import { ChatModule } from './modules/chat/chat.module';
 import { PlantasModule } from './modules/plantas/plantas.module';
 import { MetricasModule } from './modules/metricas/metricas.module';
 import { ZodValidationPipe } from 'nestjs-zod';
-import { APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RegistroErroresFilter } from './filters/registro-errores.filter';
 import { JwtStrategy } from './strategy/jwt.stategy';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
@@ -56,6 +57,10 @@ import { JwtModule } from '@nestjs/jwt';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: RegistroErroresFilter,
     },
   ],
 })
