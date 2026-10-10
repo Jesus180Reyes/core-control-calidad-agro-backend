@@ -1,6 +1,6 @@
 # SPEC 38 — Autorización por PIN de supervisor para pesajes sobre el peso máximo
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 03 (guardado de pesajes), SPEC 04 (bandas de peso), SPEC 34 (reusa `validateCallerEsAdmin` y `validateUsuarioActivo`), SPEC 37 (mensaje del 403 como parámetro), SPEC 22 (convención de Swagger)
 > **Date:** 2026-10-10
 > **Objective:** Que un pesaje cuyo `peso_neto` supera el `peso_maximo` del lote solo se pueda guardar con la autorización de un supervisor, que la da escribiendo su PIN, y que el pesaje registre qué supervisor lo aprobó con excepción.
@@ -294,44 +294,44 @@ Rutas: de **40** a **42**. `auth` pasa a **5** y `pesajes` a **8**. En el OpenAP
 
 ## Acceptance criteria
 
-- [ ] El DDL quedó aplicado y `SHOW CREATE TABLE` muestra:
+- [X] El DDL quedó aplicado y `SHOW CREATE TABLE` muestra:
   - la tabla `pines_supervisor` con sus dos `UNIQUE` y sus dos FKs;
   - `fk_pesajes_aprobado_con_excepcion_por`;
   - la tabla `autorizaciones_pin` con sus dos `UNIQUE` y sus cuatro FKs.
-- [ ] La tabla `usuarios` no tiene columnas nuevas.
-- [ ] El route log muestra **42** rutas: `auth` 5 y `pesajes` 8.
-- [ ] `PATCH /auth/usuarios/:id/pin` sin token responde 401.
-- [ ] Con un token de `OPERADOR` responde 403 `No tiene permisos para asignar PINs de supervisor`, aunque el `:id` no exista.
-- [ ] Con un token de `ADMIN`, sobre un usuario `SUPERVISOR` activo sin PIN, responde 200 `{ ok: true, msg: 'PIN asignado correctamente', pin }`. Además:
+- [X] La tabla `usuarios` no tiene columnas nuevas.
+- [X] El route log muestra **42** rutas: `auth` 5 y `pesajes` 8.
+- [X] `PATCH /auth/usuarios/:id/pin` sin token responde 401.
+- [X] Con un token de `OPERADOR` responde 403 `No tiene permisos para asignar PINs de supervisor`, aunque el `:id` no exista.
+- [X] Con un token de `ADMIN`, sobre un usuario `SUPERVISOR` activo sin PIN, responde 200 `{ ok: true, msg: 'PIN asignado correctamente', pin }`. Además:
   - `pin` tiene exactamente 4 dígitos;
   - `pines_supervisor` tiene una fila con ese `usuario_id`, ese `pin` y `created_by` igual al admin.
-- [ ] Sobre un usuario que ya tiene PIN responde 400 `El usuario con id 'X' ya tiene un PIN asignado`, y su fila no cambia.
-- [ ] Sobre un usuario `OPERADOR` o `ADMIN` responde 400 `El usuario con id 'X' no tiene el rol SUPERVISOR`.
-- [ ] Sobre un id inexistente responde 400 `El usuario con id 'X' no existe`. Sobre un usuario con `isActive = 0` responde 400 `El usuario con id 'X' esta inactivo`.
-- [ ] Después de asignar PIN a dos supervisores, sus dos `pin` son distintos.
-- [ ] `POST /pesajes/validar-pin` con el PIN de un supervisor activo responde 200. La respuesta trae:
+- [X] Sobre un usuario que ya tiene PIN responde 400 `El usuario con id 'X' ya tiene un PIN asignado`, y su fila no cambia.
+- [X] Sobre un usuario `OPERADOR` o `ADMIN` responde 400 `El usuario con id 'X' no tiene el rol SUPERVISOR`.
+- [X] Sobre un id inexistente responde 400 `El usuario con id 'X' no existe`. Sobre un usuario con `isActive = 0` responde 400 `El usuario con id 'X' esta inactivo`.
+- [X] Después de asignar PIN a dos supervisores, sus dos `pin` son distintos.
+- [X] `POST /pesajes/validar-pin` con el PIN de un supervisor activo responde 200. La respuesta trae:
   - `autorizacion.token` en formato UUID;
   - `autorizacion.supervisor` igual a su `complete_name`.
 
   Además inserta una fila con `supervisor_id`, `solicitado_por` = quien llama y `usada_en` en `NULL`.
-- [ ] Con un PIN que no está asignado responde 400 `PIN incorrecto` y no inserta ninguna fila.
-- [ ] Con el PIN de un supervisor con `isActive = 0` responde 400 `PIN incorrecto`.
-- [ ] Con `pin: '123'`, `pin: '12345'` o `pin: 'abcd'` responde 400 desde Zod.
-- [ ] `POST /pesajes` con `peso_neto > peso_maximo` y sin `autorizacion_token` responde 201, igual que antes de este spec, con `aprobado_con_excepcion_por` en `NULL`.
-- [ ] El mismo pesaje con un token válido sin usar responde 201. La fila tiene `aprobado_con_excepcion_por` = `supervisor_id` de la autorización, `fuera_de_rango = 1` y el estado `MAXIMO`.
-- [ ] Después de ese 201, la autorización tiene `usada_por` = el operador, `usada_en` con la hora de MySQL y `pesaje_id` = el id del pesaje nuevo.
-- [ ] Repetir con el mismo token responde 400 `La autorizacion ya fue utilizada` y no inserta ninguna fila.
-- [ ] Un token con formato UUID que no está en la tabla responde 400 `La autorizacion no existe`.
-- [ ] Un token que no es UUID responde 400 desde Zod.
-- [ ] Un pesaje con `peso_neto` exactamente igual al `peso_maximo` se guarda sin token, con `aprobado_con_excepcion_por` en `NULL`.
-- [ ] Un pesaje dentro del rango que manda un token válido responde 201, guarda `aprobado_con_excepcion_por` en `NULL` y deja la autorización sin usar (`usada_en` en `NULL`).
-- [ ] Un pesaje bajo el `peso_minimo` se guarda sin token, como antes de este spec.
-- [ ] Un token pedido por un operador lo puede consumir otro operador, y `usada_por` registra a quien lo consumió.
-- [ ] Si el pesaje falla por otra validación (lote cerrado, operador no vinculado), la autorización no queda marcada como usada.
-- [ ] La respuesta de `POST /pesajes` sigue siendo `{ ok, msg, pesaje: { id, peso_neto, fuera_de_rango } }`.
-- [ ] Ninguna respuesta de la API, salvo la de `PATCH /auth/usuarios/:id/pin`, contiene un PIN.
-- [ ] `/docs` muestra los dos endpoints nuevos con su descripción, y la descripción de `POST /pesajes` menciona `autorizacion_token`.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
+- [X] Con un PIN que no está asignado responde 400 `PIN incorrecto` y no inserta ninguna fila.
+- [X] Con el PIN de un supervisor con `isActive = 0` responde 400 `PIN incorrecto`.
+- [X] Con `pin: '123'`, `pin: '12345'` o `pin: 'abcd'` responde 400 desde Zod.
+- [X] `POST /pesajes` con `peso_neto > peso_maximo` y sin `autorizacion_token` responde 201, igual que antes de este spec, con `aprobado_con_excepcion_por` en `NULL`.
+- [X] El mismo pesaje con un token válido sin usar responde 201. La fila tiene `aprobado_con_excepcion_por` = `supervisor_id` de la autorización, `fuera_de_rango = 1` y el estado `MAXIMO`.
+- [X] Después de ese 201, la autorización tiene `usada_por` = el operador, `usada_en` con la hora de MySQL y `pesaje_id` = el id del pesaje nuevo.
+- [X] Repetir con el mismo token responde 400 `La autorizacion ya fue utilizada` y no inserta ninguna fila.
+- [X] Un token con formato UUID que no está en la tabla responde 400 `La autorizacion no existe`.
+- [X] Un token que no es UUID responde 400 desde Zod.
+- [X] Un pesaje con `peso_neto` exactamente igual al `peso_maximo` se guarda sin token, con `aprobado_con_excepcion_por` en `NULL`.
+- [X] Un pesaje dentro del rango que manda un token válido responde 201, guarda `aprobado_con_excepcion_por` en `NULL` y deja la autorización sin usar (`usada_en` en `NULL`).
+- [X] Un pesaje bajo el `peso_minimo` se guarda sin token, como antes de este spec.
+- [X] Un token pedido por un operador lo puede consumir otro operador, y `usada_por` registra a quien lo consumió.
+- [X] Si el pesaje falla por otra validación (lote cerrado, operador no vinculado), la autorización no queda marcada como usada.
+- [X] La respuesta de `POST /pesajes` sigue siendo `{ ok, msg, pesaje: { id, peso_neto, fuera_de_rango } }`.
+- [X] Ninguna respuesta de la API, salvo la de `PATCH /auth/usuarios/:id/pin`, contiene un PIN.
+- [X] `/docs` muestra los dos endpoints nuevos con su descripción, y la descripción de `POST /pesajes` menciona `autorizacion_token`.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
 
 ---
 
