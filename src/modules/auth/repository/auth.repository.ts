@@ -64,31 +64,37 @@ export class AuthRepository {
         };
     }
     async registerUser(data: RegisterUserDto, createdBy: number) {
+        const { complete_name, rol, username, cedula } = data;
 
-        const { complete_name, password, rol, username, cedula } = data;
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateCallerEsAdmin(createdBy, 'No tiene permisos para registrar usuarios', trx);
+            await this.validateRolExiste(rol, trx);
 
-        const user = await this.getUserByCedula(cedula);
-        const hashedPassword = await bcrypt.hash(password, this.SALT_ROUNDS);
+            const user = await this.getUserByCedula(cedula, trx);
+            if (user) {
+                throw new ConflictException(`El usuario con '${cedula}' ya existe registrado`);
+            }
 
-        if (user) {
-            throw new ConflictException(`El usuario con '${cedula}' ya existe registrado`);
-        }
+            await this.validateUsernameDisponible(username, trx);
 
-        const result = await this.db
-            .insertInto('usuarios')
-            .values({
-                username,
-                complete_name,
-                rol_id: rol,
-                password: hashedPassword,
-                password_vence_en: sql`NOW()`,
-                created_by: createdBy,
-                cedula,
-            })
-            .executeTakeFirstOrThrow();
+            const passwordTemporal = this.generarPasswordTemporal();
+            const hashedPassword = await bcrypt.hash(passwordTemporal, this.SALT_ROUNDS);
 
-        return Number(result.insertId);
+            const result = await trx
+                .insertInto('usuarios')
+                .values({
+                    username,
+                    complete_name,
+                    rol_id: rol,
+                    password: hashedPassword,
+                    password_vence_en: sql`NOW()`,
+                    created_by: createdBy,
+                    cedula,
+                })
+                .executeTakeFirstOrThrow();
 
+            return { id: Number(result.insertId), passwordTemporal };
+        });
     }
 
     async renovarPassword(data: RenovarPasswordDto) {
@@ -117,7 +123,7 @@ export class AuthRepository {
 
     async resetearPassword(id: number, userId: number) {
         return await this.db.transaction().execute(async (trx) => {
-            await this.validateCallerEsAdmin(userId, trx);
+            await this.validateCallerEsAdmin(userId, 'No tiene permisos para restablecer contraseñas', trx);
             this.validateNoEsMismoUsuario(id, userId);
             await this.validateUsuarioActivo(id, trx);
 
@@ -158,7 +164,7 @@ export class AuthRepository {
         }
     }
 
-    private async validateCallerEsAdmin(userId: number, db: Kysely<Database>) {
+    private async validateCallerEsAdmin(userId: number, mensaje: string, db: Kysely<Database>) {
         const caller = await db
             .selectFrom('usuarios')
             .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
@@ -167,7 +173,7 @@ export class AuthRepository {
             .executeTakeFirst();
 
         if (!caller || caller.rol !== 'ADMIN') {
-            throw new ForbiddenException('No tiene permisos para restablecer contraseñas');
+            throw new ForbiddenException(mensaje);
         }
     }
 
@@ -192,8 +198,36 @@ export class AuthRepository {
         }
     }
 
-    async getUserByCedula(cedula: string) {
-        const user = await this.db
+    private async validateRolExiste(rolId: number, db: Kysely<Database>) {
+        const rol = await db
+            .selectFrom('roles')
+            .select('id')
+            .where('id', '=', rolId)
+            .executeTakeFirst();
+
+        if (!rol) {
+            throw new BadRequestException(`El rol con id '${rolId}' no existe`);
+        }
+    }
+
+    /**
+     * Sin filtrar `isActive`, porque el login tampoco lo filtra. `usuarios`
+     * no tiene `UNIQUE` sobre `username` (spec 37): esta es la unica barrera.
+     */
+    private async validateUsernameDisponible(username: string, db: Kysely<Database>) {
+        const user = await db
+            .selectFrom('usuarios')
+            .select('id')
+            .where('username', '=', username)
+            .executeTakeFirst();
+
+        if (user) {
+            throw new BadRequestException(`El nombre de usuario '${username}' ya esta en uso`);
+        }
+    }
+
+    async getUserByCedula(cedula: string, db: Kysely<Database> = this.db) {
+        const user = await db
             .selectFrom('usuarios')
             .selectAll()
             .where('cedula', '=', cedula)
