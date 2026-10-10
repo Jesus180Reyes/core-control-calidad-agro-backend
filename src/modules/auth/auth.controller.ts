@@ -44,18 +44,23 @@ export class AuthController {
   @ApiOperation({
     summary: 'Registrar un usuario',
     description:
-      'Exige token: el usuario creado queda con created_by igual al userId del que llama. ' +
-      'No discrimina por rol, asi que cualquier usuario autenticado puede crear usuarios. ' +
-      'La cedula es la clave natural y no puede repetirse. ' +
-      'Devuelve el id del usuario creado, no el objeto usuario.',
+      'Exige rol ADMIN, leido de la base en cada request; cualquier otro rol, o un token cuyo usuario ya no existe, responde 403. ' +
+      'El usuario creado queda con created_by igual al userId del que llama. Un admin puede crear otro admin. ' +
+      'El body no lleva contraseña: el sistema genera una temporal de 10 caracteres y la devuelve en password_temporal una sola vez; no se guarda en texto plano. ' +
+      'La temporal nace vencida: el login con ella responde 403 con passwordVencida: true, ' +
+      'y el usuario debe renovarla con POST /auth/renovar-password. ' +
+      'En user devuelve el id del usuario creado, no el objeto usuario. ' +
+      '400 si el rol no existe; 409 si la cedula ya esta registrada; ' +
+      '400 si el username ya esta en uso (sin distinguir mayusculas) o excede 20 caracteres.',
   })
   async register(@Body() data: RegisterUserDto, @Req() req: Request) {
     const { userId } = req.user as { userId: number };
-    const user = await this.authService.registerUser(data, userId);
+    const { id, passwordTemporal } = await this.authService.registerUser(data, userId);
     return {
       ok: true,
       msg: 'Usuario registrado correctamente',
-      user,
+      user: id,
+      password_temporal: passwordTemporal,
     };
 
   }
