@@ -1,8 +1,9 @@
-import { ArgumentsHost, Catch, HttpException } from '@nestjs/common';
+import { ArgumentsHost, Catch, HttpException, Logger } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { Request } from 'express';
-import { Insertable } from 'kysely';
-import { LogErroresTable } from 'src/database/types/types';
+import { Insertable, Kysely, MysqlDialect } from 'kysely';
+import { createPool } from 'mysql2';
+import { Database, LogErroresTable } from 'src/database/types/types';
 
 // TEXT mide bytes y un caracter utf8mb4 ocupa hasta 4: 15000 caracteres
 // caben siempre. Con STRICT_TRANS_TABLES un valor largo haria fallar el INSERT.
@@ -16,6 +17,8 @@ const MAX_ENTORNO = 20;
 // app.useGlobalFilters en main.ts: cada error se guardaria dos veces.
 @Catch()
 export class RegistroErroresFilter extends BaseExceptionFilter {
+  private readonly logger = new Logger(RegistroErroresFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     super.catch(exception, host);
 
@@ -24,7 +27,39 @@ export class RegistroErroresFilter extends BaseExceptionFilter {
     if (status < 500) return;
 
     const req = host.switchToHttp().getRequest<Request>();
-    this.armarFila(exception, status, req);
+    // Sin await: el INSERT no retrasa la respuesta, que ya salio.
+    void this.registrar(exception, status, req);
+  }
+
+  // Conexion propia y de un solo uso, no req['db']: DatabaseMiddleware la
+  // destruye en 'finish' y puede ser justo la conexion que fallo. Registrar
+  // un error nunca relanza: si algo falla, queda solo en consola.
+  private async registrar(exception: unknown, status: number, req: Request) {
+    let db: Kysely<Database> | undefined;
+    try {
+      const fila = this.armarFila(exception, status, req);
+      db = new Kysely<Database>({
+        dialect: new MysqlDialect({
+          pool: createPool({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+            connectionLimit: 1,
+            waitForConnections: true,
+          }),
+        }),
+      });
+      await db.insertInto('log_errores').values(fila).execute();
+    } catch (err) {
+      this.logger.error(
+        `No se pudo registrar el error en log_errores: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      if (db) {
+        await db.destroy().catch(() => undefined);
+      }
+    }
   }
 
   private armarFila(
