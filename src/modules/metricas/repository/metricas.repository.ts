@@ -40,6 +40,104 @@ export class MetricasRepository {
         return this.dbService.client;
     }
 
+    // Tres consultas sobre la misma base, mas la del periodo. Corren con
+    // Promise.all sobre la conexion unica del request, que las serializa.
+    async getMetricasCalidad(filtros: FiltrosMetricasCalidadDto) {
+        const periodo = await this.resolverPeriodo(filtros);
+        const base = () => this.baseCalidad(periodo, filtros);
+
+        const [filaResumen, filasEstado, filasCliente] = await Promise.all([
+            base()
+                .where('pesajes.isActive', 'in', [0, 1])
+                .select(this.agregados())
+                .executeTakeFirstOrThrow(),
+
+            // La base va como tabla derivada en un LEFT JOIN: las condiciones
+            // del periodo quedan del lado del join y los estados sin pesajes
+            // se conservan con total 0.
+            this.db
+                .selectFrom('estados_calidad')
+                .leftJoin(
+                    base()
+                        .where('pesajes.isActive', '=', 1)
+                        .select('pesajes.estado_calidad_id')
+                        .as('p'),
+                    (join) => join.onRef('p.estado_calidad_id', '=', 'estados_calidad.id'),
+                )
+                .select((eb) => [
+                    'estados_calidad.id as estado_calidad_id',
+                    'estados_calidad.codigo',
+                    'estados_calidad.nombre',
+                    eb.fn.count('p.estado_calidad_id').as('total'),
+                ])
+                .groupBy([
+                    'estados_calidad.id',
+                    'estados_calidad.codigo',
+                    'estados_calidad.nombre',
+                ])
+                .orderBy('estados_calidad.id', 'asc')
+                .execute(),
+
+            base()
+                .leftJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+                .where('pesajes.isActive', 'in', [0, 1])
+                .select(['lotes.cliente_id', 'clientes.nombre as cliente', ...this.agregados()])
+                .groupBy(['lotes.cliente_id', 'clientes.nombre'])
+                .orderBy('total_pesajes', 'desc')
+                .orderBy('lotes.cliente_id', 'asc')
+                .execute(),
+        ]);
+
+        const resumen = this.calcularIndicadores(filaResumen);
+
+        return {
+            periodo,
+            filtros: {
+                cliente_id: filtros.cliente_id ?? null,
+                usuario_id: filtros.usuario_id ?? null,
+            },
+            resumen,
+            por_estado_calidad: filasEstado.map((e) => {
+                const total = Number(e.total);
+                return {
+                    estado_calidad_id: e.estado_calidad_id,
+                    codigo: e.codigo,
+                    nombre: e.nombre,
+                    total,
+                    porcentaje: resumen.total_pesajes === 0
+                        ? null
+                        : Math.round((total / resumen.total_pesajes) * 100 * 100) / 100,
+                };
+            }),
+            por_cliente: filasCliente.map((c) => ({
+                cliente_id: Number(c.cliente_id),
+                cliente: c.cliente ?? null,
+                ...this.calcularIndicadores(c),
+            })),
+        };
+    }
+
+    // Agregados condicionales: activos y anulados salen del mismo recorrido.
+    // La desviacion es relativa al peso_ideal de cada lote y tiene signo; los
+    // CASE sin ELSE dejan NULL, que AVG y STDDEV_POP ignoran.
+    private agregados() {
+        const activo = sql`pesajes.isActive = 1`;
+        const conDesviacion = sql`pesajes.isActive = 1 AND pesajes.peso_neto IS NOT NULL AND lotes.peso_ideal > 0`;
+        const desviacion = sql`(pesajes.peso_neto - lotes.peso_ideal) / lotes.peso_ideal * 100`;
+        type Agregado = string | number | null;
+
+        return [
+            sql<Agregado>`SUM(CASE WHEN ${activo} THEN 1 ELSE 0 END)`.as('total_pesajes'),
+            sql<Agregado>`SUM(CASE WHEN ${activo} AND pesajes.fuera_de_rango = 1 THEN 1 ELSE 0 END)`.as('fuera_de_rango'),
+            sql<Agregado>`AVG(CASE WHEN ${conDesviacion} THEN ${desviacion} END)`.as('desviacion_promedio_pct'),
+            sql<Agregado>`STDDEV_POP(CASE WHEN ${conDesviacion} THEN ${desviacion} END)`.as('desviacion_estandar_pct'),
+            sql<Agregado>`SUM(CASE WHEN ${activo} AND pesajes.aprobado = 1 THEN 1 ELSE 0 END)`.as('aprobados_por_aprobador'),
+            sql<Agregado>`SUM(CASE WHEN ${activo} AND pesajes.aprobado = 0 THEN 1 ELSE 0 END)`.as('rechazados_por_aprobador'),
+            sql<Agregado>`SUM(CASE WHEN ${activo} AND pesajes.aprobado IS NULL THEN 1 ELSE 0 END)`.as('sin_revisar'),
+            sql<Agregado>`SUM(CASE WHEN pesajes.isActive = 0 THEN 1 ELSE 0 END)`.as('anulados'),
+        ];
+    }
+
     // El periodo se resuelve con el reloj de MySQL, el mismo con el que NOW()
     // escribe pesajes.created_at. Sin extremos son los ultimos 30 dias con hoy
     // incluido; con uno solo, el otro se completa para formar 30 dias.
