@@ -1,6 +1,6 @@
 # SPEC 37 — Registro de usuarios solo por un admin, con contraseña generada
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 33 (la contraseña nace vencida y se renueva con su flujo), SPEC 34 (reusa `validateCallerEsAdmin` y `generarPasswordTemporal`), SPEC 22 (convención de Swagger)
 > **Date:** 2026-10-10
 > **Objective:** Que `POST /auth/register` solo lo pueda usar un usuario con rol `ADMIN`, y que la contraseña del usuario nuevo la genere el sistema y se devuelva una sola vez, igual que en el reset del spec 34.
