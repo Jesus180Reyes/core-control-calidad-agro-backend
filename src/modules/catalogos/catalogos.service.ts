@@ -13,6 +13,10 @@ export class CatalogosService {
         return await this.catalogosRepository.getUsuarios();
     }
 
+    async findOperadores() {
+        return await this.catalogosRepository.getOperadores();
+    }
+
     async findUnidadesMedida() {
         return await this.catalogosRepository.getUnidadesMedida();
     }
