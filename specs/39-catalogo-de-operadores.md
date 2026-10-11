@@ -118,19 +118,19 @@ Sin operadores activos responde **200** con `data: []`. No hay 400 ni 404: la ru
 
 ## Acceptance criteria
 
-- [ ] El route log muestra **43** rutas, con `GET /catalogos/operadores` entre ellas.
-- [ ] Sin header `Authorization`, `GET /catalogos/operadores` responde 401.
-- [ ] Con el token de un `OPERADOR`, responde 200.
-- [ ] Con el token de un `ADMIN`, responde 200 con el mismo contenido.
-- [ ] La respuesta es `{ ok: true, msg: 'Operadores obtenidos correctamente', data }`.
-- [ ] Cada elemento de `data` tiene exactamente las claves `id` y `nombre`.
-- [ ] `data` contiene a todos los usuarios con `isActive = 1` y rol `OPERADOR`, y a ningún otro, comparado contra una consulta directa en MySQL.
-- [ ] Ningún usuario con rol `ADMIN` o `SUPERVISOR` aparece en `data`.
-- [ ] Un operador con `isActive = 0` no aparece en `data`.
-- [ ] `data` viene ordenado por `nombre` ascendente.
-- [ ] `GET /catalogos/usuarios` responde exactamente lo mismo que antes de este spec.
-- [ ] `/docs` muestra `GET /catalogos/operadores` bajo el tag `catalogos`, con su descripción.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
+- [X] El route log muestra **43** rutas, con `GET /catalogos/operadores` entre ellas.
+- [X] Sin header `Authorization`, `GET /catalogos/operadores` responde 401.
+- [X] Con el token de un `OPERADOR`, responde 200.
+- [X] Con el token de un `ADMIN`, responde 200 con el mismo contenido.
+- [X] La respuesta es `{ ok: true, msg: 'Operadores obtenidos correctamente', data }`.
+- [X] Cada elemento de `data` tiene exactamente las claves `id` y `nombre`.
+- [X] `data` contiene a todos los usuarios con `isActive = 1` y rol `OPERADOR`, y a ningún otro, comparado contra una consulta directa en MySQL.
+- [X] Ningún usuario con rol `ADMIN` o `SUPERVISOR` aparece en `data`.
+- [X] Un operador con `isActive = 0` no aparece en `data`.
+- [X] `data` viene ordenado por `nombre` ascendente.
+- [X] `GET /catalogos/usuarios` responde exactamente lo mismo que antes de este spec.
+- [X] `/docs` muestra `GET /catalogos/operadores` bajo el tag `catalogos`, con su descripción.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
 
 ---
 

@@ -29,6 +29,18 @@ export class CatalogosRepository {
         return usuarios;
     }
 
+    async getOperadores() {
+        const operadores = await this.db
+            .selectFrom('usuarios')
+            .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select(['usuarios.id', 'usuarios.complete_name as nombre'])
+            .where('usuarios.isActive', '=', 1)
+            .where('roles.nombre', '=', 'OPERADOR')
+            .orderBy('usuarios.complete_name', 'asc')
+            .execute();
+        return operadores;
+    }
+
     async getUnidadesMedida() {
         const unidades = await this.db
             .selectFrom('unidades_medida')

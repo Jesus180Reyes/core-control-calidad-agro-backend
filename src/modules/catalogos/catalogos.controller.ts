@@ -44,6 +44,25 @@ export class CatalogosController {
         };
     }
 
+    @Get('operadores')
+    @ApiOperation({
+        summary: 'Usuarios activos con rol OPERADOR',
+        description:
+            'Lista de referencia para selectores: vincular operadores a un cliente y filtrar ' +
+            'por usuario. Cada elemento es { id, nombre }, con complete_name aliasado a nombre. ' +
+            'La clave del payload es data. Filtra isActive = 1 y el rol OPERADOR por ' +
+            'roles.nombre, y ordena por nombre. Abierto a cualquier usuario autenticado, sin ' +
+            'filtro por cliente_operador.',
+    })
+    async findOperadores() {
+        const data = await this.catalogosService.findOperadores();
+        return {
+            ok: true,
+            msg: 'Operadores obtenidos correctamente',
+            data,
+        };
+    }
+
     @Get('unidades-medida')
     @ApiOperation({
         summary: 'Unidades de medida',
