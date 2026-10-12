@@ -19,6 +19,8 @@ npm run test:cov
 npm run test:e2e       # jest -c ./test/jest-e2e.json
 ```
 
+**Docker** (2026-10-11): `docker compose up -d --build` starts the API on host port **4001** and a `mysql:8.0` on **3307** (both overridable with `COMPOSE_API_PORT` / `COMPOSE_DB_PORT`), reading the same `.env`. MySQL initialises from `db/schema.sql` + `db/seed.sql` **only when its volume is empty** — after changing either file, `docker compose down -v` to reload. `db/` is a dump of the local DB (structure + catalog tables, **no `productos` and no `usuarios`**), so a fresh database has no users and no products: both are inserted by hand. The image runs `nest build` (not `tsc` — the CLI rewrites the `src/...` imports) and has no real health endpoint yet: its `HEALTHCHECK` counts any HTTP answer, a 401 included, as alive. `NODE_ENV` from `.env` overrides the image's `production`, so the local stack serves Swagger.
+
 Run a single unit test file: `npx jest path/to/file.spec.ts`. There are currently no `*.spec.ts` files or `test/` e2e directory in the repo — testing infra is configured (jest, ts-jest, supertest) but unused so far.
 
 Server listens on `process.env.PORT` (default 4000). No global route prefix is set (the `app.setGlobalPrefix('api/v1')` line in `src/main.ts` is commented out).

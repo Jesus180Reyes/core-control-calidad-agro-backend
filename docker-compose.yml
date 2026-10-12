@@ -1,0 +1,49 @@
+# Ambiente local completo: la API y un MySQL que arranca con db/schema.sql y
+# db/seed.sql. Lee las credenciales del mismo .env que usa npm run start:dev.
+#
+#   docker compose up -d --build
+#   docker compose logs -f api
+#   docker compose down        # conserva los datos
+#   docker compose down -v     # borra los datos; el proximo up recarga db/
+#
+# Los puertos del host son configurables porque tu MySQL local ya ocupa el
+# 3306 y npm run start:dev el 4000.
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${COMPOSE_DB_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Solo se ejecutan cuando el volumen esta vacio (primer arranque).
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Dentro de la red de compose el MySQL es el servicio, no 127.0.0.1.
+      DB_HOST: mysql
+      DB_PORT: 3306
+      PORT: 4000
+    ports:
+      - "${COMPOSE_API_PORT:-4001}:4000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

@@ -1,0 +1,26 @@
+# Se instala y compila dentro de la imagen.
+node_modules
+dist
+coverage
+*.tsbuildinfo
+
+# Secretos: se inyectan en tiempo de ejecucion, nunca dentro de la imagen.
+.env
+.env.*
+!.env.example
+
+# No hacen falta para construir ni para correr la API.
+.git
+.github
+.vscode
+.idea
+.agents
+.claude
+specs
+db
+test
+*.md
+diagram.jpeg
+docker-compose*.yml
+Dockerfile
+.dockerignore
