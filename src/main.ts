@@ -3,10 +3,13 @@ import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // app.setGlobalPrefix('api/v1');
+
+  app.useBodyParser('json', { limit: '1mb' });
 
   app.enableCors();
 
