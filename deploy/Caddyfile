@@ -1,0 +1,14 @@
+# Caddy saca y renueva el certificado de Let's Encrypt solo, siempre que el
+# DNS de DOMAIN ya apunte a la IP del servidor y los puertos 80/443 esten
+# abiertos.
+{$DOMAIN} {
+	encode gzip
+
+	# La API acepta JSON de hasta 1mb (main.ts); el proxy deja un poco mas
+	# para que el limite que se vea sea siempre el de la API.
+	request_body {
+		max_size 2MB
+	}
+
+	reverse_proxy api:4000
+}

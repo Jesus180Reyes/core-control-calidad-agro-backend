@@ -1,0 +1,8 @@
+# Archivos que se ejecutan o se leen en Linux (contenedores, VPS): siempre LF,
+# aunque el repo se trabaje en Windows con core.autocrlf=true. Un .sh con CRLF
+# falla con "/bin/sh^M: bad interpreter".
+*.sh        text eol=lf
+*.sql       text eol=lf
+*.yml       text eol=lf
+Dockerfile  text eol=lf
+Caddyfile   text eol=lf

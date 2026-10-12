@@ -18,6 +18,7 @@ coverage
 .claude
 specs
 db
+deploy
 test
 *.md
 diagram.jpeg

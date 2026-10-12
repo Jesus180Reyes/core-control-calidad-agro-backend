@@ -450,8 +450,8 @@ describe('ChatRepository / el turno', () => {
 
         expect(conversar).toHaveBeenCalledTimes(4);
         // Las tres del bucle con herramientas; la de cierre sin ellas.
-        expect(conversar.mock.calls[2][2]).toBeFalsy();
-        expect(conversar.mock.calls[3][2]).toBe(true);
+        expect((conversar.mock.calls[2] as unknown[])[2]).toBeFalsy();
+        expect((conversar.mock.calls[3] as unknown[])[2]).toBe(true);
         expect(respuesta).toBe('Son 2 clientes.');
     });
 
