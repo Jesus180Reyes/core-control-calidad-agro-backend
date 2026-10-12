@@ -42,6 +42,9 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
+    # Hora de Honduras (UTC-6, sin horario de verano). La API ademas la fija en
+    # cada sesion; esto cubre a quien consulte la base por fuera de la API.
+    command: --default-time-zone=-06:00
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}

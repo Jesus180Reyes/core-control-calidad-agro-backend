@@ -27,6 +27,9 @@ FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
+# Hora de Honduras tambien en Node: algunos textos (prompts de Gemini y del
+# chat) formatean fechas con getHours()/getDate(), que usan esta zona.
+ENV TZ=America/Tegucigalpa
 
 COPY --from=deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist

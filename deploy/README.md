@@ -41,7 +41,8 @@ apt update && apt -y upgrade && apt -y install unattended-upgrades fail2ban
 curl -fsSL https://get.docker.com | sh
 usermod -aG docker deploy
 
-# Zona horaria del sistema (logs y cron); la de MySQL es otro tema, ver abajo
+# Zona horaria del sistema (logs y cron). MySQL y la API ya fijan la suya
+# (-06:00) en docker-compose.prod.yml y el Dockerfile.
 timedatectl set-timezone America/Tegucigalpa
 ```
 
@@ -162,11 +163,6 @@ ssh -L 3308:IP_INTERNA_MYSQL:3306 deploy@IP
 
 ## Pendientes conocidos antes de produccion
 
-- **Zona horaria de MySQL**: el contenedor corre en UTC, asi que `NOW()` y
-  `CURDATE()` van 6 horas adelantados respecto a Honduras. Corregirlo cambia
-  lo que devuelve la API y obliga a migrar las columnas `DATETIME`
-  existentes: necesita su propio spec, idealmente **antes** de cargar datos
-  reales en produccion.
 - **`GET /health`**: el healthcheck actual acepta cualquier respuesta HTTP.
 - **CORS** abierto a cualquier origen.
 - **Rate limiting** (spec 23): `/auth/login` y `/pesajes/validar-pin` sin

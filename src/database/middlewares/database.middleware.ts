@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Kysely, MysqlDialect } from 'kysely';
 import { createPool } from 'mysql2';
 import { Database } from '../types/types';
+import { fijarZonaHorariaSesion, opcionesZonaHoraria } from '../zona-horaria';
 
 @Injectable()
 export class DatabaseMiddleware implements NestMiddleware {
@@ -17,7 +18,9 @@ export class DatabaseMiddleware implements NestMiddleware {
           database: process.env.DB_NAME,
           connectionLimit: 1,
           waitForConnections: true,
+          ...opcionesZonaHoraria,
         }),
+        onCreateConnection: fijarZonaHorariaSesion,
       }),
     });
 

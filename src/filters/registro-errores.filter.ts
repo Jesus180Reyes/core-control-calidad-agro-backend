@@ -4,6 +4,10 @@ import { Request } from 'express';
 import { Insertable, Kysely, MysqlDialect } from 'kysely';
 import { createPool } from 'mysql2';
 import { Database, LogErroresTable } from 'src/database/types/types';
+import {
+  fijarZonaHorariaSesion,
+  opcionesZonaHoraria,
+} from 'src/database/zona-horaria';
 
 // TEXT mide bytes y un caracter utf8mb4 ocupa hasta 4: 15000 caracteres
 // caben siempre. Con STRICT_TRANS_TABLES un valor largo haria fallar el INSERT.
@@ -48,7 +52,9 @@ export class RegistroErroresFilter extends BaseExceptionFilter {
             database: process.env.DB_NAME,
             connectionLimit: 1,
             waitForConnections: true,
+            ...opcionesZonaHoraria,
           }),
+          onCreateConnection: fijarZonaHorariaSesion,
         }),
       });
       await db.insertInto('log_errores').values(fila).execute();
