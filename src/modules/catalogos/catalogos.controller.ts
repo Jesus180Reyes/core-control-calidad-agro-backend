@@ -79,4 +79,23 @@ export class CatalogosController {
             data,
         };
     }
+
+    @Get('estados-calidad')
+    @ApiOperation({
+        summary: 'Estados de calidad',
+        description:
+            'Lista de referencia para el selector del filtro ?estado_calidad_id de ' +
+            'GET /pesajes/byLote/:loteId y GET /pesajes/historial. Cada elemento es { id, nombre } ' +
+            'y la clave del payload es data. Devuelve todas las filas, sin filtro (la tabla no ' +
+            'tiene columna isActive), ordenadas por id. Abierto a cualquier usuario autenticado, ' +
+            'sin filtro por cliente_operador.',
+    })
+    async findEstadosCalidad() {
+        const data = await this.catalogosService.findEstadosCalidad();
+        return {
+            ok: true,
+            msg: 'Estados de calidad obtenidos correctamente',
+            data,
+        };
+    }
 }
