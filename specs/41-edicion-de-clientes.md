@@ -1,6 +1,6 @@
 # SPEC 41 — Edición de clientes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01 (módulo `clientes`), SPEC 11 (`validateClienteActivo` y la terna de rechazo), SPEC 22 (convención de Swagger), SPEC 25 (`constancia_exonerado` y documentos fiscales que leen el cliente por `JOIN`)
 > **Date:** 2026-10-14
 > **Objective:** Agregar `PATCH /clientes/:id`, que edita los datos de contacto, ubicación, producto, nombre y constancia de exoneración de un cliente activo, sin permitir tocar `rtn` ni `codigo_exportacion`.
@@ -185,29 +185,29 @@ Errores:
 
 ## Acceptance criteria
 
-- [ ] El route log muestra **45** rutas, con `PATCH /clientes/:id` entre ellas.
-- [ ] Sin header `Authorization`, `PATCH /clientes/1` responde 401.
-- [ ] Con el token de un `OPERADOR` sin vínculo en `cliente_operador` con ese cliente, la edición responde 200.
-- [ ] `PATCH /clientes/:id` con `{ "telefono": "9999-0000" }` responde `{ ok: true, msg: 'Cliente actualizado correctamente' }` y en MySQL solo cambiaron `telefono`, `updated_at` y `actualizado_por`.
-- [ ] `actualizado_por` queda con el `userId` del token y `updated_at` con la hora de la edición.
-- [ ] Cada uno de los ocho campos editables se puede cambiar por separado, verificado en MySQL.
-- [ ] Un cuerpo `{}` responde 400 `Debe enviar al menos un campo a editar`.
-- [ ] Un cuerpo `{ "rtn": "0801..." }` responde 400 `Debe enviar al menos un campo a editar` y el `rtn` no cambia.
-- [ ] Un cuerpo `{ "rtn": "0801...", "telefono": "1234" }` responde 200, cambia el teléfono y el `rtn` no cambia.
-- [ ] Lo mismo vale para `codigo_exportacion`.
-- [ ] `{ "telefono": null }` responde 400.
-- [ ] `{ "telefono": "" }` y `{ "nombre": "   " }` responden 400.
-- [ ] `{ "correo_contacto": "no-es-correo" }` responde 400.
-- [ ] Un valor más largo que su columna responde 400, no 500.
-- [ ] Un `:id` que no existe responde 400 `El cliente con id 'X' no existe`.
-- [ ] Un cliente rechazado responde 400 `El cliente con id 'X' ya fue rechazado` y ninguna columna cambia.
-- [ ] Un `producto_id` inexistente o inactivo responde 400 y ninguna columna cambia.
-- [ ] Editar el `nombre` de un cliente con documentos fiscales hace que `GET /documentos-fiscales/:id` muestre el nombre nuevo (riesgo aceptado, verificado).
-- [ ] `PATCH /clientes/:id/rechazar` sigue respondiendo igual que antes.
-- [ ] `GET /clientes`, `GET /clientes/all` y `POST /clientes` responden igual que antes, y ninguno devuelve `actualizado_por` ni `constancia_exonerado`.
-- [ ] `/docs` muestra `PATCH /clientes/{id}` bajo el tag `clientes`, con su descripción y su `@ApiParam`.
-- [ ] `SHOW CREATE TABLE clientes` muestra `fk_clientes_actualizado_por`.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
+- [X] El route log muestra **45** rutas, con `PATCH /clientes/:id` entre ellas.
+- [X] Sin header `Authorization`, `PATCH /clientes/1` responde 401.
+- [X] Con el token de un `OPERADOR` sin vínculo en `cliente_operador` con ese cliente, la edición responde 200.
+- [X] `PATCH /clientes/:id` con `{ "telefono": "9999-0000" }` responde `{ ok: true, msg: 'Cliente actualizado correctamente' }` y en MySQL solo cambiaron `telefono`, `updated_at` y `actualizado_por`.
+- [X] `actualizado_por` queda con el `userId` del token y `updated_at` con la hora de la edición.
+- [X] Cada uno de los ocho campos editables se puede cambiar por separado, verificado en MySQL.
+- [X] Un cuerpo `{}` responde 400 `Debe enviar al menos un campo a editar`.
+- [X] Un cuerpo `{ "rtn": "0801..." }` responde 400 `Debe enviar al menos un campo a editar` y el `rtn` no cambia.
+- [X] Un cuerpo `{ "rtn": "0801...", "telefono": "1234" }` responde 200, cambia el teléfono y el `rtn` no cambia.
+- [X] Lo mismo vale para `codigo_exportacion`.
+- [X] `{ "telefono": null }` responde 400.
+- [X] `{ "telefono": "" }` y `{ "nombre": "   " }` responden 400.
+- [X] `{ "correo_contacto": "no-es-correo" }` responde 400.
+- [X] Un valor más largo que su columna responde 400, no 500.
+- [X] Un `:id` que no existe responde 400 `El cliente con id 'X' no existe`.
+- [X] Un cliente rechazado responde 400 `El cliente con id 'X' ya fue rechazado` y ninguna columna cambia.
+- [X] Un `producto_id` inexistente o inactivo responde 400 y ninguna columna cambia.
+- [X] Editar el `nombre` de un cliente con documentos fiscales hace que `GET /documentos-fiscales/:id` muestre el nombre nuevo (riesgo aceptado, verificado).
+- [X] `PATCH /clientes/:id/rechazar` sigue respondiendo igual que antes.
+- [X] `GET /clientes`, `GET /clientes/all` y `POST /clientes` responden igual que antes, y ninguno devuelve `actualizado_por` ni `constancia_exonerado`.
+- [X] `/docs` muestra `PATCH /clientes/{id}` bajo el tag `clientes`, con su descripción y su `@ApiParam`.
+- [X] `SHOW CREATE TABLE clientes` muestra `fk_clientes_actualizado_por`.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
 
 ---
 
