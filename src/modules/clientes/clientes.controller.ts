@@ -110,7 +110,7 @@ export class ClientesController {
         summary: 'Crear un cliente',
         description:
             'Crea el cliente y, con usuario_ids, lo vincula a esos operadores en cliente_operador. ' +
-            'Esa es la unica forma de crear el vinculo: no hay endpoints para gestionarlo despues. ' +
+            'Despues de crear el cliente, los vinculos se cambian con PATCH /clientes/:id/operadores. ' +
             'El rtn y el codigo_exportacion deben estar libres, pero la unicidad se valida solo en ' +
             'codigo, sin restriccion en MySQL, y los validadores ignoran a los clientes rechazados, ' +
             'asi que un rtn rechazado se puede reutilizar. Devuelve el id creado, no el cliente. ' +
