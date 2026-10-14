@@ -106,6 +106,7 @@ export interface ClientesTable {
   created_by: number | null;
   created_at: Generated<Date | string | null>;
   updated_at: Generated<Date | string | null>;
+  actualizado_por: number | null;
   motivo_rechazo: string | null;
   rechazado_por: number | null;
   rechazado_en: Date | string | null;
