@@ -113,18 +113,18 @@ Con la tabla vacía responde **200** con `data: []`. No hay 400 ni 404: la ruta 
 
 ## Acceptance criteria
 
-- [ ] El route log muestra **44** rutas, con `GET /catalogos/estados-calidad` entre ellas.
-- [ ] Sin header `Authorization`, `GET /catalogos/estados-calidad` responde 401.
-- [ ] Con el token de un `OPERADOR`, responde 200.
-- [ ] Con el token de un `ADMIN`, responde 200 con el mismo contenido.
-- [ ] La respuesta es `{ ok: true, msg: 'Estados de calidad obtenidos correctamente', data }`.
-- [ ] Cada elemento de `data` tiene exactamente las claves `id` y `nombre`.
-- [ ] `data` contiene todas las filas de `estados_calidad`, comparado contra `SELECT id, nombre FROM estados_calidad` en MySQL.
-- [ ] `data` viene ordenado por `id` ascendente.
-- [ ] Cada `id` de `data` usado como `?estado_calidad_id` en `GET /pesajes/historial` filtra los pesajes de ese estado.
-- [ ] Los otros cuatro endpoints de `catalogos` responden exactamente lo mismo que antes de este spec.
-- [ ] `/docs` muestra `GET /catalogos/estados-calidad` bajo el tag `catalogos`, con su descripción.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
+- [X] El route log muestra **44** rutas, con `GET /catalogos/estados-calidad` entre ellas.
+- [X] Sin header `Authorization`, `GET /catalogos/estados-calidad` responde 401.
+- [X] Con el token de un `OPERADOR`, responde 200.
+- [X] Con el token de un `ADMIN`, responde 200 con el mismo contenido.
+- [X] La respuesta es `{ ok: true, msg: 'Estados de calidad obtenidos correctamente', data }`.
+- [X] Cada elemento de `data` tiene exactamente las claves `id` y `nombre`.
+- [X] `data` contiene todas las filas de `estados_calidad`, comparado contra `SELECT id, nombre FROM estados_calidad` en MySQL.
+- [X] `data` viene ordenado por `id` ascendente.
+- [X] Cada `id` de `data` usado como `?estado_calidad_id` en `GET /pesajes/historial` filtra los pesajes de ese estado.
+- [X] Los otros cuatro endpoints de `catalogos` responden exactamente lo mismo que antes de este spec.
+- [X] `/docs` muestra `GET /catalogos/estados-calidad` bajo el tag `catalogos`, con su descripción.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`, y no se aplicó DDL.
 
 ---
 
