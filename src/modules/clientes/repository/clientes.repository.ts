@@ -216,6 +216,21 @@ export class ClientesRepository {
         });
     }
 
+    async getOperadoresByCliente(clienteId: number) {
+        await this.validateClienteActivo(clienteId, this.db);
+
+        return await this.db
+            .selectFrom('cliente_operador')
+            .innerJoin('usuarios', 'usuarios.id', 'cliente_operador.usuario_id')
+            .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select(['usuarios.id', 'usuarios.complete_name as nombre'])
+            .where('cliente_operador.cliente_id', '=', clienteId)
+            .where('usuarios.isActive', '=', 1)
+            .where('roles.nombre', '=', 'OPERADOR')
+            .orderBy('usuarios.complete_name', 'asc')
+            .execute();
+    }
+
     private async linkOperadores(
         clienteId: number,
         usuarioIds: number[],
