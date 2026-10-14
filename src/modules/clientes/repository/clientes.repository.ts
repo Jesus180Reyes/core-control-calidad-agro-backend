@@ -2,6 +2,8 @@ import { DatabaseService } from 'src/database/database.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateClienteDto } from '../dto/create-cliente.dto';
 import { RechazarClienteDto } from '../dto/rechazar-cliente.dto';
+import { EditarClienteDto } from '../dto/editar-cliente.dto';
+import { EditarOperadoresClienteDto } from '../dto/editar-operadores-cliente.dto';
 import { FiltrosClientesDto } from '../dto/filtros-clientes.dto';
 import { PaginacionClientesDto } from '../dto/paginacion-clientes.dto';
 import { Kysely, sql } from 'kysely';
@@ -185,6 +187,83 @@ export class ClientesRepository {
         });
     }
 
+    async editarCliente(
+        clienteId: number,
+        data: EditarClienteDto,
+        userId: number,
+    ) {
+        const campos = Object.fromEntries(
+            Object.entries(data).filter(([, valor]) => valor !== undefined),
+        ) as Partial<EditarClienteDto>;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateClienteActivo(clienteId, trx);
+
+            if (campos.producto_id !== undefined) {
+                await this.validateProducto(campos.producto_id, trx);
+            }
+
+            await trx
+                .updateTable('clientes')
+                .set({
+                    ...campos,
+                    updated_at: sql<Date>`NOW()`,
+                    actualizado_por: userId,
+                })
+                .where('id', '=', clienteId)
+                .execute();
+
+            return true;
+        });
+    }
+
+    async getOperadoresByCliente(clienteId: number) {
+        await this.validateClienteActivo(clienteId, this.db);
+
+        return await this.db
+            .selectFrom('cliente_operador')
+            .innerJoin('usuarios', 'usuarios.id', 'cliente_operador.usuario_id')
+            .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select(['usuarios.id', 'usuarios.complete_name as nombre'])
+            .where('cliente_operador.cliente_id', '=', clienteId)
+            .where('usuarios.isActive', '=', 1)
+            .where('roles.nombre', '=', 'OPERADOR')
+            .orderBy('usuarios.complete_name', 'asc')
+            .execute();
+    }
+
+    async editarOperadoresCliente(
+        clienteId: number,
+        data: EditarOperadoresClienteDto,
+    ) {
+        const { usuario_ids } = data;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateClienteActivo(clienteId, trx);
+            await this.validateUsuariosExisten(usuario_ids, trx);
+
+            const actuales = await trx
+                .selectFrom('cliente_operador')
+                .select('usuario_id')
+                .where('cliente_id', '=', clienteId)
+                .execute();
+            const vinculados = new Set(actuales.map((v) => v.usuario_id));
+
+            await trx
+                .deleteFrom('cliente_operador')
+                .where('cliente_id', '=', clienteId)
+                .where('usuario_id', 'not in', usuario_ids)
+                .execute();
+
+            const nuevos = usuario_ids.filter((id) => !vinculados.has(id));
+            if (nuevos.length > 0) {
+                await this.linkOperadores(clienteId, nuevos, trx);
+            }
+
+            return true;
+        });
+    }
+
     private async linkOperadores(
         clienteId: number,
         usuarioIds: number[],
@@ -219,6 +298,25 @@ export class ClientesRepository {
         }
 
         return producto;
+    }
+
+    private async validateUsuariosExisten(
+        usuarioIds: number[],
+        db: Kysely<Database>,
+    ) {
+        const existentes = await db
+            .selectFrom('usuarios')
+            .select('id')
+            .where('id', 'in', usuarioIds)
+            .execute();
+        const ids = new Set(existentes.map((u) => u.id));
+
+        const faltante = usuarioIds.find((id) => !ids.has(id));
+        if (faltante !== undefined) {
+            throw new BadRequestException(
+                `El usuario con id '${faltante}' no existe`,
+            );
+        }
     }
 
     private async validateRtnDisponible(rtn: string, db: Kysely<Database>) {

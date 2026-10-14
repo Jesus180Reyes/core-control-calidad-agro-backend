@@ -15,6 +15,8 @@ import type { Request } from 'express';
 import { ClientesService } from './clientes.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
+import { EditarClienteDto } from './dto/editar-cliente.dto';
+import { EditarOperadoresClienteDto } from './dto/editar-operadores-cliente.dto';
 import { FiltrosClientesDto } from './dto/filtros-clientes.dto';
 import { PaginacionClientesDto } from './dto/paginacion-clientes.dto';
 
@@ -80,13 +82,35 @@ export class ClientesController {
         };
     }
 
+    @Get(':id/operadores')
+    @ApiOperation({
+        summary: 'Operadores vinculados a un cliente',
+        description:
+            'Devuelve los operadores vinculados al cliente por cliente_operador, cada uno como ' +
+            '{ id, nombre }, ordenados por nombre ASC. Solo lista usuarios con isActive = 1 y rol ' +
+            'OPERADOR, el mismo filtro que GET /catalogos/operadores: un vinculo a un usuario ' +
+            'inactivo o con otro rol existe en la tabla pero no se muestra. Un cliente sin ' +
+            'operadores devuelve una lista vacia. Un cliente inexistente o rechazado responde 400. ' +
+            'NO valida el vinculo cliente_operador del que llama: cualquier usuario autenticado ' +
+            'lee los vinculos de cualquier cliente.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del cliente', example: 1 })
+    async findOperadores(@Param('id', ParseIntPipe) id: number) {
+        const operadores = await this.clientesService.findOperadores(id);
+        return {
+            ok: true,
+            msg: 'Operadores del cliente obtenidos correctamente',
+            operadores,
+        };
+    }
+
     @Post()
     @HttpCode(201)
     @ApiOperation({
         summary: 'Crear un cliente',
         description:
             'Crea el cliente y, con usuario_ids, lo vincula a esos operadores en cliente_operador. ' +
-            'Esa es la unica forma de crear el vinculo: no hay endpoints para gestionarlo despues. ' +
+            'Despues de crear el cliente, los vinculos se cambian con PATCH /clientes/:id/operadores. ' +
             'El rtn y el codigo_exportacion deben estar libres, pero la unicidad se valida solo en ' +
             'codigo, sin restriccion en MySQL, y los validadores ignoran a los clientes rechazados, ' +
             'asi que un rtn rechazado se puede reutilizar. Devuelve el id creado, no el cliente. ' +
@@ -125,6 +149,65 @@ export class ClientesController {
         return {
             ok: rechazado,
             msg: 'Cliente rechazado correctamente',
+        };
+    }
+
+    @Patch(':id/operadores')
+    @ApiOperation({
+        summary: 'Reemplazar los operadores vinculados a un cliente',
+        description:
+            'La lista usuario_ids REEMPLAZA el conjunto completo de vinculos del cliente en ' +
+            'cliente_operador: se insertan los ids que no estaban, se BORRAN fisicamente los ' +
+            'vinculos que no vienen en la lista y los que ya estaban no se tocan. Exige al menos ' +
+            'un id y no admite repetidos (400). Solo valida que cada usuario exista, no su rol ni ' +
+            'si esta activo, asi que se puede vincular a un ADMIN o a un usuario inactivo. Ojo: ' +
+            'GET /clientes/:id/operadores solo muestra operadores activos, y un vinculo que ese GET ' +
+            'no muestra tambien se borra si no viene en la lista. Un cliente inexistente o ' +
+            'rechazado responde 400. No escribe nada en el cliente. Responde { ok, msg } sin ' +
+            'payload, 200 aunque el conjunto no cambie. ' +
+            'NO valida el vinculo cliente_operador del que llama: cualquier usuario autenticado ' +
+            'puede cambiar los operadores de cualquier cliente, incluido vincularse a si mismo.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del cliente', example: 1 })
+    async editarOperadores(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: EditarOperadoresClienteDto,
+    ) {
+        const editado = await this.clientesService.editarOperadores(id, dto);
+        return {
+            ok: editado,
+            msg: 'Operadores del cliente actualizados correctamente',
+        };
+    }
+
+    @Patch(':id')
+    @ApiOperation({
+        summary: 'Editar un cliente',
+        description:
+            'Edicion parcial de un cliente activo. Campos editables, todos opcionales: nombre, ' +
+            'producto_id, correo_contacto, telefono, direccion_planta, ubicacionLongitud, ' +
+            'ubicacionLatitude y constancia_exonerado; hay que enviar al menos uno o responde 400. ' +
+            'Solo se escriben los campos enviados, mas updated_at y actualizado_por (el usuario del ' +
+            'token). rtn y codigo_exportacion NO se pueden editar: si llegan en el cuerpo se ignoran. ' +
+            'Ningun campo se puede vaciar: null o una cadena vacia responden 400. Cambiar el nombre ' +
+            'cambia tambien el nombre que muestran las facturas ya registradas en ' +
+            'GET /documentos-fiscales/:id, porque el documento lee el cliente por JOIN. Un cliente ' +
+            'rechazado o inexistente responde 400, igual que un producto_id inexistente o inactivo. ' +
+            'Responde { ok, msg } sin el cliente. ' +
+            'NO valida el vinculo cliente_operador: cualquier usuario autenticado puede editar ' +
+            'cualquier cliente.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del cliente a editar', example: 1 })
+    async editar(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: EditarClienteDto,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const editado = await this.clientesService.editar(id, dto, userId);
+        return {
+            ok: editado,
+            msg: 'Cliente actualizado correctamente',
         };
     }
 }

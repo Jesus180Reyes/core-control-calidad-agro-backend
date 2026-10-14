@@ -49,4 +49,13 @@ export class CatalogosRepository {
             .execute();
         return unidades;
     }
+
+    async getEstadosCalidad() {
+        const estados = await this.db
+            .selectFrom('estados_calidad')
+            .select(['id', 'nombre'])
+            .orderBy('id', 'asc')
+            .execute();
+        return estados;
+    }
 }

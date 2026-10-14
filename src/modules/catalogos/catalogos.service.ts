@@ -20,4 +20,8 @@ export class CatalogosService {
     async findUnidadesMedida() {
         return await this.catalogosRepository.getUnidadesMedida();
     }
+
+    async findEstadosCalidad() {
+        return await this.catalogosRepository.getEstadosCalidad();
+    }
 }

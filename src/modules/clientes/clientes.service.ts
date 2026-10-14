@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ClientesRepository } from './repository/clientes.repository';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
+import { EditarClienteDto } from './dto/editar-cliente.dto';
+import { EditarOperadoresClienteDto } from './dto/editar-operadores-cliente.dto';
 import { FiltrosClientesDto } from './dto/filtros-clientes.dto';
 import { PaginacionClientesDto } from './dto/paginacion-clientes.dto';
 
@@ -30,6 +32,25 @@ export class ClientesService {
             clienteId,
             dto,
             userId,
+        );
+    }
+
+    async editar(clienteId: number, dto: EditarClienteDto, userId: number) {
+        return await this.clientesRepository.editarCliente(
+            clienteId,
+            dto,
+            userId,
+        );
+    }
+
+    async findOperadores(clienteId: number) {
+        return await this.clientesRepository.getOperadoresByCliente(clienteId);
+    }
+
+    async editarOperadores(clienteId: number, dto: EditarOperadoresClienteDto) {
+        return await this.clientesRepository.editarOperadoresCliente(
+            clienteId,
+            dto,
         );
     }
 }
