@@ -1,6 +1,6 @@
 # SPEC 42 — Gestión de operadores vinculados a un cliente
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01 (tabla `cliente_operador` y `usuario_ids` en `POST /clientes`), SPEC 11 (`validateClienteActivo`), SPEC 22 (convención de Swagger), SPEC 39 (filtro de operadores activos por rol `OPERADOR`)
 > **Date:** 2026-10-14
 > **Objective:** Agregar `GET /clientes/:id/operadores`, que lista los operadores vinculados a un cliente, y `PATCH /clientes/:id/operadores`, que reemplaza ese conjunto de vínculos por la lista enviada.
@@ -220,28 +220,28 @@ La posición de los handlers no carga peso.
 
 ## Acceptance criteria
 
-- [ ] El route log muestra **47** rutas, con `GET /clientes/:id/operadores` y `PATCH /clientes/:id/operadores` entre ellas.
-- [ ] Sin header `Authorization`, las dos rutas responden 401.
-- [ ] Con el token de un `OPERADOR` sin vínculo con el cliente, las dos rutas responden 200.
+- [X] El route log muestra **47** rutas, con `GET /clientes/:id/operadores` y `PATCH /clientes/:id/operadores` entre ellas.
+- [X] Sin header `Authorization`, las dos rutas responden 401.
+- [X] Con el token de un `OPERADOR` sin vínculo con el cliente, las dos rutas responden 200.
 - [ ] `GET /clientes/:id/operadores` responde `{ ok: true, msg: 'Operadores del cliente obtenidos correctamente', operadores }`, y cada elemento tiene exactamente las claves `id` y `nombre`.
-- [ ] `operadores` coincide con una consulta directa en MySQL de los vínculos del cliente cuyo usuario tiene `isActive = 1` y rol `OPERADOR`, ordenado por nombre ascendente.
-- [ ] Un vínculo a un usuario con `isActive = 0` o con rol `ADMIN` existe en `cliente_operador` y no aparece en el `GET`.
-- [ ] Un cliente sin vínculos responde 200 con `operadores: []`.
-- [ ] Las dos rutas responden 400 `El cliente con id 'X' no existe` con un id inexistente, y 400 `El cliente con id 'X' ya fue rechazado` con un cliente rechazado. En el `PATCH`, `cliente_operador` no cambia.
-- [ ] `PATCH` de `[X, Y]` a `[Y, Z]` responde `{ ok: true, msg: 'Operadores del cliente actualizados correctamente' }`, borra la fila de `X`, inserta la de `Z` y deja la de `Y` con el mismo `id` y `created_at`.
-- [ ] `PATCH` con el mismo conjunto que ya existe responde 200 y no cambia ninguna fila.
-- [ ] Después del `PATCH`, `GET /clientes` con el token de `X` no trae al cliente y con el de `Z` sí.
-- [ ] `{ "usuario_ids": [] }` responde 400 `Debe vincular al menos un usuario`.
-- [ ] `{}` responde 400 `Usuarios a vincular requeridos`.
-- [ ] `{ "usuario_ids": [4, 4] }` responde 400 `No se permiten usuarios repetidos`.
-- [ ] `{ "usuario_ids": [0] }` y `{ "usuario_ids": ["4"] }` responden 400.
-- [ ] Un `usuario_id` que no existe responde 400 `El usuario con id 'X' no existe` y `cliente_operador` no cambia.
-- [ ] Un `usuario_id` de un `ADMIN` o de un usuario inactivo se vincula con 200.
-- [ ] El `PATCH` no cambia ninguna columna de `clientes`.
-- [ ] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id` y `PATCH /clientes/:id/rechazar` responden igual que antes.
-- [ ] `/docs` muestra las dos rutas bajo el tag `clientes`, agrupadas en `/clientes/{id}/operadores`, con su descripción y su `@ApiParam`.
-- [ ] La descripción de `POST /clientes` en `/docs` ya no dice que no hay endpoints para gestionar el vínculo.
-- [ ] No se aplicó DDL y no se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
+- [X] `operadores` coincide con una consulta directa en MySQL de los vínculos del cliente cuyo usuario tiene `isActive = 1` y rol `OPERADOR`, ordenado por nombre ascendente.
+- [X] Un vínculo a un usuario con `isActive = 0` o con rol `ADMIN` existe en `cliente_operador` y no aparece en el `GET`.
+- [X] Un cliente sin vínculos responde 200 con `operadores: []`.
+- [X] Las dos rutas responden 400 `El cliente con id 'X' no existe` con un id inexistente, y 400 `El cliente con id 'X' ya fue rechazado` con un cliente rechazado. En el `PATCH`, `cliente_operador` no cambia.
+- [X] `PATCH` de `[X, Y]` a `[Y, Z]` responde `{ ok: true, msg: 'Operadores del cliente actualizados correctamente' }`, borra la fila de `X`, inserta la de `Z` y deja la de `Y` con el mismo `id` y `created_at`.
+- [X] `PATCH` con el mismo conjunto que ya existe responde 200 y no cambia ninguna fila.
+- [X] Después del `PATCH`, `GET /clientes` con el token de `X` no trae al cliente y con el de `Z` sí.
+- [X] `{ "usuario_ids": [] }` responde 400 `Debe vincular al menos un usuario`.
+- [X] `{}` responde 400 `Usuarios a vincular requeridos`.
+- [X] `{ "usuario_ids": [4, 4] }` responde 400 `No se permiten usuarios repetidos`.
+- [X] `{ "usuario_ids": [0] }` y `{ "usuario_ids": ["4"] }` responden 400.
+- [X] Un `usuario_id` que no existe responde 400 `El usuario con id 'X' no existe` y `cliente_operador` no cambia.
+- [X] Un `usuario_id` de un `ADMIN` o de un usuario inactivo se vincula con 200.
+- [X] El `PATCH` no cambia ninguna columna de `clientes`.
+- [X] `POST /clientes`, `GET /clientes`, `GET /clientes/all`, `PATCH /clientes/:id` y `PATCH /clientes/:id/rechazar` responden igual que antes.
+- [X] `/docs` muestra las dos rutas bajo el tag `clientes`, agrupadas en `/clientes/{id}/operadores`, con su descripción y su `@ApiParam`.
+- [X] La descripción de `POST /clientes` en `/docs` ya no dice que no hay endpoints para gestionar el vínculo.
+- [X] No se aplicó DDL y no se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
 
 ---
 
