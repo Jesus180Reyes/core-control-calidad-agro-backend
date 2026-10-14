@@ -81,6 +81,28 @@ export class ClientesController {
         };
     }
 
+    @Get(':id/operadores')
+    @ApiOperation({
+        summary: 'Operadores vinculados a un cliente',
+        description:
+            'Devuelve los operadores vinculados al cliente por cliente_operador, cada uno como ' +
+            '{ id, nombre }, ordenados por nombre ASC. Solo lista usuarios con isActive = 1 y rol ' +
+            'OPERADOR, el mismo filtro que GET /catalogos/operadores: un vinculo a un usuario ' +
+            'inactivo o con otro rol existe en la tabla pero no se muestra. Un cliente sin ' +
+            'operadores devuelve una lista vacia. Un cliente inexistente o rechazado responde 400. ' +
+            'NO valida el vinculo cliente_operador del que llama: cualquier usuario autenticado ' +
+            'lee los vinculos de cualquier cliente.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del cliente', example: 1 })
+    async findOperadores(@Param('id', ParseIntPipe) id: number) {
+        const operadores = await this.clientesService.findOperadores(id);
+        return {
+            ok: true,
+            msg: 'Operadores del cliente obtenidos correctamente',
+            operadores,
+        };
+    }
+
     @Post()
     @HttpCode(201)
     @ApiOperation({

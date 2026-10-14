@@ -41,4 +41,8 @@ export class ClientesService {
             userId,
         );
     }
+
+    async findOperadores(clienteId: number) {
+        return await this.clientesRepository.getOperadoresByCliente(clienteId);
+    }
 }
