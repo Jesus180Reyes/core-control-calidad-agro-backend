@@ -112,6 +112,7 @@ CREATE TABLE `clientes` (
   `isActive` tinyint(1) DEFAULT '1',
   `created_at` timestamp NULL DEFAULT (now()),
   `updated_at` timestamp NULL DEFAULT (now()),
+  `actualizado_por` int DEFAULT NULL,
   `motivo_rechazo` varchar(255) DEFAULT NULL,
   `rechazado_por` int DEFAULT NULL,
   `rechazado_en` datetime DEFAULT NULL,
@@ -122,7 +123,9 @@ CREATE TABLE `clientes` (
   KEY `created_by` (`created_by`),
   KEY `fk_clientes_producto` (`producto_id`),
   KEY `fk_clientes_rechazado_por` (`rechazado_por`),
+  KEY `fk_clientes_actualizado_por` (`actualizado_por`),
   CONSTRAINT `clientes_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `usuarios` (`id`),
+  CONSTRAINT `fk_clientes_actualizado_por` FOREIGN KEY (`actualizado_por`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `fk_clientes_producto` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`),
   CONSTRAINT `fk_clientes_rechazado_por` FOREIGN KEY (`rechazado_por`) REFERENCES `usuarios` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
