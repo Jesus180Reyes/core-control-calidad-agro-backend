@@ -15,6 +15,7 @@ import type { Request } from 'express';
 import { ClientesService } from './clientes.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
+import { EditarClienteDto } from './dto/editar-cliente.dto';
 import { FiltrosClientesDto } from './dto/filtros-clientes.dto';
 import { PaginacionClientesDto } from './dto/paginacion-clientes.dto';
 
@@ -125,6 +126,37 @@ export class ClientesController {
         return {
             ok: rechazado,
             msg: 'Cliente rechazado correctamente',
+        };
+    }
+
+    @Patch(':id')
+    @ApiOperation({
+        summary: 'Editar un cliente',
+        description:
+            'Edicion parcial de un cliente activo. Campos editables, todos opcionales: nombre, ' +
+            'producto_id, correo_contacto, telefono, direccion_planta, ubicacionLongitud, ' +
+            'ubicacionLatitude y constancia_exonerado; hay que enviar al menos uno o responde 400. ' +
+            'Solo se escriben los campos enviados, mas updated_at y actualizado_por (el usuario del ' +
+            'token). rtn y codigo_exportacion NO se pueden editar: si llegan en el cuerpo se ignoran. ' +
+            'Ningun campo se puede vaciar: null o una cadena vacia responden 400. Cambiar el nombre ' +
+            'cambia tambien el nombre que muestran las facturas ya registradas en ' +
+            'GET /documentos-fiscales/:id, porque el documento lee el cliente por JOIN. Un cliente ' +
+            'rechazado o inexistente responde 400, igual que un producto_id inexistente o inactivo. ' +
+            'Responde { ok, msg } sin el cliente. ' +
+            'NO valida el vinculo cliente_operador: cualquier usuario autenticado puede editar ' +
+            'cualquier cliente.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del cliente a editar', example: 1 })
+    async editar(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: EditarClienteDto,
+        @Req() req: Request,
+    ) {
+        const { userId } = req.user as { userId: number };
+        const editado = await this.clientesService.editar(id, dto, userId);
+        return {
+            ok: editado,
+            msg: 'Cliente actualizado correctamente',
         };
     }
 }
