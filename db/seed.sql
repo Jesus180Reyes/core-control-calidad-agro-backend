@@ -77,6 +77,7 @@ INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isAct
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (18,'MODULO-ADMINISTRACION','Ingresar Modulo de Administracion','El que tenga el permiso puede ingresar al modulo de administracion',1,'2026-09-22 22:46:52');
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (19,'VER-MIRADOR-3D','Ingresar al modulo de Mirador 3D','El que tenga el permiso puede ingresar al modulo de Mirador 3D',1,'2026-10-06 16:37:54');
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (20,'VER-METRICAS','Ingresar al modulo Metricas','El que tenga el permiso puede ingresar al modulo de Metricas',1,'2026-10-10 00:59:45');
+INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (21,'EDITAR-CLIENTE','Editar cliente','PATCH /clientes/:id: editar los datos de un cliente activo',1,'2026-10-14 17:14:11');
 /*!40000 ALTER TABLE `catalogo_permisos` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -124,6 +125,8 @@ INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) 
 INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (57,4,14,1,'2026-10-11 04:31:20');
 INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (58,4,15,1,'2026-10-11 04:31:28');
 INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (59,4,16,1,'2026-10-11 04:31:36');
+INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (60,2,21,1,'2026-10-14 17:14:11');
+INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (61,3,21,1,'2026-10-14 17:14:11');
 /*!40000 ALTER TABLE `permisos` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
