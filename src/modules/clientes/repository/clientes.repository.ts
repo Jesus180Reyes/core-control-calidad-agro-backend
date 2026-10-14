@@ -2,6 +2,7 @@ import { DatabaseService } from 'src/database/database.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateClienteDto } from '../dto/create-cliente.dto';
 import { RechazarClienteDto } from '../dto/rechazar-cliente.dto';
+import { EditarClienteDto } from '../dto/editar-cliente.dto';
 import { FiltrosClientesDto } from '../dto/filtros-clientes.dto';
 import { PaginacionClientesDto } from '../dto/paginacion-clientes.dto';
 import { Kysely, sql } from 'kysely';
@@ -177,6 +178,36 @@ export class ClientesRepository {
                     motivo_rechazo: motivo,
                     rechazado_por: userId,
                     rechazado_en: sql<Date>`NOW()`,
+                })
+                .where('id', '=', clienteId)
+                .execute();
+
+            return true;
+        });
+    }
+
+    async editarCliente(
+        clienteId: number,
+        data: EditarClienteDto,
+        userId: number,
+    ) {
+        const campos = Object.fromEntries(
+            Object.entries(data).filter(([, valor]) => valor !== undefined),
+        ) as Partial<EditarClienteDto>;
+
+        return await this.db.transaction().execute(async (trx) => {
+            await this.validateClienteActivo(clienteId, trx);
+
+            if (campos.producto_id !== undefined) {
+                await this.validateProducto(campos.producto_id, trx);
+            }
+
+            await trx
+                .updateTable('clientes')
+                .set({
+                    ...campos,
+                    updated_at: sql<Date>`NOW()`,
+                    actualizado_por: userId,
                 })
                 .where('id', '=', clienteId)
                 .execute();
