@@ -16,6 +16,7 @@ import { ClientesService } from './clientes.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { RechazarClienteDto } from './dto/rechazar-cliente.dto';
 import { EditarClienteDto } from './dto/editar-cliente.dto';
+import { EditarOperadoresClienteDto } from './dto/editar-operadores-cliente.dto';
 import { FiltrosClientesDto } from './dto/filtros-clientes.dto';
 import { PaginacionClientesDto } from './dto/paginacion-clientes.dto';
 
@@ -148,6 +149,34 @@ export class ClientesController {
         return {
             ok: rechazado,
             msg: 'Cliente rechazado correctamente',
+        };
+    }
+
+    @Patch(':id/operadores')
+    @ApiOperation({
+        summary: 'Reemplazar los operadores vinculados a un cliente',
+        description:
+            'La lista usuario_ids REEMPLAZA el conjunto completo de vinculos del cliente en ' +
+            'cliente_operador: se insertan los ids que no estaban, se BORRAN fisicamente los ' +
+            'vinculos que no vienen en la lista y los que ya estaban no se tocan. Exige al menos ' +
+            'un id y no admite repetidos (400). Solo valida que cada usuario exista, no su rol ni ' +
+            'si esta activo, asi que se puede vincular a un ADMIN o a un usuario inactivo. Ojo: ' +
+            'GET /clientes/:id/operadores solo muestra operadores activos, y un vinculo que ese GET ' +
+            'no muestra tambien se borra si no viene en la lista. Un cliente inexistente o ' +
+            'rechazado responde 400. No escribe nada en el cliente. Responde { ok, msg } sin ' +
+            'payload, 200 aunque el conjunto no cambie. ' +
+            'NO valida el vinculo cliente_operador del que llama: cualquier usuario autenticado ' +
+            'puede cambiar los operadores de cualquier cliente, incluido vincularse a si mismo.',
+    })
+    @ApiParam({ name: 'id', description: 'Id del cliente', example: 1 })
+    async editarOperadores(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: EditarOperadoresClienteDto,
+    ) {
+        const editado = await this.clientesService.editarOperadores(id, dto);
+        return {
+            ok: editado,
+            msg: 'Operadores del cliente actualizados correctamente',
         };
     }
 
