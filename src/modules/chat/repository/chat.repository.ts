@@ -37,7 +37,16 @@ type EstadoDeLote = 'abierto' | 'finalizado' | 'pendiente_aprobacion';
  * con `CURDATE()`, nunca en Node y menos en el modelo: el reloj que cuenta es
  * el mismo con el que `NOW()` escribio los `created_at`.
  */
-type Periodo = 'hoy' | 'esta_semana' | 'este_mes';
+const PERIODOS = [
+    'hoy',
+    'ayer',
+    'esta_semana',
+    'semana_pasada',
+    'ultimos_7_dias',
+    'este_mes',
+    'mes_pasado',
+] as const;
+type Periodo = (typeof PERIODOS)[number];
 
 /**
  * Los filtros que comparten las dos herramientas de pesajes. Cada una usa los
@@ -1574,6 +1583,11 @@ export class ChatRepository {
      * como el SPEC 16 incluye el dia entero pese a que `created_at` es DATETIME.
      * "esta semana" empieza el lunes —`WEEKDAY()` devuelve 0 ese dia— y "este
      * mes" el dia 1, no hace 30 dias.
+     *
+     * Los periodos pasados (`ayer`, `semana_pasada`, `mes_pasado`) son los
+     * unicos con las dos fronteras: terminan donde empieza el periodo en curso,
+     * asi que su `hasta` es el `desde` del actual. `ultimos_7_dias` cuenta hoy
+     * como uno de los siete, igual que los 30 dias del SPEC 35.
      */
     private ventanaDelPeriodo(filtros: FiltrosDePesajes): Ventana {
         if (filtros.desde !== undefined || filtros.hasta !== undefined) {
@@ -1601,15 +1615,38 @@ export class ChatRepository {
                     hasta: sql<Date>`DATE_ADD(CURDATE(), INTERVAL 1 DAY)`,
                     descripcion: 'solo los de hoy',
                 };
+            case 'ayer':
+                return {
+                    desde: sql<Date>`DATE_SUB(CURDATE(), INTERVAL 1 DAY)`,
+                    hasta: sql<Date>`CURDATE()`,
+                    descripcion: 'solo los de ayer',
+                };
             case 'esta_semana':
                 return {
                     desde: sql<Date>`DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`,
                     descripcion: 'desde el lunes de esta semana',
                 };
+            case 'semana_pasada':
+                return {
+                    desde: sql<Date>`DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) + 7 DAY)`,
+                    hasta: sql<Date>`DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`,
+                    descripcion: 'de lunes a domingo de la semana pasada',
+                };
+            case 'ultimos_7_dias':
+                return {
+                    desde: sql<Date>`DATE_SUB(CURDATE(), INTERVAL 6 DAY)`,
+                    descripcion: 'los ultimos 7 dias, hoy incluido',
+                };
             case 'este_mes':
                 return {
                     desde: sql<Date>`DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
                     descripcion: 'desde el dia 1 de este mes',
+                };
+            case 'mes_pasado':
+                return {
+                    desde: sql<Date>`DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)`,
+                    hasta: sql<Date>`DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
+                    descripcion: 'todo el mes pasado',
                 };
             default:
                 return {};
@@ -1704,10 +1741,10 @@ export class ChatRepository {
             : undefined;
     }
 
-    /** Uno de los tres periodos, o nada. Un valor raro no se interpreta. */
+    /** Uno de los periodos declarados, o nada. Un valor raro no se interpreta. */
     private aPeriodo(valor: unknown): Periodo | undefined {
-        return valor === 'hoy' || valor === 'esta_semana' || valor === 'este_mes'
-            ? valor
+        return PERIODOS.includes(valor as Periodo)
+            ? (valor as Periodo)
             : undefined;
     }
 

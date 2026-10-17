@@ -178,7 +178,11 @@ describe('ChatRepository / coercion de argumentos', () => {
 
     it('no interpreta un periodo que no esta en la lista', () => {
         expect(p.aPeriodo('esta_semana')).toBe('esta_semana');
-        expect(p.aPeriodo('ayer')).toBeUndefined();
+        expect(p.aPeriodo('ayer')).toBe('ayer');
+        expect(p.aPeriodo('mes_pasado')).toBe('mes_pasado');
+        // Lo que el prompt manda decir en voz alta, nunca adivinar.
+        expect(p.aPeriodo('antier')).toBeUndefined();
+        expect(p.aPeriodo('ultimos_15_dias')).toBeUndefined();
     });
 
     it('traduce el tri-estado de aprobado sin confundir null con rechazado', () => {
@@ -217,6 +221,26 @@ describe('ChatRepository / ventana temporal', () => {
         expect(ventana({ periodo: 'este_mes' }).descripcion).toBe(
             'desde el dia 1 de este mes',
         );
+    });
+
+    it('los periodos pasados cierran donde empieza el periodo en curso', () => {
+        for (const [periodo, descripcion] of [
+            ['ayer', 'solo los de ayer'],
+            ['semana_pasada', 'de lunes a domingo de la semana pasada'],
+            ['mes_pasado', 'todo el mes pasado'],
+        ]) {
+            const resultado = ventana({ periodo });
+            expect(resultado.desde).toBeDefined();
+            expect(resultado.hasta).toBeDefined();
+            expect(resultado.descripcion).toBe(descripcion);
+        }
+    });
+
+    it('los ultimos 7 dias no tienen frontera de cierre', () => {
+        const resultado = ventana({ periodo: 'ultimos_7_dias' });
+        expect(resultado.desde).toBeDefined();
+        expect(resultado.hasta).toBeUndefined();
+        expect(resultado.descripcion).toBe('los ultimos 7 dias, hoy incluido');
     });
 
     it('una fecha explicita gana al periodo y lo descarta entero', () => {
