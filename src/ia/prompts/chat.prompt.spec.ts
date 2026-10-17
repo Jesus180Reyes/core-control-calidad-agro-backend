@@ -90,3 +90,49 @@ describe('chat.prompt / agradecimientos y despedidas', () => {
         expect(INSTRUCCION_SISTEMA_CHAT).toContain(FRASE_IDENTIDAD);
     });
 });
+
+/**
+ * Pruebas sobre el TEXTO del vocabulario del dominio. Como las de arriba, no
+ * comprueban que el modelo traduzca bien: eso solo se ve contra la API real.
+ */
+describe('chat.prompt / vocabulario del dominio', () => {
+    const posVocabulario = INSTRUCCION_SISTEMA_CHAT.indexOf('VOCABULARIO:');
+
+    it('la seccion existe y va despues de las frases literales', () => {
+        expect(posVocabulario).toBeGreaterThan(
+            INSTRUCCION_SISTEMA_CHAT.indexOf('SOLO LECTURA:'),
+        );
+        expect(posVocabulario).toBeLessThan(
+            INSTRUCCION_SISTEMA_CHAT.indexOf('CIFRAS:'),
+        );
+    });
+
+    it('traduce a los valores reales de las herramientas', () => {
+        const seccion = INSTRUCCION_SISTEMA_CHAT.slice(posVocabulario);
+        expect(seccion).toContain('fuera_de_rango true');
+        expect(seccion).toContain('pendiente_aprobacion');
+        expect(seccion).toContain('metricas_de_lote');
+        expect(seccion).toContain('detalle_de_pesaje');
+    });
+
+    it('traduce las expresiones de Honduras sin convertir unidades', () => {
+        const seccion = INSTRUCCION_SISTEMA_CHAT.slice(posVocabulario);
+        expect(seccion).toContain('espanol de Honduras');
+        expect(seccion).toContain('"Aplazar" es reprobar');
+        expect(seccion).toContain('conviertas nunca');
+    });
+
+    it('el cheque hondureno cuenta como cortesia', () => {
+        const posCheque = INSTRUCCION_SISTEMA_CHAT.indexOf('"cheque"');
+        expect(posCheque).toBeGreaterThan(-1);
+        expect(posCheque).toBeLessThan(
+            INSTRUCCION_SISTEMA_CHAT.indexOf(FRASE_CORTESIA),
+        );
+    });
+
+    it('prohibe usar estado_calidad_id sin conocer los ids', () => {
+        expect(INSTRUCCION_SISTEMA_CHAT).toContain(
+            'no uses estado_calidad_id',
+        );
+    });
+});
