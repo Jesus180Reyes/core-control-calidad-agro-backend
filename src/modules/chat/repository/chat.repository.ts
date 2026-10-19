@@ -858,6 +858,7 @@ export class ChatRepository {
                 'lotes.aprobado_en',
                 'finalizador.complete_name as finalizado_por',
                 'lotes.finalizado_en',
+                'lotes.observaciones_aprobador',
             ])
             .where('lotes.cliente_id', '=', clienteId);
 
@@ -922,6 +923,9 @@ export class ChatRepository {
                         aprobado_en: this.fechaHora(lote.aprobado_en),
                         finalizado_por: lote.finalizado_por,
                         finalizado_en: this.fechaHora(lote.finalizado_en),
+                        // SPEC 46: NULL o '' (SPEC 45) llegan al modelo como null.
+                        observaciones_aprobador:
+                            lote.observaciones_aprobador?.trim() || null,
                     }
                     : {}),
             })),

@@ -279,7 +279,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'lotes_de_cliente',
         description:
-            'Lista los lotes de un cliente. Por defecto solo los abiertos: pide otro estado unicamente si el usuario lo dice.',
+            'Lista los lotes de un cliente. Por defecto solo los abiertos: pide otro estado unicamente si el usuario lo dice. Los lotes finalizados traen ademas quien los aprobo y finalizo, y la observacion final que dejo el aprobador al cerrarlos, o null si no dejo ninguna.',
         parameters: {
             type: 'OBJECT',
             properties: {
