@@ -1,6 +1,6 @@
 # SPEC 43 — Catálogo de orígenes de lotes
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 02 (módulo `lotes` y `POST /lotes`), SPEC 09 (convención de `catalogos`), SPEC 22 (convención de Swagger), SPEC 24 (`GET /lotes/cliente/:clienteId/all/finalizados`)
 > **Date:** 2026-10-17
 > **Objective:** Crear la tabla `origenes`, un catálogo **global** compartido por todos los clientes, con `POST /origenes` para darlos de alta y `GET /catalogos/origenes` para el selector, y permitir que un lote guarde su origen y lo muestre en los cuatro listados de lotes.
