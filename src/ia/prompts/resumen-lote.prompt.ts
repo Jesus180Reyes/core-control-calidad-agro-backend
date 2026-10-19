@@ -16,6 +16,8 @@ export interface ResumenLotePayload {
     cliente: string;
     producto: string | null;
     variedad_o_talla: string | null;
+    /** Nombre del origen (SPEC 43), o null si el lote se creo sin el. */
+    origen: string | null;
     unidad_medida: string | null;
     rango_peso: { minimo: number; ideal: number; maximo: number };
     pesajes: {
@@ -52,7 +54,7 @@ export interface ResumenLotePayload {
  * debajo, que es justo lo que el frontend no espera renderizar.
  *
  * La ultima regla es la defensa contra inyeccion de prompt: `nombre_lote`,
- * `variedad_o_talla` y el nombre del cliente son texto libre que alguien
+ * `variedad_o_talla`, el origen y el nombre del cliente son texto libre que alguien
  * escribio por API. Es la primera de tres barreras; las otras dos son el
  * rechazo con 502 de cualquier salida con etiqueta HTML y el renderizador del
  * frontend con el HTML crudo apagado.

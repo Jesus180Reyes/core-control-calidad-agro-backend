@@ -329,6 +329,7 @@ export class LotesRepository {
             cliente: datos.cliente,
             producto: datos.producto,
             variedad_o_talla: datos.variedad_o_talla,
+            origen: datos.origen,
             unidad_medida: datos.unidad_medida,
             rango_peso: {
                 minimo: Number(datos.peso_minimo),
@@ -405,9 +406,11 @@ export class LotesRepository {
                 'unidades_medida.id',
                 'lotes.unidad_medida_id',
             )
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.nombre_lote',
                 'lotes.variedad_o_talla',
+                'origenes.nombre as origen',
                 'lotes.peso_minimo',
                 'lotes.peso_ideal',
                 'lotes.peso_maximo',
