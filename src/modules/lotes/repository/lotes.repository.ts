@@ -32,6 +32,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -43,6 +44,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .where('lotes.estado', '=', 'abierto')
@@ -57,6 +59,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -68,6 +71,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .where('lotes.estado', '=', 'abierto')
@@ -81,6 +85,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -92,6 +97,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .where('lotes.estado', '=', 'cerrado')
@@ -109,6 +115,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
             .leftJoin('usuarios as finalizador', 'finalizador.id', 'lotes.finalizado_por')
             .select([
@@ -122,6 +129,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
                 'aprobador.complete_name as aprobado_por',
                 'lotes.aprobado_en',
                 'finalizador.complete_name as finalizado_por',

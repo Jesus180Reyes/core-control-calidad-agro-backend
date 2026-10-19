@@ -27,6 +27,8 @@ export class LotesController {
         summary: 'Lotes abiertos de un cliente',
         description:
             'Lotes en curso del cliente, con producto, unidad de medida y etapa resueltos a nombre. ' +
+            'Devuelve 11 campos; el ultimo es origen, el nombre del origen del lote por LEFT JOIN, ' +
+            'o null si el lote no tiene. Se muestra aunque el origen este inactivo. ' +
             'Filtra estado = abierto, asi que no lista los cerrados, rechazados ni finalizados. ' +
             'Nunca expone resumen_ia. Ordena por created_at DESC. ' +
             'Es una de las pocas rutas que SI valida el vinculo cliente_operador: responde 403 si ' +
@@ -49,7 +51,8 @@ export class LotesController {
     @ApiOperation({
         summary: 'Lotes abiertos de un cliente, sin validar el vinculo',
         description:
-            'Misma consulta y mismos campos que GET /lotes/cliente/{clienteId}. La unica ' +
+            'Misma consulta y mismos 11 campos que GET /lotes/cliente/{clienteId}, origen incluido ' +
+            '(nombre del origen o null). La unica ' +
             'diferencia es que NO valida el vinculo cliente_operador: cualquier usuario ' +
             'autenticado obtiene los lotes de cualquier cliente. ' +
             'Pese al nombre no son "todos" los lotes: filtra estado = abierto igual que la otra, ' +
@@ -71,7 +74,8 @@ export class LotesController {
         summary: 'Bandeja del aprobador: lotes en CLIENTE_FINAL',
         description:
             'Los lotes que un supervisor ya envio a la etapa CLIENTE_FINAL y esperan al aprobador. ' +
-            'Mismos campos que las otras dos rutas cliente/..., pero filtra estado = cerrado, asi ' +
+            'Mismos 11 campos que las otras dos rutas cliente/..., origen incluido (nombre del ' +
+            'origen o null), pero filtra estado = cerrado, asi ' +
             'que es el unico listado de lotes cerrados de la API. ' +
             'CUIDADO: la etapa se filtra con un id 2 hardcodeado, no resolviendo el codigo ' +
             'CLIENTE_FINAL. Si en un ambiente ese codigo no es el id 2, esta ruta devuelve datos ' +
@@ -98,7 +102,8 @@ export class LotesController {
             'etapa FINALIZADO. Es la unica lectura que los muestra: las otras tres rutas ' +
             'cliente/... filtran estado = abierto o la etapa CLIENTE_FINAL, asi que un lote ' +
             'finalizado desaparece de todas ellas y aparece aqui. ' +
-            'Devuelve los mismos 10 campos que sus tres hermanas mas cuatro de auditoria: ' +
+            'Devuelve 15 campos: los mismos 11 que sus tres hermanas, origen incluido (nombre del ' +
+            'origen o null, despues de etapa), mas cuatro de auditoria: ' +
             'aprobado_por, aprobado_en, finalizado_por y finalizado_en. Es el unico endpoint del ' +
             'proyecto que expone quien firmo un lote y cuando; los dos usuarios viajan con su ' +
             'nombre completo, nunca con su id. La terna de rechazo no viaja: en un lote ' +
