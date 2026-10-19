@@ -186,6 +186,16 @@ Once confirmed, follow these rules during the entire implementation:
 - Say: `Step N completed. Could you review the diff and let me know if I continue with Step N+1?`
 - Wait for confirmation before continuing.
 
+**Read the memory of what you touch.** Before the first step, read the root `CLAUDE.md` and the `CLAUDE.md` of every module the spec touches (`src/modules/<module>/CLAUDE.md`, `src/ia/CLAUDE.md`, `src/filters/CLAUDE.md`, `src/database/CLAUDE.md`). They hold the conventions and traps of each module.
+
+**Update the memory as part of the implementation, not after it.** When the code is done, update:
+
+- the `CLAUDE.md` of **each module the spec touched** — new routes with their contract (body, response, status codes, validators in order), new columns, decisions and what was deferred. If a new module has no `CLAUDE.md`, create one following the shape of the existing ones;
+- `src/database/CLAUDE.md` if the spec carried DDL;
+- the **root** `CLAUDE.md` **only** for what crosses modules: a new env var, the route counts, the spec range in "Spec-driven workflow", a new cross-cutting convention. Do not copy module detail into it.
+
+Write the current state, not history: no "this said X until spec Y", no recounting of earlier numbers — `specs/` and git already keep that. If a fact you are adding makes an existing sentence false, rewrite that sentence instead of appending a correction. Show the memory diff together with the code diff of the last step.
+
 **If during the implementation you find an ambiguity** the spec does not resolve:
 
 - Stop.
@@ -204,6 +214,7 @@ Once confirmed, follow these rules during the entire implementation:
 
 ```
 ✅ All steps of the plan are implemented.
+Memory updated: [list of CLAUDE.md files touched]
 
 Next step: verify the spec's acceptance criteria one by one.
 If they all pass, update the spec's state to "Implemented" (or the equivalent

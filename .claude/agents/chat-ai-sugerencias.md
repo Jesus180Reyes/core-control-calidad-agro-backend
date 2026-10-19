@@ -38,7 +38,7 @@ Lo que **no** es tu trabajo, y si aparece lo mandas a "Out of scope" o lo sugier
 
 Antes de proponer nada, lee:
 
-1. `CLAUDE.md` (ya lo tienes en contexto: convenciones del proyecto y la sección de `src/ia/`).
+1. `CLAUDE.md` (ya lo tienes en contexto: convenciones del proyecto), más `src/ia/CLAUDE.md` y `src/modules/chat/CLAUDE.md`, que no se cargan solos.
 2. `specs/28-chatbot-de-consultas-con-gemini.md` — el diseño del chat, sus reglas y lo que dejó fuera a propósito.
 3. `specs/30-identidad-del-asistente-agri.md` y cualquier spec posterior que toque el chat (busca con Grep `chat.prompt` o `Agri` en `specs/`). **Una mejora que un spec ya descartó no se propone de nuevo sin decir por qué cambió la situación.**
 4. `src/ia/prompts/chat.prompt.ts` — la instrucción de sistema, las frases literales (`FRASE_DECLINACION`, `FRASE_SOLO_LECTURA`, `FRASE_IDENTIDAD`, …) y las ocho herramientas.

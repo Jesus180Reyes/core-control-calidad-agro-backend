@@ -1,0 +1,39 @@
+# clientes module
+
+Specs: 01 (operator link), 08 (`/all`), 11 (rejection), 17 (filters), 29 (pagination), 41 (edit), 42 (operator links). Seven routes.
+
+## Access control
+
+**`ClientesRepository` validates `cliente_operador` on none of its four writes** (`createCliente`, `rechazarCliente`, `editarCliente`, `editarOperadoresCliente`). Routes that skip the check: `GET /clientes/all`, `PATCH /clientes/:id/rechazar`, `PATCH /clientes/:id`, `GET` and `PATCH /clientes/:id/operadores`. None has a permission code enforced. Specs 41 and 42 decided the permission is checked **in the front** and the backend accepts any authenticated user. The sharpest consequence: `PATCH /clientes/:id/operadores` is the write that **decides who passes** `validateVinculoOperador` everywhere else, and anyone can call it — including to link themselves to any client, which then shows up in their `GET /clientes` and lets them create lotes and weigh-ins for it. `GET /clientes/all` makes the `cliente_operador` filter of `GET /clientes` cosmetic.
+
+## Tables
+
+**`clientes`** — clients, with an `isActive` logical-deletion flag and the rejection trio `motivo_rechazo`/`rechazado_por`/`rechazado_en` (written only by `PATCH /clientes/:id/rechazar`). There is **no `clientes.estado`**: `POST /clientes` creates immediately-usable clients.
+- `constancia_exonerado VARCHAR(50) NULL` (spec 25) — the client's exoneration certificate, written only by `PATCH /clientes/:id`, **returned by no endpoint**. Never `selectAll()` here or it leaks into the six fields of the listings.
+- `actualizado_por INT NULL` (spec 41, FK `fk_clientes_actualizado_por` → `usuarios`) — the user of the **last** edit, written only by `PATCH /clientes/:id`, returned by no read. No edit history.
+- `updated_at` has `DEFAULT (now())` but **no `ON UPDATE CURRENT_TIMESTAMP`** (verified 2026-10-14): every `UPDATE` that wants it to move must write it. `rechazarCliente` does not.
+- `clientes.pais_id` deliberately **does not exist** (see `documentos-fiscales`): enabling a second country is its own spec.
+
+**`cliente_operador`** — many-to-many between clients and operator users, `UNIQUE (cliente_id, usuario_id)`, **no `isActive`**. Written by `POST /clientes` and replaced as a set by `PATCH /clientes/:id/operadores`, which deletes physically — the only table in the project whose rows are deleted.
+
+**Uniqueness.** The live table carries real `UNIQUE KEY rtn (rtn)` and `UNIQUE KEY codigo_exportacion (codigo_exportacion)` (no spec records who added them). So `validateRtnDisponible` and `validateCodigoExportacionDisponible` **ignore `isActive`**, exactly as the `UNIQUE` does, and answer a dedicated 400 (`pertenece a un cliente rechazado`) when the holder is rejected. **Rejecting a client does not free its RTN or export code** — spec 11's decision to free them was never possible against this database. `nombre` is not unique.
+
+## Routes
+
+**`POST /clientes`** — creates a client; optional `usuario_ids` links operators (existence only, no role or `isActive` check).
+
+**`GET /clientes`** — only clients linked to the caller via `cliente_operador`. **Accepts no filters** (spec 17 gave them to `/all` only, by decision). Its only query params are `pagina`/`limite` (`PaginacionClientesDto`); any other param is stripped, so `?nombre=agro` answers 200 with the full cartera. `total` counts the caller's cartera. Ordered `nombre` ASC, against `/all`'s `created_at` ASC — **deliberately not unified**.
+
+**`GET /clientes/all`** — **every** active client, no `cliente_operador` filter, the same six fields (`id`, `nombre`, `producto`, `codigo_exportacion`, `telefono`, `direccion_planta`). Four optional filters (spec 17): `nombre` (`LIKE '%v%'`), `producto_id` (`=` on the base-table column), `codigo_exportacion` and `rtn` (both **exact** `=` — identifiers, so a fragment returns `[]`). `?rtn` filters a column the response does not return, by decision. `isActive = 1` and the order always apply, so **no param lists a rejected client**. Plus `?pagina`/`?limite`, which never 400. **Divergence from the spec 16 convention, in code and in no spec:** `FiltrosClientesDto` uses `.optional()` **without** `.catch(undefined)`, so `?producto_id=abc`, `?producto_id=-1` and empty values (`?nombre=`, `?rtn=`, …) answer **400**, while an unknown param is stripped with a 200. The code is the truth; this DTO holds both policies at once.
+
+**`PATCH /clientes/:id/rechazar`** (spec 11) — logical deactivation, not an approval flow: `isActive = 0` plus the rejection trio. Body one required `motivo`, 5–255. `{ ok, msg }`. 400 if the client does not exist or is already rejected (`isActive = 0`; `NULL` is not rejected). Irreversible; no endpoint lists rejected clients. **No cascade**: the client's lotes stay open, their pesajes active, its `cliente_operador` rows intact — and `GET /lotes/cliente/:clienteId` still returns them while `POST /pesajes` still accepts weigh-ins against them, since neither validates `clientes.isActive`.
+
+**`PATCH /clientes/:id`** (spec 41) — **partial edit** of an active client. Eight optional fields — `nombre`, `producto_id`, `correo_contacto`, `telefono`, `direccion_planta`, `ubicacionLongitud`, `ubicacionLatitude`, `constancia_exonerado` — and **at least one**, or **400** `Debe enviar al menos un campo a editar`. **`rtn` and `codigo_exportacion` are not editable** (not in the DTO; a body with only them counts as empty). **No field can be emptied**: `null` and empty/whitespace strings are a 400. Text trimmed and capped at the column length (`direccion_planta` at 16383, its `TEXT` in bytes over 4). Writes only the fields sent plus `updated_at = NOW()` and `actualizado_por = userId`, so its width varies from 3 to 10 columns. **Overwrites** (unlike `completarDocumentoFiscal`). Transaction: 400 if the client does not exist or is rejected (`validateClienteActivo`), 400 if `producto_id` is missing/inactive (`validateProducto`). `{ ok, msg }`. **Editing `nombre` renames the client on every already registered invoice** in `GET /documentos-fiscales/:id`, which reads it by `JOIN` — an accepted risk.
+
+**`GET /clientes/:id/operadores`** (spec 42) — linked operators, so the front can preselect them. `{ ok, msg, operadores }`, each exactly `{ id, nombre }` (`complete_name as nombre`), ordered `complete_name` ASC. Only linked users with `isActive = 1` and `roles.nombre = 'OPERADOR'` — **the same filter as `GET /catalogos/operadores`** — so a link to an inactive user or an `ADMIN`/`SUPERVISOR` exists and is not returned. `[]` if none. 400 if the client does not exist or is rejected.
+
+**`PATCH /clientes/:id/operadores`** (spec 42) — **replaces the whole set** of links. Body `{ usuario_ids }`: at least one, positive integers, **no duplicates** (400 `No se permiten usuarios repetidos`). Inside one transaction: `validateClienteActivo`, `validateUsuariosExisten` (existence only — **not role, not `isActive`**; 400 `El usuario con id 'X' no existe` for the first missing one), reads the current links, `DELETE`s those not in the list and inserts — through the existing `linkOperadores` — only the new ones, so a surviving link keeps its `id` and `created_at`. Returns `true` / `{ ok, msg }`, 200 even if nothing changed. Writes **nothing on `clientes`** and keeps no history, so who changed the links is not recorded. **Asymmetry with the `GET`:** a hidden link (inactive or non-operator user) is still deleted if not resent — an accepted risk. An empty list is a 400, so a client can never be left with no operators through this route. Do not copy it as the template for removing anything with audit value.
+
+## Deferred
+
+`GET /clientes/:id` (declare it **after** `@Get('all')` or it swallows `/clientes/all`), validating role/`isActive` of linked users, an audit of who changed a link, a listing from the user's side, `clientes.pais_id`, renaming `rtn` to something country-neutral (spec 17 exposes `?rtn`).

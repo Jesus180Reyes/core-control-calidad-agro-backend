@@ -37,7 +37,7 @@ Una declinación **correcta** (aritmética, cultura general, peticiones de escri
 
 Lee, en este orden:
 
-1. `CLAUDE.md` (ya en contexto), sobre todo la sección de `src/ia/` y las de lotes y pesajes.
+1. `CLAUDE.md` (ya en contexto) y los de cada módulo, que no se cargan solos: `src/ia/CLAUDE.md`, `src/modules/chat/CLAUDE.md`, `src/modules/lotes/CLAUDE.md` y `src/modules/pesajes/CLAUDE.md`.
 2. `specs/28-chatbot-de-consultas-con-gemini.md` y **todos** los specs posteriores que tocan el chat (`Grep` de `chat.prompt`, `Agri`, `chat_log` o `HERRAMIENTAS_CHAT` en `specs/`). Una mejora que un spec ya descartó no se propone de nuevo sin decir qué cambió.
 3. `src/ia/prompts/chat.prompt.ts` completo: la instrucción de sistema, las frases fijas, el vocabulario y las herramientas con sus argumentos y enums.
 4. `src/modules/chat/repository/chat.repository.ts`: el bucle de `responder`, `redactarConLoQueHay`, el despachador, cada herramienta (qué devuelve cuando no hay filas, cuándo devuelve `{ error }` o `{ aviso }`), los topes (`MAX_VUELTAS`, `MAX_FILAS_MODELO`, `LIMITE_MAXIMO`, `MAX_COINCIDENCIAS`) y `GET /chat/sugerencias`.

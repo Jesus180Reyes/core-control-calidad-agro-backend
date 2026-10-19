@@ -36,6 +36,7 @@ Read `template.md` (in the same directory as this skill) to see the full structu
 Before asking questions about the feature, make sure you have project context:
 
 1. Read the project-memory file, if one exists. Try in order and stop at the first hit: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `README.md`. This adapts the skill to whichever agent is running it (Claude Code, Codex, Gemini CLI, etc.).
+   - **Per-module memory.** If the root file points to per-directory memory files (in this repo: `src/modules/<module>/CLAUDE.md`, `src/ia/CLAUDE.md`, `src/filters/CLAUDE.md`, `src/database/CLAUDE.md`), read the ones for every module the feature touches **before asking any question**. They hold that module's routes, decisions, deferred work and traps; the root file only holds what crosses modules. Agents do not load them automatically until a file in that directory is read, so read them explicitly.
 2. Look at the `specs/` listing in the session context above to see which specs already exist and how they are numbered.
 3. If previous specs exist, read at least the two most recent ones to pick up the project's conventions — including the **language** they are written in and the exact wording they use for states and section headings. A new spec must match the existing ones.
 
@@ -136,7 +137,8 @@ When the content is ready (either because you had everything, or because all sec
 
 ## Hard rules
 
-- **Never write code during this command.** Only the spec's `.md` file at the end.
+- **Never write code during this command.** Only the spec's `.md` file at the end. Do not edit any `CLAUDE.md` either: the memory files are updated by `/spec-impl` once the spec is implemented.
+- **In the implementation plan, include a final step that updates the memory files**: the `CLAUDE.md` of each module the spec touches, and the root `CLAUDE.md` only for facts that cross modules (a new env var, a new route count, a new cross-cutting convention). Name the files in the step.
 - **Never propose implementing the spec after saving it.** Your job ends when the file is written. The user runs `/spec-impl` when they are ready.
 - **Never assume decisions the user did not confirm.** If you are missing information, ask — in Phase 2, which is where the questions belong.
 - **Do not re-ask in Phase 3 what was already answered in Phase 2.** If the information is complete, write the whole spec and save it. Section-by-section confirmation is the fallback for incomplete information, not the default.
