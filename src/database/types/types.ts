@@ -17,6 +17,7 @@ export interface UsuariosTable {
 export interface LotesTable {
   id: Generated<number>;
   cliente_id: number;
+  origen_id: number | null;
   nombre_lote: string;
   producto_id: number;
   unidad_medida_id: number;
@@ -241,6 +242,16 @@ export interface AutorizacionesPinTable {
   pesaje_id: string | number | null;
 }
 
+export interface OrigenesTable {
+  id: Generated<number>;
+  nombre: string;
+  direccion: string | null;
+  telefono: string | null;
+  isActive: Generated<number>;
+  created_at: Generated<Date | null>;
+  created_by: number;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -276,5 +287,6 @@ export interface Database {
   log_errores: LogErroresTable;
   pines_supervisor: PinesSupervisorTable;
   autorizaciones_pin: AutorizacionesPinTable;
+  origenes: OrigenesTable;
   bitacora: BitacoraView;
 }
