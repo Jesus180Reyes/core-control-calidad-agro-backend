@@ -269,6 +269,7 @@ CREATE TABLE `lotes` (
   `finalizado_por` int DEFAULT NULL,
   `finalizado_en` datetime DEFAULT NULL,
   `firma_aprobador` mediumtext,
+  `observaciones_aprobador` varchar(1000) DEFAULT NULL,
   `cerrado_en` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `cliente_id` (`cliente_id`),

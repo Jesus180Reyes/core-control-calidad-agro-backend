@@ -306,6 +306,10 @@ export class LotesController {
             'obligatoria, de modo que una llamada sin cuerpo responde 400; solo se acepta PNG, y el ' +
             'maximo son 500000 caracteres. La firma se guarda y NO la devuelve ninguna lectura de ' +
             'la API, ni siquiera el listado de lotes finalizados. ' +
+            'Acepta ademas observaciones_aprobador, OPCIONAL: una observacion final de texto libre ' +
+            'de hasta 1000 caracteres, que se recorta antes de medirla. Si no se envia, queda en ' +
+            'null. Se escribe en la misma transaccion que la firma, no se puede editar despues y ' +
+            'NO la devuelve ninguna lectura de esta API: la consume el servicio de reportes. ' +
             'Exige que el lote este cerrado en CLIENTE_FINAL, que no haya sido finalizado ya y que ' +
             'TODOS sus pesajes activos esten revisados, es decir con aprobado distinto de null. Pide ' +
             'revisados, no aprobados: un lote cuyos pesajes el aprobador rechazo todos finaliza bien. ' +
