@@ -157,7 +157,7 @@ export class LotesRepository {
 
         return await this.db.transaction().execute(async (trx) => {
             await this.validateCliente(cliente_id, trx);
-            await this.validateVinculoOperador(cliente_id, userId, trx);
+            // await this.validateVinculoOperador(cliente_id, userId, trx);
             await this.validateProducto(producto_id, trx);
             await this.validateUnidadMedida(unidad_medida_id, trx);
             if (origen_id !== undefined) {
