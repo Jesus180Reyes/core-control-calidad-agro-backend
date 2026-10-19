@@ -284,6 +284,7 @@ export class LotesRepository {
                     finalizado_por: userId,
                     finalizado_en: sql<Date>`NOW()`,
                     firma_aprobador: dto.firma_aprobador,
+                    observaciones_aprobador: dto.observaciones_aprobador ?? null,
                 })
                 .where('id', '=', loteId)
                 .execute();
