@@ -1510,8 +1510,8 @@ export class ChatRepository {
     ): Promise<ResultadoHerramienta> {
         const conVentana: FiltrosDePesajes =
             filtros.periodo === undefined &&
-            filtros.desde === undefined &&
-            filtros.hasta === undefined
+                filtros.desde === undefined &&
+                filtros.hasta === undefined
                 ? { ...filtros, periodo: 'hoy' }
                 : filtros;
 
