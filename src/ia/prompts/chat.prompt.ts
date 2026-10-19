@@ -26,7 +26,7 @@
  *    tambien `herramientas` en NULL. Un mensaje mixto pierde la cortesia, no
  *    los datos: se contesta solo la parte de datos.
  *
- * Las ocho funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
+ * Las nueve funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
  * `rechazar_lote`, no hay nada detras que despachar.
  */
@@ -155,6 +155,10 @@ probable y dilo en la respuesta.
   firma", "pendiente", "cliente final". finalizado: "terminado", "firmado",
   "listo", "cerrado del todo". "Cerrado" a secas puede ser pendiente o
   finalizado: toma finalizado, dilo, y ofrece ver los pendientes.
+- "Lotes aprobados" o "lo que se aprobo" con un tiempo ("hoy", "esta semana")
+  y sin cliente es lotes_aprobados: no necesitas resolver ningun cliente antes.
+  Es la aprobacion del supervisor; si preguntan por lo que el aprobador
+  finalizo, aclara que lotes_aprobados trae esa situacion en cada lote.
 - Anulado no es lo mismo que rechazado. "Anulado", "borrado", "eliminado" o
   "cancelado" es un pesaje que el operador anulo: no aparece en ninguna lista y
   solo se ve con detalle_de_pesaje por su id. "Rechazado por el aprobador" o "no
@@ -279,7 +283,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'lotes_de_cliente',
         description:
-            'Lista los lotes de un cliente. Por defecto solo los abiertos: pide otro estado unicamente si el usuario lo dice.',
+            'Lista los lotes de un cliente. Por defecto solo los abiertos: pide otro estado unicamente si el usuario lo dice. Los lotes finalizados traen ademas quien los aprobo y finalizo, y la observacion final que dejo el aprobador al cerrarlos, o null si no dejo ninguna.',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -470,6 +474,47 @@ export const HERRAMIENTAS_CHAT = [
                 },
             },
             required: ['pesaje_id'],
+        },
+    },
+    {
+        name: 'lotes_aprobados',
+        description:
+            'Lista los lotes que un supervisor aprobo (los mando al aprobador) en un periodo, de todos los clientes o de uno, del mas reciente al mas antiguo. Usala para "que lotes se aprobaron hoy", "lo que se aprobo esta semana" o "lo que se mando al aprobador ayer". Cada lote trae quien lo aprobo, cuando, y su situacion actual: pendiente_aprobacion o finalizado. Los que el aprobador rechazo despues no aparecen. Sin periodo ni fechas devuelve los de hoy.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                cliente_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Deja solo los lotes de ese cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes. Sin el, lista todos los clientes.',
+                },
+                desde: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia.',
+                },
+                hasta: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia entero.',
+                },
+                periodo: {
+                    type: 'STRING',
+                    enum: [
+                        'hoy',
+                        'ayer',
+                        'esta_semana',
+                        'semana_pasada',
+                        'ultimos_7_dias',
+                        'este_mes',
+                        'mes_pasado',
+                    ],
+                    description:
+                        'Ventana relativa sobre la fecha de aprobacion, resuelta por el sistema. Usala en vez de calcular la fecha tu. Por defecto hoy.',
+                },
+                limite: {
+                    type: 'INTEGER',
+                    description: 'Cuantas filas devolver. Por defecto 10.',
+                },
+            },
         },
     },
 ];
