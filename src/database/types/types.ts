@@ -40,6 +40,7 @@ export interface LotesTable {
   finalizado_por: number | null;
   finalizado_en: Date | string | null;
   firma_aprobador: string | null;
+  observaciones_aprobador: string | null;
 }
 export interface EstadosCalidadTable {
   id: Generated<number>;
