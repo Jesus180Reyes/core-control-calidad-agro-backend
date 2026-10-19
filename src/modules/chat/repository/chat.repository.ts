@@ -566,6 +566,16 @@ export class ChatRepository {
             case 'detalle_de_pesaje':
                 return await this.detalleDePesaje(this.aEntero(args.pesaje_id));
 
+            case 'lotes_aprobados':
+                // Solo la ventana y el limite: el resto de filtros de pesajes no
+                // aplica a lotes y no debe colarse en `filtros_aplicados`.
+                return await this.lotesAprobados(this.aEntero(args.cliente_id), {
+                    desde: this.aFecha(args.desde),
+                    hasta: this.aFecha(args.hasta),
+                    periodo: this.aPeriodo(args.periodo),
+                    limite: this.aLimite(args.limite),
+                });
+
             default:
                 // Incluye el caso que importa: una funcion de escritura que el
                 // modelo se invento. No existe, no se despacha y se registra.
@@ -1471,6 +1481,119 @@ export class ChatRepository {
             registrado_por: pesaje.registrado_por,
             registrado_en: this.fechaHora(pesaje.created_at),
             revision_del_aprobador: this.revision(pesaje.aprobado),
+        };
+    }
+
+    // ---------------------------------------------------------------------
+    // Herramienta 9: lotes_aprobados
+    // ---------------------------------------------------------------------
+
+    /**
+     * Los lotes que un supervisor aprobo en una ventana de tiempo, de todos los
+     * clientes o de uno.
+     *
+     * Existe porque "que lotes se aprobaron hoy" no tenia herramienta:
+     * `lotes_de_cliente` exige un cliente y no conoce fechas, y el modelo
+     * declinaba con la frase fija.
+     *
+     * "Aprobado" es `PATCH /lotes/:id/aprobar` (SPEC 13): se filtra por
+     * `aprobado_en`, no por `finalizado_en`. Un lote aprobado y despues
+     * finalizado sigue contando —finalizar no borra `aprobado_en`— y se marca
+     * con su situacion. Los que el aprobador rechazo despues quedan fuera por
+     * `motivo_rechazo IS NULL`, la senal canonica de rechazo.
+     *
+     * Sin periodo ni fechas se asume `hoy` y se dice en `filtros_aplicados`.
+     */
+    private async lotesAprobados(
+        clienteId: number | undefined,
+        filtros: FiltrosDePesajes,
+    ): Promise<ResultadoHerramienta> {
+        const conVentana: FiltrosDePesajes =
+            filtros.periodo === undefined &&
+            filtros.desde === undefined &&
+            filtros.hasta === undefined
+                ? { ...filtros, periodo: 'hoy' }
+                : filtros;
+
+        const ventana = this.ventanaDelPeriodo(conVentana);
+
+        let cliente: { nombre: string } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
+        }
+
+        let consulta = this.db
+            .selectFrom('lotes')
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
+            .select([
+                'lotes.id',
+                'lotes.nombre_lote',
+                'clientes.nombre as cliente',
+                'productos.nombre as producto',
+                'aprobador.complete_name as aprobado_por',
+                'lotes.aprobado_en',
+                'lotes.finalizado_por',
+            ])
+            .where('lotes.aprobado_en', 'is not', null)
+            .where('lotes.motivo_rechazo', 'is', null);
+
+        if (clienteId !== undefined) {
+            consulta = consulta.where('lotes.cliente_id', '=', clienteId);
+        }
+        if (ventana.desde !== undefined) {
+            consulta = consulta.where('lotes.aprobado_en', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            consulta = consulta.where('lotes.aprobado_en', '<', ventana.hasta);
+        }
+
+        const total = await this.contarFiltrados(consulta);
+        const filas = Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO);
+        const lotes = await consulta
+            .orderBy('lotes.aprobado_en', 'desc')
+            .limit(filas)
+            .execute();
+
+        const cabecera = {
+            cliente: cliente?.nombre ?? 'todos los clientes',
+            filtros_aplicados: this.filtrosEnPalabras(conVentana, ventana),
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                lotes: [],
+                total: 0,
+                aviso: 'No hay ningun lote aprobado por un supervisor con esos criterios. Los lotes que el aprobador rechazo despues no se cuentan.',
+            };
+        }
+
+        return {
+            ...cabecera,
+            total,
+            mostrados: lotes.length,
+            lotes: lotes.map((lote) => ({
+                id: lote.id,
+                nombre_lote: lote.nombre_lote,
+                cliente: lote.cliente,
+                producto: lote.producto,
+                aprobado_por: lote.aprobado_por,
+                aprobado_en: this.fechaHora(lote.aprobado_en),
+                situacion:
+                    lote.finalizado_por !== null
+                        ? 'finalizado'
+                        : 'pendiente_aprobacion',
+            })),
         };
     }
 
