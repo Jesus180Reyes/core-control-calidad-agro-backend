@@ -24,4 +24,8 @@ export class CatalogosService {
     async findEstadosCalidad() {
         return await this.catalogosRepository.getEstadosCalidad();
     }
+
+    async findOrigenes() {
+        return await this.catalogosRepository.getOrigenes();
+    }
 }

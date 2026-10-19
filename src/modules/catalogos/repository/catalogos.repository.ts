@@ -58,4 +58,14 @@ export class CatalogosRepository {
             .execute();
         return estados;
     }
+
+    async getOrigenes() {
+        const origenes = await this.db
+            .selectFrom('origenes')
+            .select(['id', 'nombre'])
+            .where('isActive', '=', 1)
+            .orderBy('nombre', 'asc')
+            .execute();
+        return origenes;
+    }
 }
