@@ -25,9 +25,10 @@ La lectura de la columna no es de este repositorio. La consume el servicio de re
 - Transcribir el DDL a `db/schema.sql`.
 - `FinalizarLoteDto` acepta `observaciones_aprobador` **opcional**:
   - Se recorta (`trim`) **antes** de medir el largo.
-  - Vacía, solo espacios o `null`: se guarda `NULL`, sin error.
+  - Ausente: se guarda `NULL`.
+  - Vacía o solo espacios: se guarda la cadena vacía `''`, sin error.
   - Más de 1000 caracteres después del recorte: **400** del DTO.
-  - Un valor que no es texto: **400** del DTO.
+  - Un valor que no es texto, `null` incluido: **400** del DTO.
 - `finalizarLote` escribe la columna en el mismo `UPDATE`. Pasa de **cuatro** columnas a **cinco**.
 - La respuesta de `PATCH /lotes/:id/finalizar/byApprover` no cambia: sigue siendo `{ ok, msg }`.
 - Swagger: descripción actualizada del handler.
@@ -75,11 +76,12 @@ observaciones_aprobador: string | null;
 | Campo | Regla |
 | --- | --- |
 | `firma_aprobador` | Sin cambios: obligatorio, máximo 500.000, data URL de PNG en base64. |
-| `observaciones_aprobador` | `string`, `trim`, máximo 1000, opcional. Acepta `null`. Vacío después del recorte se convierte en `undefined`. |
+| `observaciones_aprobador` | `string`, `trim`, máximo 1000, `.optional()`. No acepta `null`. |
 
 - Mensaje del máximo: `Las observaciones del aprobador no pueden superar los 1000 caracteres`.
-- El campo lleva un `.transform()`. Eso ya no es un problema: el `ZodValidationPipe` dejó de registrarse dos veces el 2026-10-10. El comentario del SPEC 26 que advierte contra `.transform()` en este DTO describe el estado anterior.
-- La forma del schema copia la de `observaciones` en `create-pesaje.dto.ts` (SPEC 44), para que las dos notas libres del proyecto se comporten igual.
+- Mensaje de tipo: `Las observaciones del aprobador deben ser texto`.
+- La forma del schema es la **del código** de `observaciones` en `create-pesaje.dto.ts`, para que las dos notas libres del proyecto se comporten igual. Ese código no hace lo que dice el SPEC 44 (que pedía aceptar `null` y guardar el vacío como `NULL`); aquí se sigue el código, no aquel spec.
+- Consecuencia: `""` y `"   "` llegan al repositorio como `''`, y `?? null` no los convierte. La fila queda con una cadena vacía, no con `NULL`.
 
 ### Escritura
 
@@ -117,7 +119,7 @@ Errores nuevos:
 | Caso | Código | Mensaje |
 | --- | --- | --- |
 | Más de 1000 caracteres después del recorte | 400 | `Las observaciones del aprobador no pueden superar los 1000 caracteres` |
-| No es texto | 400 | Del DTO |
+| No es texto, `null` incluido | 400 | `Las observaciones del aprobador deben ser texto` |
 
 Los errores de la firma (SPEC 26) y del estado del lote (SPEC 20) quedan idénticos. Como el body se valida antes que la base, una observación inválida sobre un lote no finalizable responde el error de la observación.
 
@@ -143,8 +145,8 @@ Los errores de la firma (SPEC 26) y del estado del lote (SPEC 20) quedan idénti
 2. Agregar `observaciones_aprobador: string | null` a `LotesTable`. El proyecto sigue compilando: nadie escribe la columna todavía.
 3. Agregar `observaciones_aprobador` a `FinalizarLoteDto` y al `.set()` de `finalizarLote`.
 
-   Prueba manual con lotes en `CLIENTE_FINAL` y todos sus pesajes revisados: uno con observación la guarda recortada; uno sin el campo, con `""`, `"   "` o `null` guarda `NULL`; uno con 1001 caracteres responde 400 y el lote no cambia.
-4. Actualizar el `@ApiOperation` de `PATCH /lotes/:id/finalizar/byApprover`: el campo es opcional, se recorta, vacío se guarda como `NULL`, no se puede editar después y ninguna lectura de este API lo devuelve.
+   Prueba manual con lotes en `CLIENTE_FINAL` y todos sus pesajes revisados: uno con observación la guarda recortada; uno sin el campo guarda `NULL`; uno con `""` o `"   "` guarda `''`; uno con `null` o con 1001 caracteres responde 400 y el lote no cambia.
+4. Actualizar el `@ApiOperation` de `PATCH /lotes/:id/finalizar/byApprover`: el campo es opcional, se recorta, ausente queda en `NULL`, no se puede editar después y ninguna lectura de este API lo devuelve.
 5. Actualizar `CLAUDE.md`:
    - La fila de `lotes`, en `PATCH /lotes/:id/finalizar/byApprover`: el campo opcional, y que el `UPDATE` escribe **cinco** columnas.
    - En la convención de escritura: `finalizarLote` escribe cinco columnas.
@@ -159,7 +161,8 @@ Los errores de la firma (SPEC 26) y del estado del lote (SPEC 20) quedan idénti
 - [ ] `db/schema.sql` contiene la columna `observaciones_aprobador` en `lotes`.
 - [ ] Finalizar con solo `firma_aprobador` responde 200 igual que antes y guarda `observaciones_aprobador = NULL`.
 - [ ] Finalizar con `"observaciones_aprobador": "  Conforme  "` guarda `Conforme`.
-- [ ] Finalizar con `""`, `"   "` o `null` responde 200 y guarda `NULL`.
+- [ ] Finalizar con `""` o `"   "` responde 200 y guarda `''`.
+- [ ] Finalizar con `"observaciones_aprobador": null` responde 400 `Las observaciones del aprobador deben ser texto`.
 - [ ] Finalizar con 1001 caracteres responde 400 `Las observaciones del aprobador no pueden superar los 1000 caracteres`, y ninguna columna del lote cambia.
 - [ ] Finalizar con exactamente 1000 caracteres responde 200 y los guarda completos.
 - [ ] Finalizar con `"observaciones_aprobador": 12` responde 400.
@@ -182,7 +185,8 @@ Los errores de la firma (SPEC 26) y del estado del lote (SPEC 20) quedan idénti
 - **No:** ponerla en `PATCH /lotes/:id/aprobar`. Ese endpoint es del supervisor que pasa el lote a `CLIENTE_FINAL`, no del aprobador.
 - **No:** un endpoint aparte para escribirla. Se escribe en la misma transacción que la firma, igual que el SPEC 26 decidió para la firma.
 - **Sí:** opcional. Decisión del usuario. Si fuera obligatoria, el aprobador escribiría "ok" para pasar la validación.
-- **Sí:** vacía, solo espacios o `null` se guarda como `NULL`, sin error. Es la misma regla del SPEC 44, así que el front no tiene que limpiar el campo.
+- **Sí:** el DTO es igual al que tiene hoy `pesajes.observaciones` en el código: `.optional()`, sin `null` y sin convertir el vacío. Decisión del usuario durante la implementación. Las dos notas libres del proyecto se comportan igual.
+- **No:** aceptar `null` y guardar el vacío como `NULL`, como decía la primera versión de este spec y como pide el SPEC 44. Se cambió durante la implementación. La consecuencia es que una fila puede quedar con `''` en vez de `NULL`, y el servicio de reportes tiene que tratar los dos como "sin observación".
 - **Sí:** `VARCHAR(1000)`. Decisión del usuario. Alcanza para una nota de cierre, y el DTO valida el mismo número.
 - **No:** `TEXT`. Haría falta un tope en el DTO de todas formas, y el tope de la columna quedaría flojo.
 - **Sí:** ninguna lectura de este API la devuelve. Decisión del usuario. La lee el servicio de reportes, que está en otro repo y consulta la base directamente.
@@ -202,6 +206,7 @@ Los errores de la firma (SPEC 26) y del estado del lote (SPEC 20) quedan idénti
 | El servicio de reportes empieza a leer la columna antes de que exista en su base | Coordinar el despliegue: primero el DDL, luego este backend, luego el servicio de reportes. |
 | Alguien agrega `selectAll()` en `LotesRepository` | Ya está prohibido por `firma_aprobador`. Este spec no cambia esa regla. |
 | La observación no se ve en ninguna pantalla de este front | Riesgo aceptado. Se lee en el servicio de reportes. |
+| "Sin observación" tiene dos formas en la base, `NULL` y `''` | El servicio de reportes compara con `NULLIF(TRIM(observaciones_aprobador), '') IS NULL`, o el front no manda el campo cuando está vacío. |
 
 ---
 
