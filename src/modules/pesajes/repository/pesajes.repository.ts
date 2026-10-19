@@ -291,6 +291,7 @@ export class PesajesRepository {
             dispositivo_identificador,
             secuencia_dispositivo,
             autorizacion_token,
+            observaciones,
         } = data;
 
         return await this.db.transaction().execute(async (trx) => {
@@ -328,6 +329,7 @@ export class PesajesRepository {
                     secuencia_dispositivo,
                     fuera_de_rango,
                     aprobado_con_excepcion_por: autorizacion?.supervisor_id ?? null,
+                    observaciones: observaciones ?? null,
                 })
                 .executeTakeFirstOrThrow(
                     () => new BadRequestException('Error al guardar el pesaje'),

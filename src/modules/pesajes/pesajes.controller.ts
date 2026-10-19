@@ -103,6 +103,10 @@ export class PesajesController {
             'y el token se consume; 400 si el token no existe o ya fue utilizado, y entonces no se ' +
             'guarda nada. Con un peso que no supera el maximo el token se ignora y no se consume. ' +
             'El estado de calidad sigue siendo MAXIMO en ambos casos. ' +
+            'Acepta observaciones OPCIONALES: una nota de texto libre de hasta 500 caracteres, que ' +
+            'se recorta antes de medirla; vacia, solo espacios o null se guardan como NULL sin ' +
+            'error, y un texto mas largo responde 400. No influye en el peso neto, el fuera de ' +
+            'rango, el estado de calidad ni la autorizacion por PIN, y no puede editarse despues. ' +
             'Devuelve solo el id, el peso neto y el indicador de fuera de rango.',
     })
     async create(@Body() dto: CreatePesajeDto, @Req() req: Request) {
