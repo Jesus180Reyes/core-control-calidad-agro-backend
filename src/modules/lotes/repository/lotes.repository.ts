@@ -144,6 +144,7 @@ export class LotesRepository {
             peso_ideal,
             peso_maximo,
             variedad_o_talla,
+            origen_id,
         } = data;
 
         return await this.db.transaction().execute(async (trx) => {
@@ -151,6 +152,9 @@ export class LotesRepository {
             await this.validateVinculoOperador(cliente_id, userId, trx);
             await this.validateProducto(producto_id, trx);
             await this.validateUnidadMedida(unidad_medida_id, trx);
+            if (origen_id !== undefined) {
+                await this.validateOrigen(origen_id, trx);
+            }
             await this.validateNombreLoteDisponible(cliente_id, nombre_lote, trx);
 
             const result = await trx
@@ -164,6 +168,7 @@ export class LotesRepository {
                     peso_ideal,
                     peso_maximo,
                     variedad_o_talla,
+                    origen_id: origen_id ?? null,
                     estado: 'abierto',
                     etapa_id: 1,
                     created_by: userId,
@@ -860,6 +865,29 @@ export class LotesRepository {
                         `La unidad de medida con id '${unidadMedidaId}' no existe`,
                     ),
             );
+    }
+
+    // SPEC 43: el catalogo de origenes es global, asi que no se valida ninguna
+    // relacion entre el origen y el cliente del lote.
+    private async validateOrigen(origenId: number, db: Kysely<Database>) {
+        const origen = await db
+            .selectFrom('origenes')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', origenId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El origen con id '${origenId}' no existe`,
+                    ),
+            );
+
+        if (origen.isActive === 0) {
+            throw new BadRequestException(
+                `El origen '${origen.nombre}' no esta activo`,
+            );
+        }
+
+        return origen;
     }
 
     private async validateNombreLoteDisponible(

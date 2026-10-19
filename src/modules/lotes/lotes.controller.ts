@@ -158,6 +158,9 @@ export class LotesController {
             'Crea el lote abierto y en la primera etapa del flujo. El nombre_lote debe estar libre ' +
             'dentro del cliente, validado solo en codigo y sin restriccion en MySQL; un lote ' +
             'rechazado libera su nombre, uno aprobado no. ' +
+            'origen_id es opcional: sin el, el lote se guarda sin origen (null); si viene, el ' +
+            'origen debe existir y estar activo, o responde 400. El catalogo de origenes es ' +
+            'global, asi que cualquier origen activo sirve para cualquier cliente. ' +
             'Valida el vinculo cliente_operador: responde 403 si el usuario no esta vinculado al ' +
             'cliente. Es el unico POST que no devuelve nada de lo que creo: responde { ok, msg } ' +
             'sin el id del lote.',
