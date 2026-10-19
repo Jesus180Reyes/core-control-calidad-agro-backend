@@ -363,6 +363,7 @@ CREATE TABLE `pesajes` (
   `aprobado_por` int DEFAULT NULL,
   `aprobado_en` datetime DEFAULT NULL,
   `aprobado_con_excepcion_por` int DEFAULT NULL,
+  `observaciones` varchar(500) DEFAULT NULL,
   `isActive` tinyint(1) DEFAULT '1' COMMENT 'Falso si el pesaje fue anulado o descartado',
   `dispositivo_identificador` varchar(50) DEFAULT NULL COMMENT 'MAC, IP o ID de la PC/Estación que corre React',
   `secuencia_dispositivo` int DEFAULT NULL COMMENT 'Contador correlativo local del puerto serial',
