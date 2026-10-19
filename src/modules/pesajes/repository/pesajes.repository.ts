@@ -65,6 +65,7 @@ export class PesajesRepository {
                 'pesajes.secuencia_dispositivo',
                 'pesajes.created_at',
                 'pesajes.aprobado',
+                'pesajes.observaciones',
             ])
             .where('pesajes.lote_id', '=', loteId)
             .where('pesajes.isActive', '=', 1);
@@ -199,6 +200,7 @@ export class PesajesRepository {
                 'pesajes.secuencia_dispositivo',
                 'pesajes.created_at',
                 'pesajes.aprobado',
+                'pesajes.observaciones',
             ])
             .orderBy('pesajes.created_at', 'desc');
 
@@ -256,6 +258,7 @@ export class PesajesRepository {
                 'pesajes.secuencia_dispositivo',
                 'pesajes.created_at',
                 'pesajes.aprobado',
+                'pesajes.observaciones',
                 'pesajes.isActive',
                 'pesajes.motivo_rechazo',
             ])
