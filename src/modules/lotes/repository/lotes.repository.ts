@@ -341,6 +341,9 @@ export class LotesRepository {
             estados_calidad,
             aprobado_en: this.fechaEnLetra(datos.aprobado_en),
             finalizado_en: this.fechaEnLetra(datos.finalizado_en),
+            // SPEC 46: la columna puede valer NULL o '' (SPEC 45); al modelo
+            // solo le llega texto o null.
+            observaciones_aprobador: datos.observaciones_aprobador?.trim() || null,
         };
 
         // 3. El fetch. Fuera de transaccion, insisto.
@@ -417,6 +420,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.aprobado_en',
                 'lotes.finalizado_en',
+                'lotes.observaciones_aprobador',
                 'clientes.nombre as cliente',
                 'productos.nombre as producto',
                 'unidades_medida.nombre as unidad_medida',
