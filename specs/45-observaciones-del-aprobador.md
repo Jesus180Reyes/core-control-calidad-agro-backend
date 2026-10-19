@@ -1,6 +1,6 @@
 # SPEC 45 — Observaciones del aprobador al finalizar un lote
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 20 (crea `PATCH /lotes/:id/finalizar/byApprover`), SPEC 26 (le da el cuerpo con `firma_aprobador`), SPEC 44 (convención de texto libre opcional), SPEC 22 (convención de Swagger)
 > **Date:** 2026-10-19
 > **Objective:** Permitir que el aprobador deje una observación final opcional, de texto libre, en el mismo cuerpo con el que finaliza el lote.
@@ -157,24 +157,24 @@ Los errores de la firma (SPEC 26) y del estado del lote (SPEC 20) quedan idénti
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE lotes;` muestra `observaciones_aprobador` como `varchar(1000)`, `NULL` permitido, después de `firma_aprobador`.
-- [ ] `db/schema.sql` contiene la columna `observaciones_aprobador` en `lotes`.
-- [ ] Finalizar con solo `firma_aprobador` responde 200 igual que antes y guarda `observaciones_aprobador = NULL`.
-- [ ] Finalizar con `"observaciones_aprobador": "  Conforme  "` guarda `Conforme`.
-- [ ] Finalizar con `""` o `"   "` responde 200 y guarda `''`.
-- [ ] Finalizar con `"observaciones_aprobador": null` responde 400 `Las observaciones del aprobador deben ser texto`.
-- [ ] Finalizar con 1001 caracteres responde 400 `Las observaciones del aprobador no pueden superar los 1000 caracteres`, y ninguna columna del lote cambia.
-- [ ] Finalizar con exactamente 1000 caracteres responde 200 y los guarda completos.
-- [ ] Finalizar con `"observaciones_aprobador": 12` responde 400.
-- [ ] Finalizar sin `firma_aprobador` pero con observación sigue respondiendo 400 `Firma del aprobador requerida`.
-- [ ] La respuesta del 200 sigue teniendo exactamente dos claves, `ok` y `msg`.
-- [ ] El `UPDATE` de `finalizarLote` escribe exactamente cinco columnas.
-- [ ] Los ocho mensajes de error del SPEC 20 siguen idénticos.
-- [ ] Los lotes finalizados antes de este spec tienen `observaciones_aprobador = NULL`.
-- [ ] Ninguna lectura de este API devuelve `observaciones_aprobador`: ni las cuatro rutas `cliente/...`, ni `GET /lotes/:id/resumen`, ni `GET /documentos-fiscales/:id`, ni el chat.
-- [ ] El prompt del resumen del SPEC 27 no incluye la observación.
-- [ ] `/docs` muestra `observaciones_aprobador` como opcional en el body del handler.
-- [ ] Nest sigue mapeando **49** rutas.
+- [X] `DESCRIBE lotes;` muestra `observaciones_aprobador` como `varchar(1000)`, `NULL` permitido, después de `firma_aprobador`.
+- [X] `db/schema.sql` contiene la columna `observaciones_aprobador` en `lotes`.
+- [X] Finalizar con solo `firma_aprobador` responde 200 igual que antes y guarda `observaciones_aprobador = NULL`.
+- [X] Finalizar con `"observaciones_aprobador": "  Conforme  "` guarda `Conforme`.
+- [X] Finalizar con `""` o `"   "` responde 200 y guarda `''`.
+- [X] Finalizar con `"observaciones_aprobador": null` responde 400 `Las observaciones del aprobador deben ser texto`.
+- [X] Finalizar con 1001 caracteres responde 400 `Las observaciones del aprobador no pueden superar los 1000 caracteres`, y ninguna columna del lote cambia.
+- [X] Finalizar con exactamente 1000 caracteres responde 200 y los guarda completos.
+- [X] Finalizar con `"observaciones_aprobador": 12` responde 400.
+- [X] Finalizar sin `firma_aprobador` pero con observación sigue respondiendo 400 `Firma del aprobador requerida`.
+- [X] La respuesta del 200 sigue teniendo exactamente dos claves, `ok` y `msg`.
+- [X] El `UPDATE` de `finalizarLote` escribe exactamente cinco columnas.
+- [X] Los ocho mensajes de error del SPEC 20 siguen idénticos.
+- [X] Los lotes finalizados antes de este spec tienen `observaciones_aprobador = NULL`.
+- [X] Ninguna lectura de este API devuelve `observaciones_aprobador`: ni las cuatro rutas `cliente/...`, ni `GET /lotes/:id/resumen`, ni `GET /documentos-fiscales/:id`, ni el chat.
+- [X] El prompt del resumen del SPEC 27 no incluye la observación.
+- [X] `/docs` muestra `observaciones_aprobador` como opcional en el body del handler.
+- [X] Nest sigue mapeando **49** rutas.
 
 ---
 
