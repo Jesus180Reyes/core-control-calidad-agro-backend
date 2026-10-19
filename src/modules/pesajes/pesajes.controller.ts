@@ -42,7 +42,9 @@ export class PesajesController {
             'historial completo; con al menos uno valido se agrega la clave paginacion { pagina, ' +
             'limite, total, total_paginas } y el que falte toma su default (pagina 1, limite 20). ' +
             'limite se topa en 100, un valor invalido se ignora como el resto de los filtros, y ' +
-            'una pagina mas alla de la ultima devuelve una lista vacia.',
+            'una pagina mas alla de la ultima devuelve una lista vacia. ' +
+            'Cada pesaje trae al final sus observaciones: la nota libre que el operador guardo al ' +
+            'pesar, o null si no guardo ninguna.',
     })
     async findHistorial(
         @Query() filtros: FiltrosHistorialDto,
@@ -71,6 +73,8 @@ export class PesajesController {
             'nunca devuelve 400. fuera_de_rango acepta true o false: 1 y 0 se ignoran, aunque la ' +
             'respuesta devuelva el campo como booleano. El lote y el filtro de activos se aplican ' +
             'siempre, digan lo que digan los parametros. ' +
+            'Cada pesaje trae al final sus observaciones: la nota libre que el operador guardo al ' +
+            'pesar, o null si no guardo ninguna. ' +
             'NO valida el vinculo cliente_operador.',
     })
     @ApiParam({ name: 'loteId', description: 'Id del lote', example: 1 })
@@ -103,6 +107,10 @@ export class PesajesController {
             'y el token se consume; 400 si el token no existe o ya fue utilizado, y entonces no se ' +
             'guarda nada. Con un peso que no supera el maximo el token se ignora y no se consume. ' +
             'El estado de calidad sigue siendo MAXIMO en ambos casos. ' +
+            'Acepta observaciones OPCIONALES: una nota de texto libre de hasta 500 caracteres, que ' +
+            'se recorta antes de medirla; vacia, solo espacios o null se guardan como NULL sin ' +
+            'error, y un texto mas largo responde 400. No influye en el peso neto, el fuera de ' +
+            'rango, el estado de calidad ni la autorizacion por PIN, y no puede editarse despues. ' +
             'Devuelve solo el id, el peso neto y el indicador de fuera de rango.',
     })
     async create(@Body() dto: CreatePesajeDto, @Req() req: Request) {
@@ -223,7 +231,8 @@ export class PesajesController {
         description:
             'Pensado para resolver el QR de una etiqueta: el frontend concatena el id escaneado. ' +
             'Devuelve los mismos campos que GET /pesajes/byLote/{loteId}, asi que la respuesta es ' +
-            'intercambiable con un elemento de esa lista. ' +
+            'intercambiable con un elemento de esa lista, observaciones incluidas: la nota libre ' +
+            'del operador va al final, o null si no hay. ' +
             'Su UNICA condicion es el id: no filtra por estado del lote, ni por etapa, ni por ' +
             'cliente activo, de modo que devuelve pesajes de lotes cerrados, rechazados y ' +
             'finalizados que el resto de lecturas esconde. ' +

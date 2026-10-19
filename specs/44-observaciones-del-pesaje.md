@@ -1,6 +1,6 @@
 # SPEC 44 — Observaciones del pesaje
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 03 (`POST /pesajes`), SPEC 15 (`GET /pesajes/historial`), SPEC 21 (`GET /pesajes/:id`), SPEC 22 (convención de Swagger)
 > **Date:** 2026-10-17
 > **Objective:** Permitir que el operador guarde una nota de texto libre en cada pesaje y que las tres lecturas de pesajes la devuelvan.

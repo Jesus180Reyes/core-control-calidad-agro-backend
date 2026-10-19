@@ -32,6 +32,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -43,6 +44,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .where('lotes.estado', '=', 'abierto')
@@ -57,6 +59,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -68,6 +71,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .where('lotes.estado', '=', 'abierto')
@@ -81,6 +85,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -92,6 +97,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
             ])
             .where('lotes.cliente_id', '=', clienteId)
             .where('lotes.estado', '=', 'cerrado')
@@ -109,6 +115,7 @@ export class LotesRepository {
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
             .leftJoin('usuarios as finalizador', 'finalizador.id', 'lotes.finalizado_por')
             .select([
@@ -122,6 +129,7 @@ export class LotesRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
                 'aprobador.complete_name as aprobado_por',
                 'lotes.aprobado_en',
                 'finalizador.complete_name as finalizado_por',
@@ -144,13 +152,17 @@ export class LotesRepository {
             peso_ideal,
             peso_maximo,
             variedad_o_talla,
+            origen_id,
         } = data;
 
         return await this.db.transaction().execute(async (trx) => {
             await this.validateCliente(cliente_id, trx);
-            await this.validateVinculoOperador(cliente_id, userId, trx);
+            // await this.validateVinculoOperador(cliente_id, userId, trx);
             await this.validateProducto(producto_id, trx);
             await this.validateUnidadMedida(unidad_medida_id, trx);
+            if (origen_id !== undefined) {
+                await this.validateOrigen(origen_id, trx);
+            }
             await this.validateNombreLoteDisponible(cliente_id, nombre_lote, trx);
 
             const result = await trx
@@ -164,6 +176,7 @@ export class LotesRepository {
                     peso_ideal,
                     peso_maximo,
                     variedad_o_talla,
+                    origen_id: origen_id ?? null,
                     estado: 'abierto',
                     etapa_id: 1,
                     created_by: userId,
@@ -316,6 +329,7 @@ export class LotesRepository {
             cliente: datos.cliente,
             producto: datos.producto,
             variedad_o_talla: datos.variedad_o_talla,
+            origen: datos.origen,
             unidad_medida: datos.unidad_medida,
             rango_peso: {
                 minimo: Number(datos.peso_minimo),
@@ -392,9 +406,11 @@ export class LotesRepository {
                 'unidades_medida.id',
                 'lotes.unidad_medida_id',
             )
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.nombre_lote',
                 'lotes.variedad_o_talla',
+                'origenes.nombre as origen',
                 'lotes.peso_minimo',
                 'lotes.peso_ideal',
                 'lotes.peso_maximo',
@@ -860,6 +876,29 @@ export class LotesRepository {
                         `La unidad de medida con id '${unidadMedidaId}' no existe`,
                     ),
             );
+    }
+
+    // SPEC 43: el catalogo de origenes es global, asi que no se valida ninguna
+    // relacion entre el origen y el cliente del lote.
+    private async validateOrigen(origenId: number, db: Kysely<Database>) {
+        const origen = await db
+            .selectFrom('origenes')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', origenId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El origen con id '${origenId}' no existe`,
+                    ),
+            );
+
+        if (origen.isActive === 0) {
+            throw new BadRequestException(
+                `El origen '${origen.nombre}' no esta activo`,
+            );
+        }
+
+        return origen;
     }
 
     private async validateNombreLoteDisponible(

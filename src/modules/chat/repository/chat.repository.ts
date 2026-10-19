@@ -835,6 +835,7 @@ export class ChatRepository {
                 'lotes.unidad_medida_id',
             )
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
             .leftJoin(
                 'usuarios as finalizador',
@@ -852,6 +853,7 @@ export class ChatRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'origenes.nombre as origen',
                 'aprobador.complete_name as aprobado_por',
                 'lotes.aprobado_en',
                 'finalizador.complete_name as finalizado_por',
@@ -910,6 +912,7 @@ export class ChatRepository {
                     maximo: this.dosDecimales(lote.peso_maximo),
                 },
                 etapa: lote.etapa,
+                origen: lote.origen,
                 // La terna de auditoria solo tiene sentido donde esta escrita.
                 // En un lote abierto los cuatro campos son null y meterlos en el
                 // contexto es pagar tokens por nada.
@@ -1011,6 +1014,7 @@ export class ChatRepository {
             },
             estado: lote.estado,
             etapa: lote.etapa,
+            origen: lote.origen,
             pesajes: {
                 activos,
                 peso_neto_total: this.dosDecimales(fila.total),
@@ -1400,11 +1404,13 @@ export class ChatRepository {
                 'lotes.unidad_medida_id',
             )
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'pesajes.id',
                 'pesajes.lote_id',
                 'lotes.nombre_lote',
                 'lotes.variedad_o_talla',
+                'origenes.nombre as origen',
                 'unidades_medida.nombre as unidad_medida',
                 'lotes.peso_minimo',
                 'lotes.peso_ideal',
@@ -1444,6 +1450,7 @@ export class ChatRepository {
             lote_id: pesaje.lote_id,
             lote: pesaje.nombre_lote,
             variedad_o_talla: pesaje.variedad_o_talla,
+            origen: pesaje.origen,
             unidad_medida: pesaje.unidad_medida,
             rango_peso_del_lote: {
                 minimo: this.dosDecimales(pesaje.peso_minimo),
@@ -1526,10 +1533,12 @@ export class ChatRepository {
                 'lotes.unidad_medida_id',
             )
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
+            .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
                 'lotes.variedad_o_talla',
+                'origenes.nombre as origen',
                 'clientes.nombre as cliente',
                 'productos.nombre as producto',
                 'unidades_medida.nombre as unidad_medida',

@@ -8,6 +8,11 @@ const createPesajeSchema = z.object({
     dispositivo_identificador: z.string().optional(),
     secuencia_dispositivo: z.number({ error: 'La secuencia del dispositivo debe ser un numero' }).int().positive('La secuencia del dispositivo debe ser mayor a 0').optional(),
     autorizacion_token: z.string().uuid('La autorizacion no es valida').optional(),
+    observaciones: z.string({ error: 'Las observaciones deben ser texto' })
+        .trim()
+        .max(500, 'Las observaciones no pueden superar los 500 caracteres')
+        .optional()
+
 });
 
 export class CreatePesajeDto extends createZodDto(createPesajeSchema) { }

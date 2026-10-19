@@ -98,4 +98,23 @@ export class CatalogosController {
             data,
         };
     }
+
+    @Get('origenes')
+    @ApiOperation({
+        summary: 'Origenes activos',
+        description:
+            'Lista de referencia para el selector de origen de POST /lotes. Cada elemento es ' +
+            '{ id, nombre } y la clave del payload es data. El catalogo es global: lista TODOS ' +
+            'los origenes activos de todos los clientes, no solo los que usa un cliente. ' +
+            'Filtra isActive = 1 y ordena por nombre. Abierto a cualquier usuario autenticado, ' +
+            'sin filtro por cliente_operador.',
+    })
+    async findOrigenes() {
+        const data = await this.catalogosService.findOrigenes();
+        return {
+            ok: true,
+            msg: 'Origenes obtenidos correctamente',
+            data,
+        };
+    }
 }
