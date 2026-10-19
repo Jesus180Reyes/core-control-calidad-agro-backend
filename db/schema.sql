@@ -247,6 +247,7 @@ DROP TABLE IF EXISTS `lotes`;
 CREATE TABLE `lotes` (
   `id` int NOT NULL AUTO_INCREMENT,
   `cliente_id` int NOT NULL,
+  `origen_id` int DEFAULT NULL,
   `nombre_lote` varchar(50) NOT NULL COMMENT 'Código único. Ej: OKRA-2026-07-A',
   `producto_id` int NOT NULL COMMENT 'Llave foránea al catálogo de productos',
   `variedad_o_talla` varchar(50) DEFAULT NULL COMMENT 'Ej: Okra American / Camarón 41/50',
@@ -279,14 +280,32 @@ CREATE TABLE `lotes` (
   KEY `fk_lotes_rechazado_por` (`rechazado_por`),
   KEY `fk_lotes_aprobado_por` (`aprobado_por`),
   KEY `fk_lotes_finalizado_por` (`finalizado_por`),
+  KEY `fk_lotes_origen` (`origen_id`),
   CONSTRAINT `fk_lotes_aprobado_por` FOREIGN KEY (`aprobado_por`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `fk_lotes_etapa` FOREIGN KEY (`etapa_id`) REFERENCES `etapas` (`id`),
   CONSTRAINT `fk_lotes_finalizado_por` FOREIGN KEY (`finalizado_por`) REFERENCES `usuarios` (`id`),
+  CONSTRAINT `fk_lotes_origen` FOREIGN KEY (`origen_id`) REFERENCES `origenes` (`id`),
   CONSTRAINT `fk_lotes_rechazado_por` FOREIGN KEY (`rechazado_por`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `lotes_ibfk_1` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `lotes_ibfk_2` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`),
   CONSTRAINT `lotes_ibfk_3` FOREIGN KEY (`unidad_medida_id`) REFERENCES `unidades_medida` (`id`),
   CONSTRAINT `lotes_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `usuarios` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `origenes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `origenes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(150) NOT NULL,
+  `direccion` varchar(255) DEFAULT NULL,
+  `telefono` varchar(20) DEFAULT NULL,
+  `isActive` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_by` int NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_origenes_created_by` (`created_by`),
+  CONSTRAINT `fk_origenes_created_by` FOREIGN KEY (`created_by`) REFERENCES `usuarios` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `paises_config`;
