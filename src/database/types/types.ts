@@ -67,6 +67,7 @@ export interface PesajesTable {
   aprobado_por: number | null;
   aprobado_en: Date | string | null;
   aprobado_con_excepcion_por: number | null;
+  observaciones: string | null;
 }
 export interface ProductosTable {
   id: Generated<number>;
