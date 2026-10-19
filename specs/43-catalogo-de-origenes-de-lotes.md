@@ -1,6 +1,6 @@
 # SPEC 43 — Catálogo de orígenes de lotes
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02 (módulo `lotes` y `POST /lotes`), SPEC 09 (convención de `catalogos`), SPEC 22 (convención de Swagger), SPEC 24 (`GET /lotes/cliente/:clienteId/all/finalizados`)
 > **Date:** 2026-10-17
 > **Objective:** Crear la tabla `origenes`, un catálogo **global** compartido por todos los clientes, con `POST /origenes` para darlos de alta y `GET /catalogos/origenes` para el selector, y permitir que un lote guarde su origen y lo muestre en los cuatro listados de lotes.
@@ -297,29 +297,29 @@ Errores:
 
 ## Acceptance criteria
 
-- [ ] El route log muestra **49** rutas, con `POST /origenes` y `GET /catalogos/origenes` entre ellas.
-- [ ] Sin header `Authorization`, las dos rutas nuevas responden 401.
-- [ ] Con el token de un `OPERADOR` sin ningún vínculo en `cliente_operador`, las dos rutas nuevas responden 201 y 200.
-- [ ] `POST /origenes` con `nombre` responde 201 `{ ok: true, msg: 'Origen creado correctamente', origen_id }`, y en MySQL la fila tiene `isActive = 1`, `created_by` = usuario del token y `direccion`/`telefono` en `NULL`.
-- [ ] `POST /origenes` con `direccion` y `telefono` los guarda.
-- [ ] Repetir el nombre de un origen, aunque cambien mayúsculas, responde 400 `El origen 'N' ya esta registrado`.
-- [ ] Repetir el nombre de un origen inactivo también responde 400.
-- [ ] `{ "nombre": "" }`, `{ "nombre": "   " }`, `{ "telefono": null }` y un `nombre` de 151 caracteres responden 400, no 500.
-- [ ] `GET /catalogos/origenes` responde `{ ok: true, msg: 'Origenes obtenidos correctamente', data }`, con cada elemento exactamente `{ id, nombre }`, solo activos, ordenados por nombre.
-- [ ] Un origen con `isActive = 0` puesto a mano no aparece en el selector.
-- [ ] Sin orígenes en la tabla, el selector responde 200 con `data: []`.
-- [ ] `POST /lotes` sin `origen_id` responde igual que antes y guarda `origen_id = NULL`.
-- [ ] `POST /lotes` con un `origen_id` válido guarda ese `origen_id`.
-- [ ] El mismo `origen_id` se puede usar en lotes de dos clientes distintos.
-- [ ] `POST /lotes` con un `origen_id` inexistente o inactivo responde 400 con su mensaje, y no se crea el lote.
-- [ ] Los cuatro listados de lotes traen el campo `origen` con el nombre, o `null` en un lote sin origen.
-- [ ] Los tres primeros listados devuelven 11 campos y `/all/finalizados` 15, con `origen` después de `etapa`.
-- [ ] Un lote cuyo origen se desactivó a mano sigue mostrando el nombre del origen.
-- [ ] Los demás campos y filtros de los cuatro listados no cambian.
-- [ ] `/docs` muestra `POST /origenes` bajo el tag `origenes` y el selector bajo `catalogos`, con su descripción.
-- [ ] `SHOW CREATE TABLE` muestra `fk_origenes_created_by` y `fk_lotes_origen`, y `origenes` no tiene columna `cliente_id`.
-- [ ] `db/schema.sql` contiene la tabla `origenes` y la columna `lotes.origen_id`.
-- [ ] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
+- [X] El route log muestra **49** rutas, con `POST /origenes` y `GET /catalogos/origenes` entre ellas.
+- [X] Sin header `Authorization`, las dos rutas nuevas responden 401.
+- [X] Con el token de un `OPERADOR` sin ningún vínculo en `cliente_operador`, las dos rutas nuevas responden 201 y 200.
+- [X] `POST /origenes` con `nombre` responde 201 `{ ok: true, msg: 'Origen creado correctamente', origen_id }`, y en MySQL la fila tiene `isActive = 1`, `created_by` = usuario del token y `direccion`/`telefono` en `NULL`.
+- [X] `POST /origenes` con `direccion` y `telefono` los guarda.
+- [X] Repetir el nombre de un origen, aunque cambien mayúsculas, responde 400 `El origen 'N' ya esta registrado`.
+- [X] Repetir el nombre de un origen inactivo también responde 400.
+- [X] `{ "nombre": "" }`, `{ "nombre": "   " }`, `{ "telefono": null }` y un `nombre` de 151 caracteres responden 400, no 500.
+- [X] `GET /catalogos/origenes` responde `{ ok: true, msg: 'Origenes obtenidos correctamente', data }`, con cada elemento exactamente `{ id, nombre }`, solo activos, ordenados por nombre.
+- [X] Un origen con `isActive = 0` puesto a mano no aparece en el selector.
+- [X] Sin orígenes en la tabla, el selector responde 200 con `data: []`.
+- [X] `POST /lotes` sin `origen_id` responde igual que antes y guarda `origen_id = NULL`.
+- [X] `POST /lotes` con un `origen_id` válido guarda ese `origen_id`.
+- [X] El mismo `origen_id` se puede usar en lotes de dos clientes distintos.
+- [X] `POST /lotes` con un `origen_id` inexistente o inactivo responde 400 con su mensaje, y no se crea el lote.
+- [X] Los cuatro listados de lotes traen el campo `origen` con el nombre, o `null` en un lote sin origen.
+- [X] Los tres primeros listados devuelven 11 campos y `/all/finalizados` 15, con `origen` después de `etapa`.
+- [X] Un lote cuyo origen se desactivó a mano sigue mostrando el nombre del origen.
+- [X] Los demás campos y filtros de los cuatro listados no cambian.
+- [X] `/docs` muestra `POST /origenes` bajo el tag `origenes` y el selector bajo `catalogos`, con su descripción.
+- [X] `SHOW CREATE TABLE` muestra `fk_origenes_created_by` y `fk_lotes_origen`, y `origenes` no tiene columna `cliente_id`.
+- [X] `db/schema.sql` contiene la tabla `origenes` y la columna `lotes.origen_id`.
+- [X] No se agregó ninguna fila a `catalogo_permisos` ni a `permisos`.
 
 ---
 
