@@ -379,6 +379,146 @@ describe('ChatRepository / despachador', () => {
         expect(resultado.error).toContain('Tara mal puesta');
         expect(resultado.peso_neto).toBeUndefined();
     });
+
+    it('los pesajes de un cliente salen en una llamada, con el reparto por lote', async () => {
+        // Sin esto, "que se peso hoy del cliente X" recorria sus lotes uno por
+        // uno con pesajes_de_lote y agotaba las vueltas.
+        const { repo, llamadas } = crearRepositorio(
+            [
+                { id: 3, nombre: 'Agroexport', isActive: 1 }, // cliente
+                { total: 2 }, // conteo
+                [
+                    {
+                        id: '90',
+                        lote_id: 41,
+                        nombre_lote: 'BILLS2026',
+                        unidad_medida: 'Libras',
+                        peso_neto: '10.50',
+                        fuera_de_rango: 0,
+                        estado_calidad: 'PESO IDEAL',
+                        registrado_por: 'Carlos',
+                        created_at: new Date(2026, 9, 21, 8, 5),
+                        aprobado: null,
+                    },
+                ],
+                [
+                    {
+                        lote_id: 41,
+                        nombre_lote: 'BILLS2026',
+                        unidad_medida: 'Libras',
+                        cantidad: 2,
+                        peso_neto_total: '21.00',
+                        fuera_de_rango: '1',
+                    },
+                ],
+                { total: 30 }, // lotes distintos en la ventana
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            {
+                nombre: 'pesajes_de_cliente',
+                argumentos: { cliente_id: 3, periodo: 'hoy' },
+            },
+            contexto,
+        )) as {
+            total: number;
+            total_lotes: number;
+            filtros_aplicados: string;
+            pesajes: { id: number; registrado_por: string }[];
+            por_lote: { pesajes: number; peso_neto_total: number; fuera_de_rango: number }[];
+        };
+
+        expect(resultado.total).toBe(2);
+        // El reparto vino recortado a 1 fila, pero el total dice que hay 30.
+        expect(resultado.total_lotes).toBe(30);
+        expect(resultado.filtros_aplicados).toContain('solo los de hoy');
+        expect(resultado.pesajes[0]).toMatchObject({ id: 90, registrado_por: 'Carlos' });
+        expect(resultado.por_lote[0]).toEqual(
+            expect.objectContaining({ pesajes: 2, peso_neto_total: 21, fuera_de_rango: 1 }),
+        );
+        // Filtra por el cliente del lote, no por la cartera de quien pregunta.
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['lotes.cliente_id', '=', 3],
+        });
+    });
+
+    it('los pesajes de un cliente sin filas no consultan el reparto', async () => {
+        const { repo } = crearRepositorio(
+            [{ id: 3, nombre: 'Agroexport', isActive: 1 }, { total: 0 }],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'pesajes_de_cliente', argumentos: { cliente_id: 3 } },
+            contexto,
+        )) as { total: number; aviso: string };
+
+        expect(resultado.total).toBe(0);
+        expect(resultado.aviso).toContain('Agroexport');
+    });
+
+    it('los pesajes de un cliente exigen el cliente', async () => {
+        const { repo, llamadas } = crearRepositorio([], jest.fn());
+
+        const resultado = (await repo.despachar(
+            { nombre: 'pesajes_de_cliente', argumentos: {} },
+            contexto,
+        )) as { error: string };
+
+        expect(resultado.error).toBe('Falta el id del cliente.');
+        expect(llamadas).toHaveLength(0);
+    });
+
+    it('los lotes finalizados se filtran por finalizado_en y por defecto son los de hoy', async () => {
+        const { repo, llamadas } = crearRepositorio(
+            [
+                { total: 1 },
+                [
+                    {
+                        id: 41,
+                        nombre_lote: 'BILLS2026',
+                        cliente: 'Agroexport',
+                        producto: 'Azucar',
+                        aprobado_por: 'Ana',
+                        aprobado_en: new Date(2026, 9, 20, 16, 0),
+                        finalizado_por: 'Luis',
+                        finalizado_en: new Date(2026, 9, 21, 9, 30),
+                        observaciones_aprobador: '  ',
+                    },
+                ],
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'lotes_finalizados', argumentos: {} },
+            contexto,
+        )) as {
+            cliente: string;
+            filtros_aplicados: string;
+            lotes: { finalizado_por: string; finalizado_en: string; observaciones_aprobador: string | null }[];
+        };
+
+        expect(resultado.cliente).toBe('todos los clientes');
+        expect(resultado.filtros_aplicados).toContain('solo los de hoy');
+        expect(resultado.lotes[0]).toMatchObject({
+            finalizado_por: 'Luis',
+            finalizado_en: '21/10/2026 09:30',
+            observaciones_aprobador: null,
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['lotes.finalizado_por', 'is not', null],
+        });
+        expect(
+            llamadas.some(
+                (l) => l.metodo === 'where' && l.args[0] === 'lotes.finalizado_en',
+            ),
+        ).toBe(true);
+    });
 });
 
 describe('ChatRepository / el turno', () => {

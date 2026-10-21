@@ -448,11 +448,10 @@ export class ChatRepository {
         // El nombre siempre va precedido de "del cliente": sin esa palabra el
         // modelo no sabe si `${segundo}` es un cliente o un lote y se enreda.
         //
-        // La segunda es "MIS pesajes" y no "los pesajes" a proposito: ninguna
-        // herramienta lista los pesajes de un cliente, asi que "pesajes de hoy
-        // del cliente X" obligaba a recorrer sus lotes uno por uno y agotaba las
-        // vueltas (chat_log 96 y 97). Con "mis" se resuelve en UNA llamada a
+        // La segunda es "MIS pesajes": se resuelve en UNA llamada a
         // `pesajes_de_usuario`, con el usuario y el cliente ya en el contexto.
+        // "Los pesajes de hoy del cliente X" tambien cabe en una desde que
+        // existe `pesajes_de_cliente`.
         //
         // La cuarta tambien se resuelve en UNA llamada (`lotes_de_cliente` con
         // `estado: 'finalizado'`) y va con `${segundo}` para repartir los nombres.
@@ -521,7 +520,7 @@ export class ChatRepository {
      * esperado, los ids inexistentes responden con texto y el nombre de la
      * funcion se compara contra esta lista cerrada.
      *
-     * No valida `cliente_operador`, igual que las ocho consultas que despacha:
+     * No valida `cliente_operador`, igual que las consultas que despacha:
      * es la decision del SPEC 28 y esta razonada alli —los aprobadores y los
      * ADMIN no tienen filas en esa tabla y el chat les saldria vacio—.
      */
@@ -570,6 +569,20 @@ export class ChatRepository {
                 // Solo la ventana y el limite: el resto de filtros de pesajes no
                 // aplica a lotes y no debe colarse en `filtros_aplicados`.
                 return await this.lotesAprobados(this.aEntero(args.cliente_id), {
+                    desde: this.aFecha(args.desde),
+                    hasta: this.aFecha(args.hasta),
+                    periodo: this.aPeriodo(args.periodo),
+                    limite: this.aLimite(args.limite),
+                });
+
+            case 'pesajes_de_cliente':
+                return await this.pesajesDeCliente(
+                    this.aEntero(args.cliente_id),
+                    this.aFiltrosDePesajes(args),
+                );
+
+            case 'lotes_finalizados':
+                return await this.lotesFinalizados(this.aEntero(args.cliente_id), {
                     desde: this.aFecha(args.desde),
                     hasta: this.aFecha(args.hasta),
                     periodo: this.aPeriodo(args.periodo),
@@ -1593,6 +1606,318 @@ export class ChatRepository {
                     lote.finalizado_por !== null
                         ? 'finalizado'
                         : 'pendiente_aprobacion',
+            })),
+        };
+    }
+
+    // ---------------------------------------------------------------------
+    // Herramienta 10: pesajes_de_cliente
+    // ---------------------------------------------------------------------
+
+    /**
+     * Los pesajes de TODOS los lotes de un cliente, de cualquier operador.
+     *
+     * Existe porque "que se peso hoy del cliente X" no tenia herramienta:
+     * `pesajes_de_usuario` exige una persona y `pesajes_de_lote` un lote, asi
+     * que el modelo recorria `lotes_de_cliente` y despues cada lote con
+     * `pesajes_de_lote` hasta agotar las vueltas. En `chat_log` fallaban todas
+     * las que llegaban como pregunta inicial.
+     *
+     * Ademas de las filas devuelve `por_lote`: cuantos pesajes, cuanto peso
+     * neto y cuantos fuera de rango tiene cada lote dentro de la ventana. Va
+     * por lote y no como un total del cliente porque cada lote tiene su propia
+     * unidad de medida, y sumar quintales con libras es justo lo que el modelo
+     * tiene prohibido hacer y lo que aqui tampoco se hace.
+     *
+     * No filtra `lotes.estado` ni `clientes.isActive`, igual que
+     * `pesajes_de_usuario`: un pesaje de un lote ya cerrado sigue siendo algo
+     * que se peso ese dia.
+     */
+    private async pesajesDeCliente(
+        clienteId: number | undefined,
+        filtros: FiltrosDePesajes,
+    ): Promise<ResultadoHerramienta> {
+        if (clienteId === undefined) {
+            return { error: 'Falta el id del cliente.' };
+        }
+
+        const cliente = await this.db
+            .selectFrom('clientes')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', clienteId)
+            .executeTakeFirst();
+
+        if (!cliente) {
+            return { error: `No existe ningun cliente con id ${clienteId}.` };
+        }
+
+        const ventana = this.ventanaDelPeriodo(filtros);
+
+        // Una sola base con los joins y los filtros, de la que salen el conteo,
+        // las filas y el reparto por lote. Si cada una llevara sus propios
+        // filtros, el total y el reparto acabarian contando cosas distintas.
+        let base = this.db
+            .selectFrom('pesajes')
+            .innerJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin(
+                'estados_calidad',
+                'estados_calidad.id',
+                'pesajes.estado_calidad_id',
+            )
+            .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .where('lotes.cliente_id', '=', clienteId)
+            .where('pesajes.isActive', '=', 1);
+
+        if (filtros.lote_id !== undefined) {
+            base = base.where('pesajes.lote_id', '=', filtros.lote_id);
+        }
+        if (filtros.usuario_id !== undefined) {
+            base = base.where('pesajes.usuario_id', '=', filtros.usuario_id);
+        }
+        if (filtros.estado_calidad_id !== undefined) {
+            base = base.where(
+                'pesajes.estado_calidad_id',
+                '=',
+                filtros.estado_calidad_id,
+            );
+        }
+        if (filtros.fuera_de_rango !== undefined) {
+            base = base.where(
+                'pesajes.fuera_de_rango',
+                '=',
+                sql<boolean>`${filtros.fuera_de_rango ? 1 : 0}`,
+            );
+        }
+        if (filtros.nombre !== undefined) {
+            // El nombre de quien peso, como en `pesajes_de_lote`.
+            base = base.where(
+                'usuarios.complete_name',
+                'like',
+                `%${filtros.nombre}%`,
+            );
+        }
+        if (ventana.desde !== undefined) {
+            base = base.where('pesajes.created_at', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            base = base.where('pesajes.created_at', '<', ventana.hasta);
+        }
+
+        const consulta = base.select([
+            'pesajes.id',
+            'pesajes.lote_id',
+            'lotes.nombre_lote',
+            'unidades_medida.nombre as unidad_medida',
+            'pesajes.peso_neto',
+            'pesajes.fuera_de_rango',
+            'estados_calidad.nombre as estado_calidad',
+            'usuarios.complete_name as registrado_por',
+            'pesajes.created_at',
+            'pesajes.aprobado',
+        ]);
+
+        const total = await this.contarFiltrados(consulta);
+
+        const cabecera = {
+            cliente: cliente.nombre,
+            cliente_rechazado: cliente.isActive !== 1,
+            filtros_aplicados: this.filtrosEnPalabras(filtros, ventana),
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                pesajes: [],
+                por_lote: [],
+                total: 0,
+                aviso: `No hay ningun pesaje activo de los lotes del cliente ${cliente.nombre} con esos criterios. Los pesajes anulados no se listan.`,
+            };
+        }
+
+        const filas = Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO);
+        const pesajes = await consulta
+            .orderBy('pesajes.created_at', 'desc')
+            .limit(filas)
+            .execute();
+
+        const porLote = await base
+            .select([
+                'pesajes.lote_id',
+                'lotes.nombre_lote',
+                'unidades_medida.nombre as unidad_medida',
+                sql<number | string>`COUNT(*)`.as('cantidad'),
+                sql<number | string>`COALESCE(SUM(pesajes.peso_neto), 0)`.as(
+                    'peso_neto_total',
+                ),
+                sql<number | string>`COALESCE(SUM(pesajes.fuera_de_rango = 1), 0)`.as(
+                    'fuera_de_rango',
+                ),
+            ])
+            .groupBy([
+                'pesajes.lote_id',
+                'lotes.nombre_lote',
+                'unidades_medida.nombre',
+            ])
+            .orderBy('cantidad', 'desc')
+            .limit(ChatRepository.MAX_FILAS_MODELO)
+            .execute();
+
+        // `por_lote` tambien se recorta, asi que lleva su propio total: sin el,
+        // un cliente con 30 lotes en la ventana se leeria como si tuviera 20.
+        const lotesEnVentana = await base
+            .select(sql<number | string>`COUNT(DISTINCT pesajes.lote_id)`.as('total'))
+            .executeTakeFirst();
+
+        return {
+            ...cabecera,
+            total,
+            mostrados: pesajes.length,
+            total_lotes: Number(lotesEnVentana?.total ?? 0),
+            por_lote: porLote.map((l) => ({
+                lote_id: l.lote_id,
+                lote: l.nombre_lote,
+                unidad_medida: l.unidad_medida,
+                pesajes: Number(l.cantidad),
+                peso_neto_total: this.dosDecimales(l.peso_neto_total),
+                fuera_de_rango: Number(l.fuera_de_rango),
+            })),
+            pesajes: pesajes.map((p) => ({
+                id: Number(p.id),
+                lote_id: p.lote_id,
+                lote: p.nombre_lote,
+                peso_neto: this.dosDecimales(p.peso_neto),
+                unidad_medida: p.unidad_medida,
+                fuera_de_rango: !!p.fuera_de_rango,
+                estado_calidad: p.estado_calidad,
+                registrado_por: p.registrado_por,
+                registrado_en: this.fechaHora(p.created_at),
+                revision_del_aprobador: this.revision(p.aprobado),
+            })),
+        };
+    }
+
+    // ---------------------------------------------------------------------
+    // Herramienta 11: lotes_finalizados
+    // ---------------------------------------------------------------------
+
+    /**
+     * Los lotes que el aprobador finalizo en una ventana de tiempo, de todos
+     * los clientes o de uno. Es la gemela de `lotes_aprobados` sobre el otro
+     * extremo del flujo.
+     *
+     * Existe porque "que lotes se finalizaron hoy" no tenia herramienta:
+     * `lotes_de_cliente` con `estado: 'finalizado'` exige un cliente y no
+     * conoce fechas, y `lotes_aprobados` filtra por `aprobado_en`, que es otro
+     * dia y otra persona.
+     *
+     * Se filtra por `finalizado_en` y se exige `finalizado_por IS NOT NULL`,
+     * la senal canonica de finalizacion de la tabla de discriminadores. Un lote
+     * rechazado nunca tiene `finalizado_por`, asi que no hace falta excluirlo
+     * aparte.
+     *
+     * Sin periodo ni fechas se asume `hoy` y se dice en `filtros_aplicados`.
+     */
+    private async lotesFinalizados(
+        clienteId: number | undefined,
+        filtros: FiltrosDePesajes,
+    ): Promise<ResultadoHerramienta> {
+        const conVentana: FiltrosDePesajes =
+            filtros.periodo === undefined &&
+                filtros.desde === undefined &&
+                filtros.hasta === undefined
+                ? { ...filtros, periodo: 'hoy' }
+                : filtros;
+
+        const ventana = this.ventanaDelPeriodo(conVentana);
+
+        let cliente: { nombre: string } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
+        }
+
+        let consulta = this.db
+            .selectFrom('lotes')
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
+            .leftJoin(
+                'usuarios as finalizador',
+                'finalizador.id',
+                'lotes.finalizado_por',
+            )
+            .select([
+                'lotes.id',
+                'lotes.nombre_lote',
+                'clientes.nombre as cliente',
+                'productos.nombre as producto',
+                'aprobador.complete_name as aprobado_por',
+                'lotes.aprobado_en',
+                'finalizador.complete_name as finalizado_por',
+                'lotes.finalizado_en',
+                'lotes.observaciones_aprobador',
+            ])
+            .where('lotes.finalizado_por', 'is not', null);
+
+        if (clienteId !== undefined) {
+            consulta = consulta.where('lotes.cliente_id', '=', clienteId);
+        }
+        if (ventana.desde !== undefined) {
+            consulta = consulta.where('lotes.finalizado_en', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            consulta = consulta.where('lotes.finalizado_en', '<', ventana.hasta);
+        }
+
+        const total = await this.contarFiltrados(consulta);
+        const filas = Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO);
+        const lotes = await consulta
+            .orderBy('lotes.finalizado_en', 'desc')
+            .limit(filas)
+            .execute();
+
+        const cabecera = {
+            cliente: cliente?.nombre ?? 'todos los clientes',
+            filtros_aplicados: this.filtrosEnPalabras(conVentana, ventana),
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                lotes: [],
+                total: 0,
+                aviso: 'No hay ningun lote finalizado por el aprobador con esos criterios.',
+            };
+        }
+
+        return {
+            ...cabecera,
+            total,
+            mostrados: lotes.length,
+            lotes: lotes.map((lote) => ({
+                id: lote.id,
+                nombre_lote: lote.nombre_lote,
+                cliente: lote.cliente,
+                producto: lote.producto,
+                aprobado_por: lote.aprobado_por,
+                aprobado_en: this.fechaHora(lote.aprobado_en),
+                finalizado_por: lote.finalizado_por,
+                finalizado_en: this.fechaHora(lote.finalizado_en),
+                // SPEC 46: NULL o '' (SPEC 45) llegan al modelo como null.
+                observaciones_aprobador:
+                    lote.observaciones_aprobador?.trim() || null,
             })),
         };
     }

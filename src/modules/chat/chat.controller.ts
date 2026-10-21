@@ -21,7 +21,7 @@ export class ChatController {
         summary: 'Un turno de conversacion sobre lotes y pesajes',
         description:
             'Responde en lenguaje natural preguntas sobre lotes, pesajes, clientes y operadores. ' +
-            'El modelo no consulta la base: elige entre ocho funciones de SOLO LECTURA y el backend ' +
+            'El modelo no consulta la base: elige entre once funciones de SOLO LECTURA y el backend ' +
             'decide si las ejecuta, asi que desde aqui no se puede aprobar, rechazar, finalizar ni ' +
             'registrar nada. ' +
             'respuesta es MARKDOWN CRUDO, con saltos de linea reales, igual que POST /lotes/{id}/resumen: ' +
