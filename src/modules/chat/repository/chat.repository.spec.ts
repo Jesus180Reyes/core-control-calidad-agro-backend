@@ -472,6 +472,124 @@ describe('ChatRepository / despachador', () => {
         expect(llamadas).toHaveLength(0);
     });
 
+    it('la bandeja del aprobador sale de todos los clientes en una llamada, la mas vieja primero', async () => {
+        const { repo, llamadas } = crearRepositorio(
+            [
+                { id: 2 }, // etapa CLIENTE_FINAL
+                { total: 1 },
+                [
+                    {
+                        id: 41,
+                        nombre_lote: 'BILLS2026',
+                        cliente: 'Agroexport',
+                        producto: 'Azucar',
+                        aprobado_por: 'Ana',
+                        aprobado_en: new Date(2026, 9, 20, 16, 0),
+                        pesajes_activos: '14',
+                        sin_revisar: '3',
+                    },
+                ],
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'lotes_pendientes', argumentos: {} },
+            contexto,
+        )) as {
+            cliente: string;
+            total: number;
+            lotes: { pesajes_activos: number; pesajes_sin_revisar: number }[];
+        };
+
+        expect(resultado.cliente).toBe('todos los clientes activos');
+        expect(resultado.total).toBe(1);
+        expect(resultado.lotes[0]).toMatchObject({
+            pesajes_activos: 14,
+            pesajes_sin_revisar: 3,
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['clientes.isActive', '=', 1],
+        });
+        // La etapa se resuelve por codigo, nunca por un id escrito a mano.
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['codigo', '=', 'CLIENTE_FINAL'],
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['lotes.etapa_id', '=', 2],
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'orderBy',
+            args: ['lotes.aprobado_en', 'asc'],
+        });
+    });
+
+    it('la bandeja de un cliente rechazado esta vacia y lo dice', async () => {
+        const { repo } = crearRepositorio(
+            [{ nombre: 'Agroexport', isActive: 0 }],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'lotes_pendientes', argumentos: { cliente_id: 3 } },
+            contexto,
+        )) as { total: number; aviso: string };
+
+        expect(resultado.total).toBe(0);
+        expect(resultado.aviso).toContain('rechazado');
+    });
+
+    it('metricas_de_lote trae la observacion del aprobador solo si el lote esta finalizado', async () => {
+        const lote = {
+            id: 41,
+            nombre_lote: 'BILLS2026',
+            cliente: 'Agroexport',
+            peso_minimo: '9',
+            peso_ideal: '10',
+            peso_maximo: '11',
+            aprobado_por: 'Ana',
+            aprobado_en: new Date(2026, 9, 20, 16, 0),
+            finalizado_por_id: 9,
+            finalizado_por: 'Luis',
+            finalizado_en: new Date(2026, 9, 21, 9, 30),
+            observaciones_aprobador: 'Tres cajas golpeadas',
+        };
+        const agregados = {
+            activos: 2,
+            total: 21,
+            promedio: 10.5,
+            minimo: 10,
+            maximo: 11,
+            fuera_de_rango: 0,
+            aprobados: 2,
+            rechazados: 0,
+        };
+
+        const finalizado = crearRepositorio([lote, agregados, []], jest.fn());
+        const conCierre = (await finalizado.repo.despachar(
+            { nombre: 'metricas_de_lote', argumentos: { lote_id: 41 } },
+            contexto,
+        )) as { cierre?: { observaciones_aprobador: string | null } };
+
+        expect(conCierre.cierre?.observaciones_aprobador).toBe(
+            'Tres cajas golpeadas',
+        );
+
+        const abierto = crearRepositorio(
+            [{ ...lote, finalizado_por_id: null }, agregados, []],
+            jest.fn(),
+        );
+        const sinCierre = (await abierto.repo.despachar(
+            { nombre: 'metricas_de_lote', argumentos: { lote_id: 41 } },
+            contexto,
+        )) as { cierre?: unknown };
+
+        expect(sinCierre.cierre).toBeUndefined();
+    });
+
     it('los lotes finalizados se filtran por finalizado_en y por defecto son los de hoy', async () => {
         const { repo, llamadas } = crearRepositorio(
             [

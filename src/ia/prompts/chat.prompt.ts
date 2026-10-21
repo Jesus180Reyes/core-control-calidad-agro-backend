@@ -26,7 +26,7 @@
  *    tambien `herramientas` en NULL. Un mensaje mixto pierde la cortesia, no
  *    los datos: se contesta solo la parte de datos.
  *
- * Las once funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
+ * Las doce funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
  * `rechazar_lote`, no hay nada detras que despachar.
  */
@@ -167,6 +167,14 @@ probable y dilo en la respuesta.
   sus lotes uno por uno con pesajes_de_lote. Para los totales usa por_lote, que
   ya viene sumado por lote; no sumes entre lotes, porque cada uno tiene su
   unidad. Si por_lote trae menos lotes que total_lotes, di cuantos hay en total.
+- "Que tengo pendiente", "que me falta por aprobar", "que esta esperando firma"
+  o "mi bandeja" es lotes_pendientes, de todos los clientes en una llamada. No
+  recorras los clientes con lotes_de_cliente para eso.
+- "La observacion del aprobador", "que dijo el aprobador", "la nota final" o "el
+  comentario de cierre" de un lote con nombre es metricas_de_lote: busca el lote
+  con buscar_persona y lee cierre.observaciones_aprobador. No uses
+  resumen_del_lote para eso, porque el resumen no trae la observacion. Si cierre
+  no viene, el lote no esta finalizado y no tiene observacion todavia.
 - Anulado no es lo mismo que rechazado. "Anulado", "borrado", "eliminado" o
   "cancelado" es un pesaje que el operador anulo: no aparece en ninguna lista y
   solo se ve con detalle_de_pesaje por su id. "Rechazado por el aprobador" o "no
@@ -318,7 +326,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'metricas_de_lote',
         description:
-            'Devuelve los agregados de un lote ya calculados: cuantos pesajes activos tiene, el peso neto total, el promedio, el minimo, el maximo, cuantos quedaron fuera de rango con su porcentaje, y el reparto por estado de calidad. Usala para "como va el lote X".',
+            'Devuelve los agregados de un lote ya calculados: cuantos pesajes activos tiene, el peso neto total, el promedio, el minimo, el maximo, cuantos quedaron fuera de rango con su porcentaje, y el reparto por estado de calidad. Si el lote esta finalizado trae ademas cierre: quien lo aprobo y finalizo, cuando, y la observacion final del aprobador o null. Usala para "como va el lote X" y para "que observacion dejo el aprobador en el lote X".',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -458,7 +466,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'resumen_del_lote',
         description:
-            'Devuelve el resumen de cierre que se genero para un lote finalizado, si existe. No genera ninguno: si el lote no tiene resumen, lo dice.',
+            'Devuelve el resumen de cierre que se genero para un lote finalizado, si existe. No genera ninguno: si el lote no tiene resumen, lo dice. No trae la observacion del aprobador: para eso usa metricas_de_lote.',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -624,6 +632,25 @@ export const HERRAMIENTAS_CHAT = [
                     ],
                     description:
                         'Ventana relativa sobre la fecha de finalizacion, resuelta por el sistema. Usala en vez de calcular la fecha tu. Por defecto hoy.',
+                },
+                limite: {
+                    type: 'INTEGER',
+                    description: 'Cuantas filas devolver. Por defecto 10.',
+                },
+            },
+        },
+    },
+    {
+        name: 'lotes_pendientes',
+        description:
+            'Lista los lotes que esperan al aprobador ahora mismo: el supervisor ya los aprobo y nadie los ha finalizado. De todos los clientes o de uno, en UNA llamada, del que mas lleva esperando al mas reciente. Cada lote trae quien lo aprobo, cuando, cuantos pesajes activos tiene y cuantos le quedan sin revisar. Usala para "que tengo pendiente de aprobar", "que me falta por firmar" o "que hay en mi bandeja". No tiene periodo: pendiente es un estado de ahora.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                cliente_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Deja solo los lotes de ese cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes. Sin el, lista todos los clientes.',
                 },
                 limite: {
                     type: 'INTEGER',

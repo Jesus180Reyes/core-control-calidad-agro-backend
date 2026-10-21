@@ -589,6 +589,12 @@ export class ChatRepository {
                     limite: this.aLimite(args.limite),
                 });
 
+            case 'lotes_pendientes':
+                return await this.lotesPendientes(
+                    this.aEntero(args.cliente_id),
+                    this.aLimite(args.limite),
+                );
+
             default:
                 // Incluye el caso que importa: una funcion de escritura que el
                 // modelo se invento. No existe, no se despacha y se registra.
@@ -1005,6 +1011,7 @@ export class ChatRepository {
             return {
                 lote: lote.nombre_lote,
                 cliente: lote.cliente,
+                ...this.cierreDelLote(lote),
                 aviso: `El lote ${lote.nombre_lote} no tiene ningun pesaje activo, asi que no hay cifras que calcular. Puede que los hayan anulado todos.`,
             };
         }
@@ -1042,6 +1049,7 @@ export class ChatRepository {
             estado: lote.estado,
             etapa: lote.etapa,
             origen: lote.origen,
+            ...this.cierreDelLote(lote),
             pesajes: {
                 activos,
                 peso_neto_total: this.dosDecimales(fila.total),
@@ -1923,6 +1931,134 @@ export class ChatRepository {
     }
 
     // ---------------------------------------------------------------------
+    // Herramienta 12: lotes_pendientes
+    // ---------------------------------------------------------------------
+
+    /**
+     * La bandeja del aprobador: los lotes que un supervisor aprobo y que nadie
+     * ha finalizado todavia, de todos los clientes o de uno.
+     *
+     * Existe porque "que tengo pendiente de aprobar" obligaba a llamar
+     * `lotes_de_cliente` con `pendiente_aprobacion` una vez por cliente, y con
+     * mas de tres clientes se agotaban las vueltas. Un aprobador no tiene
+     * cartera, asi que ni siquiera sabia por que clientes empezar.
+     *
+     * El filtro es el mismo de `lotes_de_cliente` para ese estado —`estado =
+     * 'cerrado'` en la etapa CLIENTE_FINAL, resuelta por su `codigo`— para que
+     * las dos herramientas no cuenten cosas distintas de la misma bandeja.
+     *
+     * Solo cuenta clientes activos: un cliente rechazado no tiene trabajo que
+     * revisar, y sus lotes en la bandeja serian ruido para el aprobador.
+     *
+     * No tiene periodo: pendiente es un estado de ahora, no de un dia. Se
+     * ordena del que mas lleva esperando al mas nuevo, que es como se trabaja
+     * una bandeja, y cada lote trae cuantos pesajes le quedan sin revisar.
+     */
+    private async lotesPendientes(
+        clienteId: number | undefined,
+        limite: number,
+    ): Promise<ResultadoHerramienta> {
+        let cliente: { nombre: string; isActive: number | null } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre', 'isActive'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
+
+            if (cliente.isActive !== 1) {
+                return {
+                    cliente: cliente.nombre,
+                    lotes: [],
+                    total: 0,
+                    aviso: `El cliente ${cliente.nombre} esta rechazado, asi que sus lotes no cuentan como pendientes del aprobador.`,
+                };
+            }
+        }
+
+        const etapa = await this.db
+            .selectFrom('etapas')
+            .select(['id'])
+            .where('codigo', '=', 'CLIENTE_FINAL')
+            .executeTakeFirst();
+
+        if (!etapa) {
+            return {
+                error: "La etapa 'CLIENTE_FINAL' no esta configurada en esta base de datos, asi que no puedo listar los lotes pendientes.",
+            };
+        }
+
+        let consulta = this.db
+            .selectFrom('lotes')
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
+            .select([
+                'lotes.id',
+                'lotes.nombre_lote',
+                'clientes.nombre as cliente',
+                'productos.nombre as producto',
+                'aprobador.complete_name as aprobado_por',
+                'lotes.aprobado_en',
+                sql<number | string>`(SELECT COUNT(*) FROM pesajes p WHERE p.lote_id = lotes.id AND p.isActive = 1)`.as(
+                    'pesajes_activos',
+                ),
+                sql<number | string>`(SELECT COUNT(*) FROM pesajes p WHERE p.lote_id = lotes.id AND p.isActive = 1 AND p.aprobado IS NULL)`.as(
+                    'sin_revisar',
+                ),
+            ])
+            .where('lotes.estado', '=', 'cerrado')
+            .where('lotes.etapa_id', '=', etapa.id)
+            .where('clientes.isActive', '=', 1);
+
+        if (clienteId !== undefined) {
+            consulta = consulta.where('lotes.cliente_id', '=', clienteId);
+        }
+
+        const total = await this.contarFiltrados(consulta);
+
+        const cabecera = {
+            cliente: cliente?.nombre ?? 'todos los clientes activos',
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                lotes: [],
+                total: 0,
+                aviso: 'No hay ningun lote esperando al aprobador con esos criterios.',
+            };
+        }
+
+        const filas = Math.min(limite, ChatRepository.MAX_FILAS_MODELO);
+        const lotes = await consulta
+            .orderBy('lotes.aprobado_en', 'asc')
+            .limit(filas)
+            .execute();
+
+        return {
+            ...cabecera,
+            orden: 'del que mas lleva esperando al mas reciente',
+            total,
+            mostrados: lotes.length,
+            lotes: lotes.map((lote) => ({
+                id: lote.id,
+                nombre_lote: lote.nombre_lote,
+                cliente: lote.cliente,
+                producto: lote.producto,
+                aprobado_por: lote.aprobado_por,
+                aprobado_en: this.fechaHora(lote.aprobado_en),
+                pesajes_activos: Number(lote.pesajes_activos),
+                pesajes_sin_revisar: Number(lote.sin_revisar),
+            })),
+        };
+    }
+
+    // ---------------------------------------------------------------------
     // Coercion de argumentos y formato
     // ---------------------------------------------------------------------
 
@@ -1986,6 +2122,12 @@ export class ChatRepository {
             )
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
             .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
+            .leftJoin('usuarios as aprobador', 'aprobador.id', 'lotes.aprobado_por')
+            .leftJoin(
+                'usuarios as finalizador',
+                'finalizador.id',
+                'lotes.finalizado_por',
+            )
             .select([
                 'lotes.id',
                 'lotes.nombre_lote',
@@ -1999,9 +2141,46 @@ export class ChatRepository {
                 'lotes.peso_maximo',
                 'lotes.estado',
                 'etapas.nombre as etapa',
+                'aprobador.complete_name as aprobado_por',
+                'lotes.aprobado_en',
+                'lotes.finalizado_por as finalizado_por_id',
+                'finalizador.complete_name as finalizado_por',
+                'lotes.finalizado_en',
+                'lotes.observaciones_aprobador',
             ])
             .where('lotes.id', '=', loteId)
             .executeTakeFirst();
+    }
+
+    /**
+     * Quien aprobo y finalizo un lote y que observacion dejo, o nada si el
+     * lote no esta finalizado.
+     *
+     * Lo usa `metricas_de_lote` para que "que observacion dejo el aprobador en
+     * el lote X" se conteste con buscar_persona + metricas_de_lote. Antes la
+     * observacion solo viajaba en `lotes_de_cliente`, que pide un cliente y
+     * corta en 10 lotes, y el modelo acababa en `resumen_del_lote`, que no la
+     * trae (chat_log: "Me enrede" y declinaciones).
+     *
+     * `finalizado_por IS NOT NULL` es la senal canonica de finalizacion; el
+     * nombre puede ser null si el usuario ya no existe, por eso se mira el id.
+     */
+    private cierreDelLote(
+        lote: NonNullable<Awaited<ReturnType<ChatRepository['datosDelLote']>>>,
+    ): ResultadoHerramienta {
+        if (lote.finalizado_por_id === null) return {};
+
+        return {
+            cierre: {
+                aprobado_por: lote.aprobado_por,
+                aprobado_en: this.fechaHora(lote.aprobado_en),
+                finalizado_por: lote.finalizado_por,
+                finalizado_en: this.fechaHora(lote.finalizado_en),
+                // SPEC 46: NULL o '' (SPEC 45) llegan al modelo como null.
+                observaciones_aprobador:
+                    lote.observaciones_aprobador?.trim() || null,
+            },
+        };
     }
 
     /**
