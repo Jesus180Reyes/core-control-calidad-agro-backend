@@ -28,4 +28,8 @@ export class CatalogosService {
     async findOrigenes() {
         return await this.catalogosRepository.getOrigenes();
     }
+
+    async findDestinos() {
+        return await this.catalogosRepository.getDestinos();
+    }
 }

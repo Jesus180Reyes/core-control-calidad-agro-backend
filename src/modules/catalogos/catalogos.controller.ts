@@ -117,4 +117,24 @@ export class CatalogosController {
             data,
         };
     }
+
+    @Get('destinos')
+    @ApiOperation({
+        summary: 'Destinos activos',
+        description:
+            'Lista de referencia para el selector de destino_id de ' +
+            'PATCH /pesajes/{id}/rechazar/byApprover: a donde va el producto que el aprobador ' +
+            'rechaza (mercado local, desecho...). Cada elemento es { id, nombre } y la clave del ' +
+            'payload es data. Filtra isActive = 1 y ordena por nombre. Los destinos se cargan a ' +
+            'mano en la base, no hay endpoint para crearlos. Abierto a cualquier usuario ' +
+            'autenticado, sin filtro por cliente_operador.',
+    })
+    async findDestinos() {
+        const data = await this.catalogosService.findDestinos();
+        return {
+            ok: true,
+            msg: 'Destinos obtenidos correctamente',
+            data,
+        };
+    }
 }

@@ -68,4 +68,14 @@ export class CatalogosRepository {
             .execute();
         return origenes;
     }
+
+    async getDestinos() {
+        const destinos = await this.db
+            .selectFrom('destinos')
+            .select(['id', 'nombre'])
+            .where('isActive', '=', 1)
+            .orderBy('nombre', 'asc')
+            .execute();
+        return destinos;
+    }
 }
