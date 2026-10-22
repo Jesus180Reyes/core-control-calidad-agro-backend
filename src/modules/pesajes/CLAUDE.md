@@ -1,6 +1,6 @@
 # pesajes module
 
-Specs: 03, 04 (derived quality state), 10 (annulment), 15 (history), 16 (filters), 19 (approver review), 21 (`GET /pesajes/:id`), 29 (pagination), 38 (supervisor PIN), 44 (observations). Eight routes.
+Specs: 03, 04 (derived quality state), 10 (annulment), 15 (history), 16 (filters), 19 (approver review), 21 (`GET /pesajes/:id`), 29 (pagination), 38 (supervisor PIN), 44 (observations), 47 (destination of an approver-rejected weigh-in). Eight routes.
 
 ## Access control
 
@@ -12,8 +12,9 @@ Specs: 03, 04 (derived quality state), 10 (annulment), 15 (history), 16 (filters
 - `isActive` + rejection trio `motivo_rechazo`/`rechazado_por`/`rechazado_en` — the **operator's annulment** (`PATCH /pesajes/:id/rechazar`), which hides the row from both listings.
 - `aprobado`/`aprobado_por`/`aprobado_en` — the **approver's review**, added by hand outside any spec and adopted by spec 19. **`aprobado` is tri-state**: `1` approved, `0` rejected by the approver, `NULL` nobody reviewed it. Typed `boolean | null`, but MySQL returns `0`/`1`: **compare by truthiness or against `null`, never with `=== false`**. Reads map it with `p.aprobado === null ? null : !!p.aprobado`. `aprobado = 0` is a different concept from `isActive = 0`: the row **stays active and visible**.
 - `aprobado_con_excepcion_por INT NULL` (spec 38, FK → `usuarios`) — the supervisor who authorized an over-maximum weigh-in. No `_en`: the date is `autorizaciones_pin.usada_en`, joined by `pesaje_id`. Not the approver's `aprobado_por`.
+- `destino_id INT NULL` (spec 47, FK `fk_pesajes_destino` → `destinos`, right after `rechazado_en`) — where the product the **approver** rejected goes (local market, waste…). Written only by `PATCH /pesajes/:id/rechazar/byApprover`, where it is mandatory; `NULL` on every other row (unreviewed, approved, annulled by the operator, rejected before spec 47). The obligation lives in the DTO, not in MySQL. `destinos` (`id`, `nombre`, `isActive`, `created_at`, **no `codigo`** — the id is the identity, by decision) is hand-maintained: no CRUD, rows inserted in MySQL, `db/seed.sql` seeds `MERCADO LOCAL` (1) and `DESECHO` (2). Selector: `GET /catalogos/destinos`.
 - `observaciones VARCHAR(500) NULL` (spec 44) — the operator's free-text note (°Brix, pulp temperature…), the deliberately unstructured stand-in for measurements nobody has asked to model. Written only by `POST /pesajes`, never edited, returned by the three reads — and **not** by chat, the summary or metrics, by decision: free text may carry anything and sending it to Google is its own spec.
-- **No read returns** `aprobado_por`, `aprobado_en`, `rechazado_por`, `rechazado_en` or `aprobado_con_excepcion_por`. `motivo_rechazo` is readable only inside the text of `GET /pesajes/:id`'s 400.
+- **No read returns** `aprobado_por`, `aprobado_en`, `rechazado_por`, `rechazado_en`, `destino_id` or `aprobado_con_excepcion_por` — nor do chat, the AI summary or metrics read `destino_id`. `motivo_rechazo` is readable only inside the text of `GET /pesajes/:id`'s 400.
 
 `estados_calidad`: the quality states, resolved by `codigo` (`resolveEstadoCalidad`); no `isActive`. `POST /pesajes` derives the state from the weight against the lote's bands.
 
@@ -42,7 +43,7 @@ Specs: 03, 04 (derived quality state), 10 (annulment), 15 (history), 16 (filters
 
 **`PATCH /pesajes/:id/rechazar`** (spec 10) — the operator's **logical annulment**, not the `RECHAZADO` quality state: `isActive = 0` plus the rejection trio; weights and `estado_calidad_id` untouched. Body `motivo`, 5–255; `{ ok, msg }`. 400 if the pesaje does not exist, is already rejected, has a null `lote_id`, or its lote is not open. Irreversible; no endpoint lists annulled weigh-ins.
 
-**`PATCH /pesajes/:id/rechazar/byApprover`** — the approver's "no": `aprobado = 0` plus the rejection trio, and **`isActive` stays `1`**, so the row stays visible with `aprobado: false`. Body `motivo`, 5–255; `{ ok, msg }`. 400 if the pesaje does not exist, is annulled, was already reviewed, has a null `lote_id`, or its lote is not a closed one in `CLIENTE_FINAL`.
+**`PATCH /pesajes/:id/rechazar/byApprover`** — the approver's "no": `aprobado = 0` plus the rejection trio and `destino_id`, in one `UPDATE`, and **`isActive` stays `1`**, so the row stays visible with `aprobado: false`. Body (`RechazarPesajeAprobadorDto`, its own DTO so the operator's annulment is untouched): `motivo`, 5–255, and **`destino_id`, a mandatory positive integer** — Zod 400 if missing or not a number (Zod's default English message, kept by decision), `El destino_id debe ser un id valido` for `0`, negatives or decimals. `{ ok, msg }`. Validators in order: the pesaje does not exist, is annulled, was already reviewed, has a null `lote_id`, its lote is not a closed one in `CLIENTE_FINAL`, then `validateDestino` — **400** `El destino con id 'X' no existe` / `El destino '<nombre>' no esta activo`. With no active row in `destinos`, every approver rejection answers 400.
 
 **`PATCH /pesajes/:id/aprobar/byApprover`** (spec 19) — the approver's "yes": writes exactly `aprobado = 1`, `aprobado_por`, `aprobado_en = NOW()` — the only writer of `aprobado = 1`, the narrowest `UPDATE`. **No body, no DTO.** `{ ok, msg }`. Does not touch the lote: approving the last unreviewed weigh-in changes nothing about it. 400 if the pesaje does not exist, is annulled (`isActive = 0`), was already reviewed (`aprobado IS NOT NULL`, one message for each verdict), has a null `lote_id`, or its lote is not closed / not in `CLIENTE_FINAL` / rejected. Irreversible.
 
@@ -52,4 +53,4 @@ Specs: 03, 04 (derived quality state), 10 (annulment), 15 (history), 16 (filters
 
 ## Deferred
 
-Weighing at `CLIENTE_FINAL`, a PIN under `peso_minimo`, an `APROBADO CON EXCEPCIÓN` state, alert severity, hashing the PIN, expiring or binding authorizations, attempt limits, generating the QR (the front's job), a QR code distinct from the primary key, batch/offline sync and device idempotency by `(dispositivo_identificador, secuencia_dispositivo)`.
+Weighing at `CLIENTE_FINAL`, a PIN under `peso_minimo`, an `APROBADO CON EXCEPCIÓN` state, alert severity, hashing the PIN, expiring or binding authorizations, attempt limits, generating the QR (the front's job), a QR code distinct from the primary key, batch/offline sync and device idempotency by `(dispositivo_identificador, secuencia_dispositivo)`. From spec 47: a destination on the operator's annulment or on a rejected lote, returning `destino_id`/`motivo_rechazo` in the reads, the destination in chat/summary/metrics, CRUD of `destinos`, and editing or backfilling a destination.

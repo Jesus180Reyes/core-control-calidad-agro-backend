@@ -105,7 +105,7 @@ destino_id: number | null;
 | Campo | Regla |
 | --- | --- |
 | `motivo` | igual que `RechazarPesajeDto`: `string`, 5–255, obligatorio |
-| `destino_id` | `z.number().int().positive()`, obligatorio, mensaje `El destino_id es requerido` / `El destino_id debe ser un id valido` |
+| `destino_id` | `z.number().int().positive()`, obligatorio. `.int()` y `.positive()` responden `El destino_id debe ser un id valido`; si falta o no es número, queda el mensaje por defecto de Zod (`Invalid input: expected number, received ...`). Decisión del usuario durante la implementación. |
 
 ### Escritura: `PATCH /pesajes/:id/rechazar/byApprover`
 

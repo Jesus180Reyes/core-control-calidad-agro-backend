@@ -25,8 +25,8 @@ Conventions worth copying:
 - Audit columns are nullable and named identically on every table: `motivo_rechazo VARCHAR(255)`, `rechazado_por INT`, `rechazado_en DATETIME` (on `pesajes`, `clientes`, `lotes`), `aprobado_por`/`aprobado_en`, `finalizado_por`/`finalizado_en`, `actualizado_por`. Each `*_por` carries a real FK to `usuarios(id)`, argued as an audit column that would be worthless pointing at a missing user.
 - Text columns get the same cap in their DTO as in the DDL (`VARCHAR(500)` ↔ `.max(500)`), because the database runs `STRICT_TRANS_TABLES` and an oversized value is a MySQL 500 instead of a readable 400. Use `MEDIUMTEXT` when a value can pass 64 KB (`firma_aprobador`).
 - A destructive change (spec 14) goes in this order: create the new unique index, drop the old one, drop the columns, add the FK — and only *after* the code stopped reading those columns.
-- Create a referenced table before the column that points at it (`origenes` before `lotes.origen_id`; `pines_supervisor`, then `pesajes.aprobado_con_excepcion_por`, then `autorizaciones_pin`). Match the FK type to the referenced id: `usuarios.id` is `INT`, `pesajes.id` is `BIGINT`.
-- Column order to know before reading a `DESCRIBE`: on `lotes`, `cerrado_en` sits **last**, after the audit pairs, `firma_aprobador` and `observaciones_aprobador`; `origen_id` is at ordinal 3, after `cliente_id`.
+- Create a referenced table before the column that points at it (`origenes` before `lotes.origen_id`; `destinos` before `pesajes.destino_id`; `pines_supervisor`, then `pesajes.aprobado_con_excepcion_por`, then `autorizaciones_pin`). Match the FK type to the referenced id: `usuarios.id` is `INT`, `pesajes.id` is `BIGINT`.
+- Column order to know before reading a `DESCRIBE`: on `lotes`, `cerrado_en` sits **last**, after the audit pairs, `firma_aprobador` and `observaciones_aprobador`; `origen_id` is at ordinal 3, after `cliente_id`. On `pesajes`, `destino_id` sits right after `rechazado_en`, before the `aprobado` trio.
 
 ## Constraints — count the database, not the docs
 
@@ -36,4 +36,4 @@ Conventions worth copying:
 
 ## Hand-maintained tables
 
-No CRUD and nothing validates them at startup; a missing row surfaces as a 400 at request time: `etapas`, `estados_calidad`, `roles`, `catalogo_permisos`/`permisos`, `paises_config`, plus `productos` and `usuarios`, which `db/seed.sql` does not include.
+No CRUD and nothing validates them at startup; a missing row surfaces as a 400 at request time: `etapas`, `estados_calidad`, `roles`, `catalogo_permisos`/`permisos`, `paises_config`, `destinos` (spec 47; `db/seed.sql` seeds two rows, and with no active row every approver rejection of a weigh-in answers 400), plus `productos` and `usuarios`, which `db/seed.sql` does not include.
