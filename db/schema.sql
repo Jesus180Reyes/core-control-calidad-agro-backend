@@ -130,6 +130,17 @@ CREATE TABLE `clientes` (
   CONSTRAINT `fk_clientes_rechazado_por` FOREIGN KEY (`rechazado_por`) REFERENCES `usuarios` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `destinos`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `destinos` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) NOT NULL,
+  `isActive` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `documento_fiscal_impuesto`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -360,6 +371,7 @@ CREATE TABLE `pesajes` (
   `motivo_rechazo` varchar(255) DEFAULT NULL,
   `rechazado_por` int DEFAULT NULL,
   `rechazado_en` datetime DEFAULT NULL,
+  `destino_id` int DEFAULT NULL,
   `aprobado` tinyint(1) DEFAULT NULL,
   `aprobado_por` int DEFAULT NULL,
   `aprobado_en` datetime DEFAULT NULL,
@@ -376,8 +388,10 @@ CREATE TABLE `pesajes` (
   KEY `fk_pesajes_rechazado_por` (`rechazado_por`),
   KEY `fk_pesajes_aprobado_por` (`aprobado_por`),
   KEY `fk_pesajes_aprobado_con_excepcion_por` (`aprobado_con_excepcion_por`),
+  KEY `fk_pesajes_destino` (`destino_id`),
   CONSTRAINT `fk_pesajes_aprobado_con_excepcion_por` FOREIGN KEY (`aprobado_con_excepcion_por`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `fk_pesajes_aprobado_por` FOREIGN KEY (`aprobado_por`) REFERENCES `usuarios` (`id`),
+  CONSTRAINT `fk_pesajes_destino` FOREIGN KEY (`destino_id`) REFERENCES `destinos` (`id`),
   CONSTRAINT `fk_pesajes_rechazado_por` FOREIGN KEY (`rechazado_por`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `pesajes_ibfk_1` FOREIGN KEY (`lote_id`) REFERENCES `lotes` (`id`),
   CONSTRAINT `pesajes_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),

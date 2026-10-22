@@ -64,6 +64,7 @@ export interface PesajesTable {
   motivo_rechazo: string | null;
   rechazado_por: number | null;
   rechazado_en: Date | string | null;
+  destino_id: number | null;
   aprobado: boolean | null;
   aprobado_por: number | null;
   aprobado_en: Date | string | null;
@@ -254,6 +255,13 @@ export interface OrigenesTable {
   created_by: number;
 }
 
+export interface DestinosTable {
+  id: Generated<number>;
+  nombre: string;
+  isActive: Generated<number>;
+  created_at: Generated<Date | null>;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -290,5 +298,6 @@ export interface Database {
   pines_supervisor: PinesSupervisorTable;
   autorizaciones_pin: AutorizacionesPinTable;
   origenes: OrigenesTable;
+  destinos: DestinosTable;
   bitacora: BitacoraView;
 }

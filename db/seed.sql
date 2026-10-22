@@ -37,6 +37,13 @@ INSERT INTO `estados_calidad` (`id`, `codigo`, `nombre`, `created_at`) VALUES (3
 /*!40000 ALTER TABLE `estados_calidad` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `destinos` WRITE;
+/*!40000 ALTER TABLE `destinos` DISABLE KEYS */;
+INSERT INTO `destinos` (`id`, `nombre`, `isActive`, `created_at`) VALUES (1,'MERCADO LOCAL',1,'2026-10-23 02:51:24');
+INSERT INTO `destinos` (`id`, `nombre`, `isActive`, `created_at`) VALUES (2,'DESECHO',1,'2026-10-23 02:51:24');
+/*!40000 ALTER TABLE `destinos` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `unidades_medida` WRITE;
 /*!40000 ALTER TABLE `unidades_medida` DISABLE KEYS */;
 INSERT INTO `unidades_medida` (`id`, `codigo`, `nombre`, `created_at`) VALUES (1,'LB','LIBRAS','2026-07-19 18:56:50');

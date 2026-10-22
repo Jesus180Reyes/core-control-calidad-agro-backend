@@ -72,7 +72,7 @@ ALTER TABLE pesajes
 - **Sin `created_by`**: no hay endpoint que cree destinos, se insertan a mano.
 - `nombre` sin `UNIQUE`: nada lo valida porque nada lo escribe por API.
 - `pesajes.destino_id` nullable: los pesajes existentes, los aprobados, los no revisados y los anulados por el operador quedan en `NULL`. La obligatoriedad vive en el DTO, no en MySQL.
-- `destinos` no entra en `db/seed.sql`: los `INSERT` los hace el usuario a mano en cada entorno. Sin filas, el rechazo del aprobador responde 400 siempre (ver Risks).
+- `db/seed.sql` siembra dos destinos activos, `MERCADO LOCAL` (id 1) y `DESECHO` (id 2), para que un entorno nuevo de Docker pueda rechazar desde el arranque. Decisión del usuario durante la implementación. En los entornos existentes los `INSERT` se hacen a mano; sin filas activas, el rechazo del aprobador responde 400 siempre (ver Risks).
 
 ### `src/database/types/types.ts`
 
