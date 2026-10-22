@@ -11,6 +11,7 @@ import { Database } from 'src/database/types/types';
 import { CreatePesajeDto } from '../dto/create-pesaje.dto';
 import { ValidarPinDto } from '../dto/validar-pin.dto';
 import { RechazarPesajeDto } from '../dto/rechazar-pesaje.dto';
+import { RechazarPesajeAprobadorDto } from '../dto/rechazar-pesaje-aprobador.dto';
 import { FiltrosPesajesLoteDto } from '../dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from '../dto/filtros-historial.dto';
 import {
@@ -443,10 +444,10 @@ export class PesajesRepository {
     }
     async rechazarPesajeApprover(
         pesajeId: number,
-        data: RechazarPesajeDto,
+        data: RechazarPesajeAprobadorDto,
         userId: number,
     ) {
-        const { motivo } = data;
+        const { motivo, destino_id } = data;
 
         return await this.db.transaction().execute(async (trx) => {
             const pesaje = await this.validatePesajeActivo(pesajeId, trx);
@@ -461,12 +462,15 @@ export class PesajesRepository {
 
             await this.validateLoteEnClienteFinal(pesaje.lote_id, trx);
 
+            await this.validateDestino(destino_id, trx);
+
             await trx
                 .updateTable('pesajes')
                 .set({
                     motivo_rechazo: motivo,
                     rechazado_por: userId,
                     rechazado_en: sql<Date>`NOW()`,
+                    destino_id,
                     aprobado: false,
                 })
                 .where('id', '=', pesajeId)
@@ -615,6 +619,26 @@ export class PesajesRepository {
                         `La etapa con codigo '${codigo}' no existe`,
                     ),
             );
+    }
+
+    // SPEC 47: mismo molde que validateOrigen de LotesRepository.
+    private async validateDestino(destinoId: number, db: Kysely<Database>) {
+        const destino = await db
+            .selectFrom('destinos')
+            .select(['id', 'nombre', 'isActive'])
+            .where('id', '=', destinoId)
+            .executeTakeFirstOrThrow(
+                () =>
+                    new BadRequestException(
+                        `El destino con id '${destinoId}' no existe`,
+                    ),
+            );
+
+        if (destino.isActive === 0) {
+            throw new BadRequestException(
+                `El destino '${destino.nombre}' no esta activo`,
+            );
+        }
     }
 
     private async validateVinculoOperador(

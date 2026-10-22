@@ -54,7 +54,7 @@ Server listens on `process.env.PORT` (default 4000). No global route prefix (the
 
 **Swagger**: UI at `/docs`, OpenAPI JSON at `/docs-json`, mounted in `src/main.ts` **only when `NODE_ENV === 'development'`**. Three things to know. **First: the UI is express middleware, not a Nest route**, so the global `JwtAuthGuard` never sees it — `/docs` is open to anyone who reaches the port, which is the whole reason for the condition. **Second: `patchNestJsSwagger()` does not exist in `nestjs-zod@5`** and importing it breaks the build; in v5 `createZodDto` documents the DTOs on its own, and the only wiring is `cleanupOpenApiDoc()` around `SwaggerModule.createDocument`. **Third: `@nestjs/swagger` is pinned to `^11`** because 12.x requires `@nestjs/common@^12`; a plain `npm install @nestjs/swagger` fails with `ERESOLVE`. Controllers carry `@ApiTags` and `@ApiBearerAuth` per class, `@ApiOperation` (summary + description) per endpoint and `@ApiParam` on route params. **There are no response schemas and no `@ApiResponse` anywhere**, by decision (spec 22): `specs/` and these `CLAUDE.md` files are the only documentation of response shapes. The endpoint descriptions are where the access-control truth lives — every route that skips `validateVinculoOperador` says so in its own description. `AppController` carries `@ApiExcludeController()`: `GET /` stays mapped and still requires a token. Nothing validates the descriptions, so a new endpoint without `@ApiOperation` leaves the UI silently incomplete.
 
-**Route count** (trust the route log over this): Nest maps **49** routes — `auth` 5, `catalogos` 6, `origenes` 1, `clientes` 7, `lotes` 11, `permisos` 1, `pesajes` 8, `documentos-fiscales` 5, `chat` 2, `plantas` 1, `metricas` 1, plus `GET /`. The OpenAPI document holds **48** operations under **44** `paths` keys (`/clientes`, `/documentos-fiscales`, `/lotes/{id}/resumen` and `/clientes/{id}/operadores` each group two verbs). Update these numbers when adding a route.
+**Route count** (trust the route log over this): Nest maps **50** routes — `auth` 5, `catalogos` 7, `origenes` 1, `clientes` 7, `lotes` 11, `permisos` 1, `pesajes` 8, `documentos-fiscales` 5, `chat` 2, `plantas` 1, `metricas` 1, plus `GET /`. The OpenAPI document holds **49** operations under **45** `paths` keys (`/clientes`, `/documentos-fiscales`, `/lotes/{id}/resumen` and `/clientes/{id}/operadores` each group two verbs). Update these numbers when adding a route.
 
 ## Spec-driven workflow
 
@@ -65,7 +65,7 @@ This repo is developed spec-first via two local skills in `.agents/skills/` (mir
 
 `specs/` holds the source of truth for what was decided and, just as importantly, what was **deliberately deferred** (each spec has `Out of scope`, `Decisions`, `Risks` and `What is not in this spec` sections). Before adding a feature, check whether an existing spec already ruled it out and why — new work goes in a new spec rather than silently expanding an old one. Specs are written in Spanish; the codebase and the `CLAUDE.md` files are in English.
 
-Existing specs run from `01-vinculacion-cliente-operador.md` to `46-observaciones-del-aprobador-en-resumen-y-chat.md`; `18-filtros-de-lotes.md` is still `Draft`, which is why `lotes` has no query params.
+Existing specs run from `01-vinculacion-cliente-operador.md` to `47-destino-del-pesaje-rechazado.md`; `18-filtros-de-lotes.md` is still `Draft`, which is why `lotes` has no query params.
 
 ## Architecture
 
@@ -95,7 +95,7 @@ NestJS API (Express platform) backed by MySQL via Kysely (no ORM, no migration t
 
 **Module layout:** `*.module.ts` → `*.controller.ts` → `*.service.ts` → `repository/*.repository.ts` → `dto/*.dto.ts` (Zod), with `imports: [DatabaseModule]` and the module registered in `src/app.module.ts`.
 
-- Controllers stay thin and respond `{ ok, msg, <payload> }`, the payload key named after the resource (`clientes`, `lotes`, `permisos`). Exceptions, all deliberate: the six `catalogos` reads use `data`; reads of one row use a singular key (`pesaje`, `documento`, `resumen`); `POST /documentos-fiscales` and `POST /origenes` answer the new id alone (`documento_id`, `origen_id`). If this is ever unified, unify all of it in one spec.
+- Controllers stay thin and respond `{ ok, msg, <payload> }`, the payload key named after the resource (`clientes`, `lotes`, `permisos`). Exceptions, all deliberate: the seven `catalogos` reads use `data`; reads of one row use a singular key (`pesaje`, `documento`, `resumen`); `POST /documentos-fiscales` and `POST /origenes` answer the new id alone (`documento_id`, `origen_id`). If this is ever unified, unify all of it in one spec.
 - Services are pure pass-throughs to the repository.
 - **The repository is where business logic lives**, not just data access: hashing, JWT signing, domain validation, derived values (`peso_neto`, `fuera_de_rango`, `estado_calidad_id`). `CatalogosRepository` is the exception in the other direction (plain `SELECT`s).
 
@@ -125,7 +125,7 @@ NestJS API (Express platform) backed by MySQL via Kysely (no ORM, no migration t
 
 ## Domain
 
-A quality-control system for agricultural export batches, which since spec 25 also **records** (does not emit) the fiscal documents of an export. Core tables, all mirrored in `src/database/types/types.ts`: `clientes`, `cliente_operador`, `lotes`, `etapas`, `pesajes`, `estados_calidad`, `productos`, `unidades_medida`, `origenes`, `roles`/`usuarios`, `catalogo_permisos`/`permisos`, the fiscal tables (`paises_config`, `documentos_fiscales`, `documento_fiscal_impuesto`, `documento_fiscal_lote`), the PIN tables (`pines_supervisor`, `autorizaciones_pin`), `log_errores` and `chat_log`. Each is described in the `CLAUDE.md` of the module that owns it.
+A quality-control system for agricultural export batches, which since spec 25 also **records** (does not emit) the fiscal documents of an export. Core tables, all mirrored in `src/database/types/types.ts`: `clientes`, `cliente_operador`, `lotes`, `etapas`, `pesajes`, `estados_calidad`, `productos`, `unidades_medida`, `origenes`, `destinos`, `roles`/`usuarios`, `catalogo_permisos`/`permisos`, the fiscal tables (`paises_config`, `documentos_fiscales`, `documento_fiscal_impuesto`, `documento_fiscal_lote`), the PIN tables (`pines_supervisor`, `autorizaciones_pin`), `log_errores` and `chat_log`. Each is described in the `CLAUDE.md` of the module that owns it.
 
 **The flow**, end to end: an operator creates a lote (`EN_PROCESO`) and weighs it (`POST /pesajes`, with a supervisor PIN for weights over `peso_maximo`); a supervisor approves it (`CLIENTE_FINAL`, the lote closes); the approver reviews each weigh-in and finalizes the lote with a signature (`FINALIZADO`); `RECHAZADO` is reachable from both ends; then an AI summary can be generated and fiscal documents linked to finalized lotes. Each transition is an explicit call — nothing closes or finalizes a lote by computing its numbers. **`estado = 'cerrado'` means three different things**; use `motivo_rechazo IS NOT NULL` for a rejection and `finalizado_por IS NOT NULL` for a finalization (the discriminator table is in `src/modules/lotes/CLAUDE.md`).
 
@@ -136,6 +136,6 @@ A quality-control system for agricultural export batches, which since spec 25 al
 - **Any DDL is applied by hand in MySQL**: there is no migration tooling. A spec that needs schema work declares its DDL, transcribes it into `db/schema.sql` in the same change, and updates `src/database/types/types.ts`. Every existing environment, production included, needs the `ALTER TABLE` by hand **before** the code ships. The full history and the constraint counts live in `src/database/CLAUDE.md`.
 - When schema lands in MySQL before its spec, transcribe what is there (`DESCRIBE`, `SHOW CREATE TABLE`) and let the database win.
 - The database runs `STRICT_TRANS_TABLES`: an oversized value is a MySQL 500, not a silent truncation, so DTOs cap strings at their column length.
-- Hand-maintained tables with no CRUD and no startup validation: `etapas`, `estados_calidad`, `paises_config`, `catalogo_permisos`/`permisos`, `roles`. A missing row surfaces as a 400 at request time.
+- Hand-maintained tables with no CRUD and no startup validation: `etapas`, `estados_calidad`, `paises_config`, `catalogo_permisos`/`permisos`, `roles`, `destinos`. A missing row surfaces as a 400 at request time.
 - `README.md` is still the stock NestJS boilerplate.
 - `dist/` is present in the working tree.

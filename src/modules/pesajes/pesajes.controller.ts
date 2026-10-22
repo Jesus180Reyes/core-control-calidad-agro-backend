@@ -15,6 +15,7 @@ import type { Request } from 'express';
 import { PesajesService } from './pesajes.service';
 import { CreatePesajeDto } from './dto/create-pesaje.dto';
 import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
+import { RechazarPesajeAprobadorDto } from './dto/rechazar-pesaje-aprobador.dto';
 import { FiltrosPesajesLoteDto } from './dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from './dto/filtros-historial.dto';
 import { ValidarPinDto } from './dto/validar-pin.dto';
@@ -178,9 +179,12 @@ export class PesajesController {
         summary: 'Rechazar un pesaje, como aprobador',
         description:
             'El veredicto de "no" del aprobador sobre un pesaje: marca aprobado = 0 y escribe el ' +
-            'motivo y la auditoria. La diferencia con PATCH /pesajes/{id}/rechazar es el punto del ' +
-            'endpoint: el pesaje SIGUE ACTIVO y visible en los dos listados, marcado como no ' +
-            'aprobado, en vez de desaparecer. ' +
+            'motivo, el destino y la auditoria. La diferencia con PATCH /pesajes/{id}/rechazar es ' +
+            'el punto del endpoint: el pesaje SIGUE ACTIVO y visible en los dos listados, marcado ' +
+            'como no aprobado, en vez de desaparecer. ' +
+            'destino_id es OBLIGATORIO: a donde va el producto rechazado, elegido de ' +
+            'GET /catalogos/destinos. 400 si falta, si no existe o si el destino no esta activo. ' +
+            'Ninguna lectura devuelve el destino todavia. ' +
             'Exige que el lote este cerrado y en la etapa CLIENTE_FINAL, y que el pesaje no haya ' +
             'sido revisado ya. Irreversible: una revision no se deshace. ' +
             'NO valida el vinculo cliente_operador.',
@@ -188,7 +192,7 @@ export class PesajesController {
     @ApiParam({ name: 'id', description: 'Id del pesaje a rechazar', example: 1 })
     async rechazarByAp(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: RechazarPesajeDto,
+        @Body() dto: RechazarPesajeAprobadorDto,
         @Req() req: Request,
     ) {
         const { userId } = req.user as { userId: number };
