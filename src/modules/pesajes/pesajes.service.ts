@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PesajesRepository } from './repository/pesajes.repository';
 import { CreatePesajeDto } from './dto/create-pesaje.dto';
 import { RechazarPesajeDto } from './dto/rechazar-pesaje.dto';
+import { RechazarPesajeAprobadorDto } from './dto/rechazar-pesaje-aprobador.dto';
 import { FiltrosPesajesLoteDto } from './dto/filtros-pesajes-lote.dto';
 import { FiltrosHistorialDto } from './dto/filtros-historial.dto';
 import { ValidarPinDto } from './dto/validar-pin.dto';
@@ -40,7 +41,7 @@ export class PesajesService {
             userId,
         );
     }
-    async rechazarByApprover(pesajeId: number, dto: RechazarPesajeDto, userId: number) {
+    async rechazarByApprover(pesajeId: number, dto: RechazarPesajeAprobadorDto, userId: number) {
         return await this.pesajesRepository.rechazarPesajeApprover(
             pesajeId,
             dto,
