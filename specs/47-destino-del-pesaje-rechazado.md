@@ -1,6 +1,6 @@
 # SPEC 47 — Destino del pesaje rechazado por el aprobador
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 09 (convención de `catalogos`), SPEC 19 (revisión del aprobador), SPEC 22 (convención de Swagger), SPEC 43 (catálogo de orígenes, patrón de catálogo con `isActive`)
 > **Date:** 2026-10-22
 > **Objective:** Crear la tabla `destinos`, exigir un `destino_id` cuando el aprobador rechaza un pesaje (`PATCH /pesajes/:id/rechazar/byApprover`) y exponer `GET /catalogos/destinos` para el selector.
@@ -141,20 +141,20 @@ La respuesta no cambia: `{ ok, msg }`.
 
 ## Acceptance criteria
 
-- [ ] La tabla `destinos` y la columna `pesajes.destino_id` con `fk_pesajes_destino` existen en MySQL y en `db/schema.sql`.
-- [ ] `GET /catalogos/destinos` responde `{ ok, msg, data }` con elementos exactamente `{ id, nombre }`, solo `isActive = 1`, ordenados por `nombre` ASC.
-- [ ] `GET /catalogos/destinos` sin destinos activos responde 200 con `data: []`.
-- [ ] `PATCH /pesajes/:id/rechazar/byApprover` sin `destino_id` responde 400 y no modifica el pesaje.
-- [ ] Con `destino_id: 0`, `-1`, `1.5` o `"1"` responde 400.
-- [ ] Con un `destino_id` inexistente responde 400 `El destino con id 'X' no existe` y no modifica el pesaje.
-- [ ] Con un destino inactivo responde 400 `El destino '<nombre>' no esta activo` y no modifica el pesaje.
-- [ ] Con un destino válido deja `aprobado = 0`, el trío de rechazo y `destino_id` escritos en la misma fila, y responde `{ ok, msg }` como antes.
-- [ ] Las validaciones previas de la ruta (pesaje anulado, ya revisado, sin lote, lote fuera de `CLIENTE_FINAL`) siguen respondiendo los mismos 400.
-- [ ] `PATCH /pesajes/:id/rechazar` (operador) sigue aceptando solo `{ motivo }` y no escribe `destino_id`; un `destino_id` en su cuerpo se descarta.
-- [ ] `PATCH /pesajes/:id/aprobar/byApprover` no escribe `destino_id`.
-- [ ] Las tres lecturas de `pesajes` devuelven los mismos campos que antes.
-- [ ] `/docs` muestra `GET /catalogos/destinos` y la descripción actualizada del rechazo del aprobador.
-- [ ] `npm run lint` sin errores y `npx jest` en verde.
+- [X] La tabla `destinos` y la columna `pesajes.destino_id` con `fk_pesajes_destino` existen en MySQL y en `db/schema.sql`.
+- [X] `GET /catalogos/destinos` responde `{ ok, msg, data }` con elementos exactamente `{ id, nombre }`, solo `isActive = 1`, ordenados por `nombre` ASC.
+- [X] `GET /catalogos/destinos` sin destinos activos responde 200 con `data: []`.
+- [X] `PATCH /pesajes/:id/rechazar/byApprover` sin `destino_id` responde 400 y no modifica el pesaje.
+- [X] Con `destino_id: 0`, `-1`, `1.5` o `"1"` responde 400.
+- [X] Con un `destino_id` inexistente responde 400 `El destino con id 'X' no existe` y no modifica el pesaje.
+- [X] Con un destino inactivo responde 400 `El destino '<nombre>' no esta activo` y no modifica el pesaje.
+- [X] Con un destino válido deja `aprobado = 0`, el trío de rechazo y `destino_id` escritos en la misma fila, y responde `{ ok, msg }` como antes.
+- [X] Las validaciones previas de la ruta (pesaje anulado, ya revisado, sin lote, lote fuera de `CLIENTE_FINAL`) siguen respondiendo los mismos 400.
+- [X] `PATCH /pesajes/:id/rechazar` (operador) sigue aceptando solo `{ motivo }` y no escribe `destino_id`; un `destino_id` en su cuerpo se descarta.
+- [X] `PATCH /pesajes/:id/aprobar/byApprover` no escribe `destino_id`.
+- [X] Las tres lecturas de `pesajes` devuelven los mismos campos que antes.
+- [X] `/docs` muestra `GET /catalogos/destinos` y la descripción actualizada del rechazo del aprobador.
+- [X] `npm run lint` sin errores y `npx jest` en verde.
 
 ---
 
