@@ -24,6 +24,12 @@ export class ChatController {
             'El modelo no consulta la base: elige entre trece funciones de SOLO LECTURA y el backend ' +
             'decide si las ejecuta, asi que desde aqui no se puede aprobar, rechazar, finalizar ni ' +
             'registrar nada. ' +
+            'sugerencias es un arreglo de strings que viene SIEMPRE: vacio en un turno normal, y con 2 o 3 ' +
+            'preguntas cuando la pregunta cabia en varias consultas; en ese caso respuesta es una frase fija ' +
+            'que invita a elegir. El frontend pinta un boton por sugerencia y, al tocarlo, manda ese texto tal ' +
+            'cual como mensaje del siguiente turno. En historial, ese turno del asistente se guarda como la ' +
+            'frase, una linea en blanco y una linea "- pregunta" por sugerencia, para que el usuario pueda ' +
+            'contestar "la segunda". Las sugerencias son texto plano, sin markdown. ' +
             'respuesta es MARKDOWN CRUDO, con saltos de linea reales, igual que POST /lotes/{id}/resumen: ' +
             'el frontend lo renderiza SIN habilitar el modo HTML de su paquete de markdown. ' +
             'Responde 200 siempre que el token sea valido: si Gemini falla, si el turno no converge o ' +
@@ -37,11 +43,15 @@ export class ChatController {
     })
     async preguntar(@Body() dto: PreguntarDto, @Req() req: Request) {
         const { userId } = req.user as { userId: number };
-        const respuesta = await this.chatService.preguntar(dto, userId);
+        const { respuesta, sugerencias } = await this.chatService.preguntar(
+            dto,
+            userId,
+        );
         return {
             ok: true,
             msg: 'Consulta resuelta',
             respuesta,
+            sugerencias,
         };
     }
 

@@ -4,7 +4,9 @@ import {
     FRASE_IDENTIDAD,
     FRASE_MEMORIA,
     FRASE_SOLO_LECTURA,
+    FRASE_SUGERENCIAS,
     FRASE_VERACIDAD,
+    HERRAMIENTAS_CHAT,
     INSTRUCCION_SISTEMA_CHAT,
 } from './chat.prompt';
 
@@ -213,5 +215,44 @@ describe('chat.prompt / vocabulario del dominio', () => {
         expect(INSTRUCCION_SISTEMA_CHAT).toContain(
             'no uses estado_calidad_id',
         );
+    });
+});
+
+/**
+ * Pruebas sobre el TEXTO de las preguntas sugeridas (SPEC 48). Comprueban que
+ * la frase, la declaracion y la seccion existen y donde viven; que el modelo
+ * llame a `sugerir_preguntas` cuando toca solo se ve contra la API real.
+ */
+describe('chat.prompt / preguntas sugeridas', () => {
+    it('la frase existe y es distinta de la declinacion', () => {
+        expect(FRASE_SUGERENCIAS.length).toBeGreaterThan(0);
+        expect(FRASE_SUGERENCIAS).not.toBe(FRASE_DECLINACION);
+    });
+
+    it('la frase no nombra al modelo ni a su proveedor', () => {
+        expect(FRASE_SUGERENCIAS).not.toMatch(/gemini|google|modelo de lenguaje/i);
+    });
+
+    it('hay una declaracion sugerir_preguntas que exige las preguntas', () => {
+        const declaracion = HERRAMIENTAS_CHAT.find(
+            (h) => h.name === 'sugerir_preguntas',
+        );
+        expect(declaracion).toBeDefined();
+        expect(declaracion?.parameters.required).toContain('preguntas');
+    });
+
+    it('la seccion existe, nombra la funcion y va entre vocabulario y cifras', () => {
+        const posSeccion = INSTRUCCION_SISTEMA_CHAT.indexOf('PREGUNTAS SUGERIDAS:');
+        expect(posSeccion).toBeGreaterThan(
+            INSTRUCCION_SISTEMA_CHAT.indexOf('VOCABULARIO:'),
+        );
+        expect(posSeccion).toBeLessThan(INSTRUCCION_SISTEMA_CHAT.indexOf('CIFRAS:'));
+        expect(INSTRUCCION_SISTEMA_CHAT.slice(posSeccion)).toContain(
+            'sugerir_preguntas',
+        );
+    });
+
+    it('la instruccion conserva la frase de declinacion literal', () => {
+        expect(INSTRUCCION_SISTEMA_CHAT).toContain(FRASE_DECLINACION);
     });
 });

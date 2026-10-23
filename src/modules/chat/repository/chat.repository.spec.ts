@@ -4,8 +4,9 @@ import { Kysely } from 'kysely';
 import { DatabaseService } from 'src/database/database.service';
 import { Database } from 'src/database/types/types';
 import { GeminiService, TurnoGemini } from 'src/ia/gemini.service';
+import { FRASE_SUGERENCIAS } from 'src/ia/prompts/chat.prompt';
 import { PreguntarDto } from '../dto/preguntar.dto';
-import { ChatRepository } from './chat.repository';
+import { ChatRepository, textoConSugerencias } from './chat.repository';
 
 /**
  * Evals del chat (SPEC 28), con las respuestas de Gemini SIMULADAS.
@@ -758,9 +759,13 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('como va el lote'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('como va el lote'),
+            7,
+        );
 
         expect(respuesta).toBe('El lote **PICOLO2026** va bien.');
+        expect(sugerencias).toEqual([]);
     });
 
     it('registra el turno sin herramientas con herramientas en NULL', async () => {
@@ -837,7 +842,7 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('dame algo'), 7);
+        const { respuesta } = await repo.responder(pregunta('dame algo'), 7);
 
         expect(conversar).toHaveBeenCalledTimes(4);
         // Las tres del bucle con herramientas; la de cierre sin ellas.
@@ -855,10 +860,14 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('dame algo'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('dame algo'),
+            7,
+        );
 
         expect(conversar).toHaveBeenCalledTimes(4);
         expect(respuesta).toContain('no llegue a una respuesta');
+        expect(sugerencias).toEqual([]);
     });
 
     it('un fallo de Gemini responde con disculpa y nunca lanza', async () => {
@@ -870,9 +879,13 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('como va el lote 3'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('como va el lote 3'),
+            7,
+        );
 
         expect(respuesta).toContain('Vuelve a intentarlo');
+        expect(sugerencias).toEqual([]);
     });
 
     it('un fallo al escribir en chat_log no impide responder', async () => {
@@ -882,7 +895,7 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('hola'), 7);
+        const { respuesta } = await repo.responder(pregunta('hola'), 7);
 
         expect(respuesta).toBe('Todo bien.');
     });
@@ -895,17 +908,21 @@ describe('ChatRepository / el turno', () => {
             undefined, // sin variable: manda el defecto de 20
         );
 
-        const respuesta = await repo.responder(pregunta('otra mas'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('otra mas'),
+            7,
+        );
 
         expect(conversar).not.toHaveBeenCalled();
         expect(respuesta).toContain('limite de 20 consultas por dia');
+        expect(sugerencias).toEqual([]);
     });
 
     it('respeta el limite configurado por variable de entorno', async () => {
         const conversar = jest.fn();
         const { repo } = crearRepositorio([{ total: 3 }], conversar, '3');
 
-        const respuesta = await repo.responder(pregunta('otra mas'), 7);
+        const { respuesta } = await repo.responder(pregunta('otra mas'), 7);
 
         expect(conversar).not.toHaveBeenCalled();
         expect(respuesta).toContain('limite de 3 consultas por dia');
@@ -919,7 +936,7 @@ describe('ChatRepository / el turno', () => {
             '0',
         );
 
-        const respuesta = await repo.responder(pregunta('hola'), 7);
+        const { respuesta } = await repo.responder(pregunta('hola'), 7);
 
         // Con 5 turnos gastados y el defecto de 20, el turno pasa.
         expect(respuesta).toBe('Hola.');
@@ -953,5 +970,201 @@ describe('ChatRepository / sugerencias', () => {
 
         expect(sugerencias).toHaveLength(4);
         expect(sugerencias.join(' ')).not.toContain('undefined');
+    });
+});
+
+/**
+ * La validacion de `sugerir_preguntas` y el formato de `chat_log` (SPEC 48).
+ * Aqui solo el metodo y el helper; el corte del turno se prueba con el bucle.
+ */
+describe('ChatRepository / preguntas sugeridas', () => {
+    const { repo } = crearRepositorio([], jest.fn());
+    const validar = (preguntas: unknown) =>
+        privado(repo).validarSugerencias({ preguntas }) as string[] | null;
+
+    it('acepta tres preguntas validas tal cual', () => {
+        expect(validar(['A?', 'B?', 'C?'])).toEqual(['A?', 'B?', 'C?']);
+    });
+
+    it('se queda con las tres primeras de cuatro', () => {
+        expect(validar(['A?', 'B?', 'C?', 'D?'])).toEqual(['A?', 'B?', 'C?']);
+    });
+
+    it('con una sola valida no alcanza', () => {
+        expect(validar(['A?'])).toBeNull();
+        expect(validar(['A?', '   ', '<b>B</b>'])).toBeNull();
+    });
+
+    it('quita las repetidas antes de contar', () => {
+        expect(validar(['A?', ' A? ', 'B?'])).toEqual(['A?', 'B?']);
+        expect(validar(['A?', 'A?'])).toBeNull();
+    });
+
+    it('descarta una de 151 caracteres y acepta una de 150', () => {
+        const de150 = 'x'.repeat(150);
+        const de151 = 'y'.repeat(151);
+        expect(validar([de150, de151, 'B?'])).toEqual([de150, 'B?']);
+    });
+
+    it('cambia los saltos de linea por espacios', () => {
+        expect(validar(['Que se\npeso hoy?', 'B?'])).toEqual([
+            'Que se peso hoy?',
+            'B?',
+        ]);
+    });
+
+    it('ignora lo que no es string y un argumento que no es arreglo', () => {
+        expect(validar(['A?', 3, null, 'B?'])).toEqual(['A?', 'B?']);
+        expect(validar('A?, B?')).toBeNull();
+        expect(validar(undefined)).toBeNull();
+    });
+
+    it('deja pasar un < suelto pero no una etiqueta', () => {
+        expect(validar(['Pesajes < 20 lb?', '<script>x</script>', 'B?'])).toEqual([
+            'Pesajes < 20 lb?',
+            'B?',
+        ]);
+    });
+
+    it('textoConSugerencias devuelve la respuesta intacta sin sugerencias', () => {
+        expect(textoConSugerencias('Hola', [])).toBe('Hola');
+    });
+
+    it('textoConSugerencias pone una linea en blanco y una vineta por pregunta', () => {
+        expect(textoConSugerencias('Frase', ['A?', 'B?'])).toBe(
+            'Frase\n\n- A?\n- B?',
+        );
+    });
+});
+
+/**
+ * El corte del turno por `sugerir_preguntas` (SPEC 48), con Gemini simulado.
+ */
+describe('ChatRepository / el turno con preguntas sugeridas', () => {
+    const tres = [
+        'Que lotes de Agroexport estan abiertos?',
+        'Que se peso hoy de Agroexport?',
+        'Que rechazo el aprobador de Agroexport esta semana?',
+    ];
+
+    /** Lo que Gemini recibio como respuesta a cada funcion en la vuelta `n`. */
+    const respuestasDeVuelta = (conversar: jest.Mock, n: number) => {
+        const contents = (conversar.mock.calls[n] as unknown[])[1] as {
+            parts: { functionResponse?: { name: string; response: unknown } }[];
+        }[];
+        return contents[contents.length - 1].parts.map((p) => p.functionResponse);
+    };
+
+    it('con tres preguntas validas corta el turno en una sola llamada', async () => {
+        const conversar = jest
+            .fn()
+            .mockResolvedValue(turnoDeHerramienta('sugerir_preguntas', { preguntas: tres }));
+        const { repo } = crearRepositorio([...colaDeArranque(), undefined], conversar);
+
+        const resultado = await repo.responder(pregunta('como va lo de Agroexport'), 7);
+
+        expect(resultado).toEqual({ respuesta: FRASE_SUGERENCIAS, sugerencias: tres });
+        expect(conversar).toHaveBeenCalledTimes(1);
+    });
+
+    it('con cuatro preguntas devuelve las tres primeras', async () => {
+        const conversar = jest.fn().mockResolvedValue(
+            turnoDeHerramienta('sugerir_preguntas', { preguntas: [...tres, 'Otra?'] }),
+        );
+        const { repo } = crearRepositorio([...colaDeArranque(), undefined], conversar);
+
+        const { sugerencias } = await repo.responder(pregunta('como va'), 7);
+
+        expect(sugerencias).toEqual(tres);
+    });
+
+    it('con preguntas repetidas las devuelve sin repetir', async () => {
+        const conversar = jest.fn().mockResolvedValue(
+            turnoDeHerramienta('sugerir_preguntas', {
+                preguntas: [tres[0], tres[0], tres[1]],
+            }),
+        );
+        const { repo } = crearRepositorio([...colaDeArranque(), undefined], conversar);
+
+        const { sugerencias } = await repo.responder(pregunta('como va'), 7);
+
+        expect(sugerencias).toEqual([tres[0], tres[1]]);
+    });
+
+    it.each([
+        ['una sola pregunta', [tres[0]]],
+        ['dos vacias o con HTML', [tres[0], '  ', '<b>x</b>']],
+    ])('con %s no corta y le devuelve un error al modelo', async (_caso, preguntas) => {
+        const conversar = jest
+            .fn()
+            .mockResolvedValueOnce(turnoDeHerramienta('sugerir_preguntas', { preguntas }))
+            .mockResolvedValueOnce(turnoDeTexto('Agroexport tiene 2 lotes.'));
+        const { repo } = crearRepositorio([...colaDeArranque(), undefined], conversar);
+
+        const resultado = await repo.responder(pregunta('como va'), 7);
+
+        expect(conversar).toHaveBeenCalledTimes(2);
+        const [respuesta] = respuestasDeVuelta(conversar, 1);
+        expect(respuesta?.name).toBe('sugerir_preguntas');
+        expect((respuesta?.response as { error: string }).error).toContain(
+            'no son validas',
+        );
+        expect(resultado).toEqual({
+            respuesta: 'Agroexport tiene 2 lotes.',
+            sugerencias: [],
+        });
+    });
+
+    it('acompanada de otra herramienta, ganan los datos', async () => {
+        const conversar = jest
+            .fn()
+            .mockResolvedValueOnce({
+                tipo: 'herramientas',
+                llamadas: [
+                    { nombre: 'lotes_de_cliente', argumentos: { cliente_id: 4242 } },
+                    { nombre: 'sugerir_preguntas', argumentos: { preguntas: tres } },
+                ],
+                partes: [],
+            })
+            .mockResolvedValueOnce(turnoDeTexto('No existe ese cliente.'));
+        const { repo, llamadas } = crearRepositorio(
+            [...colaDeArranque(), undefined, undefined],
+            conversar,
+        );
+
+        const resultado = await repo.responder(pregunta('lotes de 4242'), 7);
+
+        expect(conversar).toHaveBeenCalledTimes(2);
+        const [datos, sugerir] = respuestasDeVuelta(conversar, 1);
+        expect(datos?.name).toBe('lotes_de_cliente');
+        expect((datos?.response as { error: string }).error).toContain('4242');
+        expect((sugerir?.response as { error: string }).error).toContain('va sola');
+        expect(resultado.sugerencias).toEqual([]);
+
+        // Solo la consulta de datos queda registrada como herramienta usada.
+        const values = llamadas.find((l) => l.metodo === 'values');
+        const guardado = values?.args[0] as { herramientas: string | null };
+        expect(guardado.herramientas).toContain('lotes_de_cliente');
+        expect(guardado.herramientas).not.toContain('sugerir_preguntas');
+    });
+
+    it('registra en chat_log la frase con las preguntas y sin herramientas', async () => {
+        const conversar = jest
+            .fn()
+            .mockResolvedValue(turnoDeHerramienta('sugerir_preguntas', { preguntas: tres }));
+        const { repo, llamadas } = crearRepositorio(
+            [...colaDeArranque(), undefined],
+            conversar,
+        );
+
+        await repo.responder(pregunta('como va lo de Agroexport'), 7);
+
+        const values = llamadas.find((l) => l.metodo === 'values');
+        const guardado = values?.args[0] as {
+            herramientas: string | null;
+            respuesta: string;
+        };
+        expect(guardado.herramientas).toBeNull();
+        expect(guardado.respuesta).toBe(textoConSugerencias(FRASE_SUGERENCIAS, tres));
     });
 });

@@ -192,33 +192,33 @@ PREGUNTAS SUGERIDAS:
 
 **Automáticos (`chat.prompt.spec.ts`):**
 
-- [ ] `FRASE_SUGERENCIAS` está exportada y es distinta de `FRASE_DECLINACION`.
-- [ ] `HERRAMIENTAS_CHAT` contiene una declaración llamada `sugerir_preguntas` con `preguntas` en `required`.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` contiene el encabezado `PREGUNTAS SUGERIDAS:` y el nombre `sugerir_preguntas`.
-- [ ] `INSTRUCCION_SISTEMA_CHAT` sigue conteniendo `FRASE_DECLINACION` literal.
+- [X] `FRASE_SUGERENCIAS` está exportada y es distinta de `FRASE_DECLINACION`.
+- [X] `HERRAMIENTAS_CHAT` contiene una declaración llamada `sugerir_preguntas` con `preguntas` en `required`.
+- [X] `INSTRUCCION_SISTEMA_CHAT` contiene el encabezado `PREGUNTAS SUGERIDAS:` y el nombre `sugerir_preguntas`.
+- [X] `INSTRUCCION_SISTEMA_CHAT` sigue conteniendo `FRASE_DECLINACION` literal.
 
 **Automáticos (`chat.repository.spec.ts`, Gemini simulado):**
 
-- [ ] Gemini pide `sugerir_preguntas` con 3 preguntas válidas: `preguntar` devuelve `respuesta === FRASE_SUGERENCIAS` y esas 3 preguntas, y `conversar` se llamó **una** vez.
-- [ ] Con 4 preguntas válidas, `sugerencias` trae las 3 primeras.
-- [ ] Con 1 pregunta válida, o con 3 donde dos son vacías o tienen HTML, el turno no corta: Gemini recibe un `functionResponse` con `error` y `conversar` se llama de nuevo.
-- [ ] Con preguntas repetidas, se devuelven sin repetir.
-- [ ] Una pregunta de 151 caracteres se descarta y una de 150 se acepta.
-- [ ] `sugerir_preguntas` junto con `lotes_de_cliente` en la misma vuelta: se ejecuta `lotes_de_cliente`, `sugerir_preguntas` recibe un `error` y el turno sigue.
-- [ ] Un turno de texto normal devuelve `sugerencias: []`.
-- [ ] El límite diario agotado, el `TEXTO_DISCULPA` y el `TEXTO_NO_CONVERGE` devuelven `sugerencias: []`.
-- [ ] En un turno que solo sugirió, el `INSERT` en `chat_log` lleva `herramientas: null` y `respuesta === textoConSugerencias(FRASE_SUGERENCIAS, sugerencias)`.
-- [ ] `textoConSugerencias(x, [])` devuelve `x` sin cambios.
-- [ ] `npm run test` pasa y `npm run lint` no da errores.
+- [X] Gemini pide `sugerir_preguntas` con 3 preguntas válidas: `preguntar` devuelve `respuesta === FRASE_SUGERENCIAS` y esas 3 preguntas, y `conversar` se llamó **una** vez.
+- [X] Con 4 preguntas válidas, `sugerencias` trae las 3 primeras.
+- [X] Con 1 pregunta válida, o con 3 donde dos son vacías o tienen HTML, el turno no corta: Gemini recibe un `functionResponse` con `error` y `conversar` se llama de nuevo.
+- [X] Con preguntas repetidas, se devuelven sin repetir.
+- [X] Una pregunta de 151 caracteres se descarta y una de 150 se acepta.
+- [X] `sugerir_preguntas` junto con `lotes_de_cliente` en la misma vuelta: se ejecuta `lotes_de_cliente`, `sugerir_preguntas` recibe un `error` y el turno sigue.
+- [X] Un turno de texto normal devuelve `sugerencias: []`.
+- [X] El límite diario agotado, el `TEXTO_DISCULPA` y el `TEXTO_NO_CONVERGE` devuelven `sugerencias: []`.
+- [X] En un turno que solo sugirió, el `INSERT` en `chat_log` lleva `herramientas: null` y `respuesta === textoConSugerencias(FRASE_SUGERENCIAS, sugerencias)`.
+- [X] `textoConSugerencias(x, [])` devuelve `x` sin cambios.
+- [X] `npm run test` pasa y `npm run lint` no da errores.
 
 **Manuales, contra la API real (`POST /chat` con token, sin historial, con un cliente real en lugar de `<cliente>`):**
 
-- [ ] `{ mensaje: "como va lo de <cliente>" }` responde 200, `respuesta` es exactamente `FRASE_SUGERENCIAS` y `sugerencias` trae 2 o 3 preguntas que nombran a `<cliente>`.
-- [ ] `{ mensaje: "dame lo del aprobador" }` responde 200 con `FRASE_SUGERENCIAS` y entre 2 y 3 sugerencias, no con `FRASE_DECLINACION`.
-- [ ] Mandar como `mensaje` una de las sugerencias devueltas responde con datos, `sugerencias: []`, y su fila de `chat_log` tiene `herramientas` distinto de `NULL`.
-- [ ] `{ mensaje: "cuanto es el 15% de 300" }` sigue respondiendo `FRASE_DECLINACION` con `sugerencias: []`.
-- [ ] `{ mensaje: "que se peso hoy de <cliente>" }` responde con datos y `sugerencias: []`.
-- [ ] `{ mensaje: "quien eres?" }` sigue respondiendo `FRASE_IDENTIDAD` con `sugerencias: []`.
+- [X] `{ mensaje: "como va lo de <cliente>" }` responde 200, `respuesta` es exactamente `FRASE_SUGERENCIAS` y `sugerencias` trae 2 o 3 preguntas que nombran a `<cliente>`.
+- [X] `{ mensaje: "dame lo del aprobador" }` responde 200 con `FRASE_SUGERENCIAS` y entre 2 y 3 sugerencias, no con `FRASE_DECLINACION`.
+- [X] Mandar como `mensaje` una de las sugerencias devueltas responde con datos, `sugerencias: []`, y su fila de `chat_log` tiene `herramientas` distinto de `NULL`.
+- [X] `{ mensaje: "cuanto es el 15% de 300" }` sigue respondiendo `FRASE_DECLINACION` con `sugerencias: []`.
+- [X] `{ mensaje: "que se peso hoy de <cliente>" }` responde con datos y `sugerencias: []`.
+- [X] `{ mensaje: "quien eres?" }` sigue respondiendo `FRASE_IDENTIDAD` con `sugerencias: []`.
 
 ---
 

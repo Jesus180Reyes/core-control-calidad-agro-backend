@@ -65,7 +65,7 @@ This repo is developed spec-first via two local skills in `.agents/skills/` (mir
 
 `specs/` holds the source of truth for what was decided and, just as importantly, what was **deliberately deferred** (each spec has `Out of scope`, `Decisions`, `Risks` and `What is not in this spec` sections). Before adding a feature, check whether an existing spec already ruled it out and why — new work goes in a new spec rather than silently expanding an old one. Specs are written in Spanish; the codebase and the `CLAUDE.md` files are in English.
 
-Existing specs run from `01-vinculacion-cliente-operador.md` to `47-destino-del-pesaje-rechazado.md`; `18-filtros-de-lotes.md` is still `Draft`, which is why `lotes` has no query params.
+Existing specs run from `01-vinculacion-cliente-operador.md` to `48-preguntas-sugeridas-en-el-chat.md`; `18-filtros-de-lotes.md` is still `Draft`, which is why `lotes` has no query params.
 
 ## Architecture
 

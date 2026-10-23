@@ -85,6 +85,15 @@ export const FRASE_MEMORIA =
     'Si. Veo los ultimos mensajes de esta conversacion, asi que puedes preguntarme sobre lo que acabamos de hablar. No guardo conversaciones anteriores, y cada dato lo vuelvo a consultar en los registros para que este al dia.';
 
 /**
+ * El texto que acompana a las preguntas sugeridas (SPEC 48). Tambien literal,
+ * pero esta no la escribe el modelo: la pone el backend en `respuesta` cuando
+ * corta el turno por una llamada valida a `sugerir_preguntas`. Por eso no nombra
+ * cliente ni lote; ese dato ya va en cada pregunta.
+ */
+export const FRASE_SUGERENCIAS =
+    'No me quedo del todo claro que quieres ver. Elige una de estas preguntas o escribela con tus palabras.';
+
+/**
  * Instruccion de sistema.
  *
  * La seccion de formato enumera lo permitido y prohibe el resto POR NOMBRE, el
@@ -104,6 +113,11 @@ export const FRASE_MEMORIA =
  * son obvias: los estados de calidad se nombran pero sin id, porque el contexto
  * no trae ese catalogo y un id inventado filtra mal en silencio; y anulado y
  * rechazado se separan a proposito, porque en el sistema son dos cosas.
+ *
+ * PREGUNTAS SUGERIDAS (SPEC 48) cubre la duda de intencion —"como va lo de X"
+ * cabe en varias herramientas— y la de nombres sigue en SUPUESTOS Y
+ * REPREGUNTAS. Va justo despues del vocabulario porque es la salida cuando,
+ * ya traducida la pregunta, sigue habiendo mas de una herramienta posible.
  */
 export const INSTRUCCION_SISTEMA_CHAT = `Eres Agri, el asistente de consultas de un sistema de control de calidad de
 exportaciones agricolas. Respondes preguntas sobre lotes, pesajes, clientes y
@@ -163,7 +177,9 @@ VOCABULARIO:
 Quien pregunta casi nunca usa las palabras del sistema. Antes de declinar,
 traduce lo que dijo con esta lista; declina solo si, ya traducido, ninguna
 herramienta lo contesta. Si una palabra admite dos lecturas, toma la mas
-probable y dilo en la respuesta.
+probable y dilo en la respuesta. Si la duda no es de una palabra sino de que
+quiere ver (la pregunta cabe en varias herramientas), sigue PREGUNTAS
+SUGERIDAS.
 - Lote: tambien "carga", "cargamento", "pedido" u "orden". Un nombre suelto que
   no parece de persona ("como va el BILLS2026") suele ser un lote: buscalo con
   buscar_persona.
@@ -238,6 +254,25 @@ Quien pregunta habla espanol de Honduras. Estas expresiones son comunes:
 - "Quintales" y "libras" son unidades de peso que se usan en el pais. No
   conviertas nunca: da el peso en la unidad_medida que trae el lote y, si no es
   la que pidieron, dilo.
+
+PREGUNTAS SUGERIDAS:
+- Si el mensaje habla de este sistema (un lote, un cliente, una persona,
+  pesajes, la calidad, el aprobador) pero cabe en dos o mas herramientas
+  distintas, o no dice que quiere ver, no declines y no adivines: llama a
+  sugerir_preguntas, sola, sin otras herramientas en la misma vuelta.
+- Cada pregunta sugerida es una pregunta completa que se contesta con UNA
+  herramienta, y ya trae el cliente, lote, persona o periodo que el usuario
+  nombro. No inventes nombres que no dijo.
+- Manda de 2 a 3 preguntas, cortas, sin markdown.
+- Cuenta como la UNA repregunta del turno. Si en el historial ya sugeriste
+  preguntas y el usuario sigue sin concretar, toma la opcion mas amplia y di
+  cual tomaste.
+- Si el usuario contesta con una referencia a tus sugerencias ("la segunda",
+  "la de los rechazos"), contestala como si la hubiera escrito completa.
+- Si la pregunta no tiene nada que ver con este sistema, sigue respondiendo
+  la frase de declinacion: no sugieras preguntas para eso.
+- Si la duda es solo de nombre (varias personas o clientes coinciden), sigue
+  la regla de SUPUESTOS Y REPREGUNTAS, no esta.
 
 CIFRAS:
 - Usa EXCLUSIVAMENTE los valores que te devuelven las herramientas.
@@ -736,6 +771,26 @@ export const HERRAMIENTAS_CHAT = [
                         'Ventana relativa sobre la fecha del rechazo, resuelta por el sistema. Usala en vez de calcular la fecha tu. Por defecto hoy, salvo con lote_id.',
                 },
             },
+        },
+    },
+    // La unica declaracion que no consulta nada (SPEC 48). El despachador no la
+    // ejecuta: `ChatRepository.responder` la intercepta, valida las preguntas y
+    // corta el turno. Va la ultima para que no se confunda con las de datos.
+    {
+        name: 'sugerir_preguntas',
+        description:
+            'No consulta datos. Usala cuando la pregunta habla de este sistema pero cabe en dos o mas herramientas distintas o no dice que quiere ver. Propone de 2 a 3 preguntas completas, cada una contestable con UNA herramienta, con el cliente, lote o periodo que el usuario nombro.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                preguntas: {
+                    type: 'ARRAY',
+                    items: { type: 'STRING' },
+                    description:
+                        'De 2 a 3 preguntas cortas, sin markdown, escritas como las haria el usuario.',
+                },
+            },
+            required: ['preguntas'],
         },
     },
 ];

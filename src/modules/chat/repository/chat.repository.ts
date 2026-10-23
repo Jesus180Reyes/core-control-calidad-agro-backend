@@ -6,6 +6,7 @@ import { GeminiService, LlamadaHerramienta } from 'src/ia/gemini.service';
 import {
     ContenidoGemini,
     ContextoChat,
+    FRASE_SUGERENCIAS,
     construirContents,
 } from 'src/ia/prompts/chat.prompt';
 import { PreguntarDto } from '../dto/preguntar.dto';
@@ -76,6 +77,33 @@ interface Ventana {
     hasta?: RawBuilder<Date>;
     descripcion?: string;
 }
+
+/**
+ * Lo que devuelve un turno (SPEC 48). `sugerencias` va siempre, vacio salvo
+ * cuando el modelo no entendio y propuso preguntas: entonces `respuesta` es
+ * exactamente `FRASE_SUGERENCIAS`.
+ */
+export interface RespuestaChat {
+    respuesta: string;
+    sugerencias: string[];
+}
+
+/**
+ * El texto de un turno con preguntas sugeridas tal como se guarda en
+ * `chat_log.respuesta` (SPEC 48): la frase, una linea en blanco y una vineta
+ * por pregunta. Sin sugerencias devuelve la respuesta intacta, asi que se puede
+ * llamar en todos los turnos.
+ *
+ * Se exporta porque es tambien el formato que el frontend debe guardar en
+ * `historial` para que "la segunda" se resuelva: un solo sitio que lo define.
+ */
+export const textoConSugerencias = (
+    respuesta: string,
+    sugerencias: string[],
+): string =>
+    sugerencias.length === 0
+        ? respuesta
+        : `${respuesta}\n\n${sugerencias.map((s) => `- ${s}`).join('\n')}`;
 
 /**
  * El chat de consultas (SPEC 28).
@@ -160,6 +188,28 @@ export class ChatRepository {
      */
     private static readonly LIMITE_DIARIO_POR_DEFECTO = 20;
 
+    /**
+     * Topes de `sugerir_preguntas` (SPEC 48). Una sola pregunta no es una
+     * eleccion, y mas de tres botones no caben en la pantalla de un telefono.
+     * Los 150 caracteres son para que cada boton quepa en dos lineas.
+     */
+    private static readonly MIN_SUGERENCIAS = 2;
+    private static readonly MAX_SUGERENCIAS = 3;
+    private static readonly MAX_CARACTERES_SUGERENCIA = 150;
+
+    /** La misma regla de `GeminiService`: un '<' suelto pasa, una etiqueta no. */
+    private static readonly ETIQUETA_HTML = /<[a-z!/]/i;
+
+    /**
+     * Lo que recibe el modelo cuando `sugerir_preguntas` no corta el turno. Son
+     * `{ error }` como los de cualquier herramienta, para que corrija dentro de
+     * las vueltas que le queden en lugar de rendirse.
+     */
+    private static readonly ERROR_SUGERENCIAS_INVALIDAS =
+        'Las preguntas sugeridas no son validas: manda de 2 a 3 preguntas completas, sin HTML y de menos de 150 caracteres.';
+    private static readonly ERROR_SUGERENCIAS_NO_SOLA =
+        'sugerir_preguntas va sola, sin otras herramientas en la misma vuelta.';
+
     constructor(
         private readonly dbService: DatabaseService,
         private readonly gemini: GeminiService,
@@ -178,7 +228,8 @@ export class ChatRepository {
      * 1. El contexto se resuelve por SQL, sin IA. Es lo que el despachador usa
      *    despues para no creerse lo que proponga el modelo.
      * 2. El bucle, con tope de tres vueltas. Cada vuelta es una llamada a
-     *    Gemini que o pide herramientas o entrega el texto final.
+     *    Gemini que o pide herramientas o entrega el texto final. Una
+     *    `sugerir_preguntas` sola y valida tambien lo cierra (SPEC 48).
      * 3. Ese texto es la respuesta. Si las tres vueltas se fueron en pedir
      *    datos, una cuarta llamada SIN herramientas redacta con lo que ya se
      *    consulto, en vez de tirarlo; ver `redactarConLoQueHay`.
@@ -188,15 +239,19 @@ export class ChatRepository {
      * de Google es la regla que el SPEC 27 fijo. Aqui pesa mas que alli: un
      * turno puede llamar tres veces.
      *
-     * **Siempre devuelve un string y nunca lanza.** Un 503 por falta de clave,
-     * un 502 por timeout, un modelo que no converge o una consulta que revienta
-     * acaban en un texto de disculpa. El unico codigo que este endpoint sabe
-     * devolver es 200.
+     * **Siempre devuelve una respuesta y nunca lanza.** Un 503 por falta de
+     * clave, un 502 por timeout, un modelo que no converge o una consulta que
+     * revienta acaban en un texto de disculpa. El unico codigo que este
+     * endpoint sabe devolver es 200. Todas las salidas llevan `sugerencias`,
+     * vacio salvo en el turno que propone preguntas (SPEC 48).
      *
      * El tope diario se comprueba ANTES que nada y corta el turno sin llamar a
      * Gemini. El registro en `chat_log` va al final y no puede tumbar el turno.
      */
-    async responder(dto: PreguntarDto, usuarioId: number): Promise<string> {
+    async responder(
+        dto: PreguntarDto,
+        usuarioId: number,
+    ): Promise<RespuestaChat> {
         // 0. El tope del dia. Va primero porque el objetivo es no gastar: si se
         // agoto, no hay contexto que resolver ni llamada que hacer.
         const limite = this.limiteDiario();
@@ -206,7 +261,10 @@ export class ChatRepository {
             this.logger.warn(
                 `El usuario ${usuarioId} agoto su limite diario de ${limite} consultas`,
             );
-            return `Has alcanzado el limite de ${limite} consultas por dia. El contador se reinicia manana.`;
+            return {
+                respuesta: `Has alcanzado el limite de ${limite} consultas por dia. El contador se reinicia manana.`,
+                sugerencias: [],
+            };
         }
 
         // 1. El contexto, por SQL y sin IA.
@@ -215,8 +273,10 @@ export class ChatRepository {
         const contents = construirContents(dto.mensaje, dto.historial);
         const usadas: LlamadaHerramienta[] = [];
 
-        // 2. El bucle. Se sale por el texto; agotar las vueltas es rendirse.
+        // 2. El bucle. Se sale por el texto o por unas preguntas sugeridas
+        // validas; agotar las vueltas es rendirse.
         let respuesta = ChatRepository.TEXTO_NO_CONVERGE;
+        let sugerencias: string[] = [];
 
         try {
             for (let vuelta = 1; vuelta <= ChatRepository.MAX_VUELTAS; vuelta++) {
@@ -225,6 +285,26 @@ export class ChatRepository {
                 if (turno.tipo === 'texto') {
                     respuesta = turno.texto;
                     break;
+                }
+
+                // SPEC 48. `sugerir_preguntas` sola y valida corta el turno aqui,
+                // sin devolverla a Gemini: la frase es fija y las preguntas ya
+                // estan, asi que otra llamada solo sumaria latencia. Si llega
+                // acompanada o no pasa la validacion, sigue el camino de
+                // cualquier herramienta y recibe un `{ error }` mas abajo.
+                const sugerirSola =
+                    turno.llamadas.length === 1 &&
+                    turno.llamadas[0].nombre === 'sugerir_preguntas';
+
+                if (sugerirSola) {
+                    const validas = this.validarSugerencias(
+                        turno.llamadas[0].argumentos,
+                    );
+                    if (validas) {
+                        respuesta = FRASE_SUGERENCIAS;
+                        sugerencias = validas;
+                        break;
+                    }
                 }
 
                 // El turno del modelo se reenvia TAL CUAL antes de los
@@ -236,6 +316,24 @@ export class ChatRepository {
 
                 const respuestas: ContenidoGemini['parts'] = [];
                 for (const llamada of turno.llamadas) {
+                    // Hay que contestarla igual, porque su peticion va en
+                    // `partes`; pero no se despacha ni entra en `usadas`, que
+                    // registra solo las consultas que trajeron datos. Con otras
+                    // llamadas al lado, los datos ganan.
+                    if (llamada.nombre === 'sugerir_preguntas') {
+                        respuestas.push({
+                            functionResponse: {
+                                name: llamada.nombre,
+                                response: {
+                                    error: sugerirSola
+                                        ? ChatRepository.ERROR_SUGERENCIAS_INVALIDAS
+                                        : ChatRepository.ERROR_SUGERENCIAS_NO_SOLA,
+                                },
+                            },
+                        });
+                        continue;
+                    }
+
                     const resultado = await this.despachar(llamada, contexto);
                     usadas.push(llamada);
                     respuestas.push({
@@ -272,9 +370,16 @@ export class ChatRepository {
         }
 
         // 4. La bitacora. Nunca puede tumbar el turno.
-        await this.registrar(dto, usuarioId, respuesta, usadas);
+        // Las sugerencias viajan dentro del texto: `chat_log` no tiene columna
+        // para ellas, por decision del SPEC 48.
+        await this.registrar(
+            dto,
+            usuarioId,
+            textoConSugerencias(respuesta, sugerencias),
+            usadas,
+        );
 
-        return respuesta;
+        return { respuesta, sugerencias };
     }
 
     /**
@@ -316,6 +421,41 @@ export class ChatRepository {
         );
 
         return ChatRepository.TEXTO_NO_CONVERGE;
+    }
+
+    /**
+     * Las preguntas de `sugerir_preguntas`, limpias, o `null` si no alcanzan
+     * (SPEC 48). Vienen de un modelo que leyo nombres escritos por API, asi que
+     * se tratan como cualquier argumento: solo sale lo que cumple.
+     *
+     * El orden importa: se descarta y se deduplica ANTES de recortar a tres, de
+     * modo que una pregunta vacia o repetida no le quita el sitio a una buena.
+     */
+    private validarSugerencias(
+        argumentos: Record<string, unknown>,
+    ): string[] | null {
+        const crudas = Array.isArray(argumentos?.preguntas)
+            ? (argumentos.preguntas as unknown[])
+            : [];
+
+        const limpias = crudas
+            .filter((p): p is string => typeof p === 'string')
+            .map((p) => p.trim().replace(/\r?\n/g, ' '))
+            .filter(
+                (p) =>
+                    p.length > 0 &&
+                    p.length <= ChatRepository.MAX_CARACTERES_SUGERENCIA &&
+                    !ChatRepository.ETIQUETA_HTML.test(p),
+            );
+
+        const sugerencias = [...new Set(limpias)].slice(
+            0,
+            ChatRepository.MAX_SUGERENCIAS,
+        );
+
+        return sugerencias.length < ChatRepository.MIN_SUGERENCIAS
+            ? null
+            : sugerencias;
     }
 
     /**
@@ -606,6 +746,15 @@ export class ChatRepository {
                         limite: ChatRepository.MAX_FILAS_MODELO,
                     },
                 );
+
+            case 'sugerir_preguntas':
+                // No es una consulta: `responder` la intercepta antes de llegar
+                // aqui (SPEC 48). Si aun asi llega, se contesta como a cualquier
+                // nombre que no se despacha, pero sin el aviso de herramienta
+                // inventada, porque esta si esta declarada.
+                return {
+                    error: 'sugerir_preguntas no consulta datos y no se puede ejecutar aqui.',
+                };
 
             default:
                 // Incluye el caso que importa: una funcion de escritura que el
