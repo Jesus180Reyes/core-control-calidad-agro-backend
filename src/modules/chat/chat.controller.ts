@@ -37,11 +37,15 @@ export class ChatController {
     })
     async preguntar(@Body() dto: PreguntarDto, @Req() req: Request) {
         const { userId } = req.user as { userId: number };
-        const respuesta = await this.chatService.preguntar(dto, userId);
+        const { respuesta, sugerencias } = await this.chatService.preguntar(
+            dto,
+            userId,
+        );
         return {
             ok: true,
             msg: 'Consulta resuelta',
             respuesta,
+            sugerencias,
         };
     }
 

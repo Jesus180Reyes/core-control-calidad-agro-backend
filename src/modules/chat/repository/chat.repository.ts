@@ -78,6 +78,16 @@ interface Ventana {
 }
 
 /**
+ * Lo que devuelve un turno (SPEC 48). `sugerencias` va siempre, vacio salvo
+ * cuando el modelo no entendio y propuso preguntas: entonces `respuesta` es
+ * exactamente `FRASE_SUGERENCIAS`.
+ */
+export interface RespuestaChat {
+    respuesta: string;
+    sugerencias: string[];
+}
+
+/**
  * El texto de un turno con preguntas sugeridas tal como se guarda en
  * `chat_log.respuesta` (SPEC 48): la frase, una linea en blanco y una vineta
  * por pregunta. Sin sugerencias devuelve la respuesta intacta, asi que se puede
@@ -217,15 +227,19 @@ export class ChatRepository {
      * de Google es la regla que el SPEC 27 fijo. Aqui pesa mas que alli: un
      * turno puede llamar tres veces.
      *
-     * **Siempre devuelve un string y nunca lanza.** Un 503 por falta de clave,
-     * un 502 por timeout, un modelo que no converge o una consulta que revienta
-     * acaban en un texto de disculpa. El unico codigo que este endpoint sabe
-     * devolver es 200.
+     * **Siempre devuelve una respuesta y nunca lanza.** Un 503 por falta de
+     * clave, un 502 por timeout, un modelo que no converge o una consulta que
+     * revienta acaban en un texto de disculpa. El unico codigo que este
+     * endpoint sabe devolver es 200. Todas las salidas llevan `sugerencias`,
+     * vacio salvo en el turno que propone preguntas (SPEC 48).
      *
      * El tope diario se comprueba ANTES que nada y corta el turno sin llamar a
      * Gemini. El registro en `chat_log` va al final y no puede tumbar el turno.
      */
-    async responder(dto: PreguntarDto, usuarioId: number): Promise<string> {
+    async responder(
+        dto: PreguntarDto,
+        usuarioId: number,
+    ): Promise<RespuestaChat> {
         // 0. El tope del dia. Va primero porque el objetivo es no gastar: si se
         // agoto, no hay contexto que resolver ni llamada que hacer.
         const limite = this.limiteDiario();
@@ -235,7 +249,10 @@ export class ChatRepository {
             this.logger.warn(
                 `El usuario ${usuarioId} agoto su limite diario de ${limite} consultas`,
             );
-            return `Has alcanzado el limite de ${limite} consultas por dia. El contador se reinicia manana.`;
+            return {
+                respuesta: `Has alcanzado el limite de ${limite} consultas por dia. El contador se reinicia manana.`,
+                sugerencias: [],
+            };
         }
 
         // 1. El contexto, por SQL y sin IA.
@@ -303,7 +320,7 @@ export class ChatRepository {
         // 4. La bitacora. Nunca puede tumbar el turno.
         await this.registrar(dto, usuarioId, respuesta, usadas);
 
-        return respuesta;
+        return { respuesta, sugerencias: [] };
     }
 
     /**

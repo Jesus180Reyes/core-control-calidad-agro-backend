@@ -758,9 +758,13 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('como va el lote'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('como va el lote'),
+            7,
+        );
 
         expect(respuesta).toBe('El lote **PICOLO2026** va bien.');
+        expect(sugerencias).toEqual([]);
     });
 
     it('registra el turno sin herramientas con herramientas en NULL', async () => {
@@ -837,7 +841,7 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('dame algo'), 7);
+        const { respuesta } = await repo.responder(pregunta('dame algo'), 7);
 
         expect(conversar).toHaveBeenCalledTimes(4);
         // Las tres del bucle con herramientas; la de cierre sin ellas.
@@ -855,10 +859,14 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('dame algo'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('dame algo'),
+            7,
+        );
 
         expect(conversar).toHaveBeenCalledTimes(4);
         expect(respuesta).toContain('no llegue a una respuesta');
+        expect(sugerencias).toEqual([]);
     });
 
     it('un fallo de Gemini responde con disculpa y nunca lanza', async () => {
@@ -870,9 +878,13 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('como va el lote 3'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('como va el lote 3'),
+            7,
+        );
 
         expect(respuesta).toContain('Vuelve a intentarlo');
+        expect(sugerencias).toEqual([]);
     });
 
     it('un fallo al escribir en chat_log no impide responder', async () => {
@@ -882,7 +894,7 @@ describe('ChatRepository / el turno', () => {
             conversar,
         );
 
-        const respuesta = await repo.responder(pregunta('hola'), 7);
+        const { respuesta } = await repo.responder(pregunta('hola'), 7);
 
         expect(respuesta).toBe('Todo bien.');
     });
@@ -895,17 +907,21 @@ describe('ChatRepository / el turno', () => {
             undefined, // sin variable: manda el defecto de 20
         );
 
-        const respuesta = await repo.responder(pregunta('otra mas'), 7);
+        const { respuesta, sugerencias } = await repo.responder(
+            pregunta('otra mas'),
+            7,
+        );
 
         expect(conversar).not.toHaveBeenCalled();
         expect(respuesta).toContain('limite de 20 consultas por dia');
+        expect(sugerencias).toEqual([]);
     });
 
     it('respeta el limite configurado por variable de entorno', async () => {
         const conversar = jest.fn();
         const { repo } = crearRepositorio([{ total: 3 }], conversar, '3');
 
-        const respuesta = await repo.responder(pregunta('otra mas'), 7);
+        const { respuesta } = await repo.responder(pregunta('otra mas'), 7);
 
         expect(conversar).not.toHaveBeenCalled();
         expect(respuesta).toContain('limite de 3 consultas por dia');
@@ -919,7 +935,7 @@ describe('ChatRepository / el turno', () => {
             '0',
         );
 
-        const respuesta = await repo.responder(pregunta('hola'), 7);
+        const { respuesta } = await repo.responder(pregunta('hola'), 7);
 
         // Con 5 turnos gastados y el defecto de 20, el turno pasa.
         expect(respuesta).toBe('Hola.');
