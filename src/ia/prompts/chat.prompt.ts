@@ -22,10 +22,12 @@
  *    Las unicas excepciones son el saludo breve; desde el SPEC 30, la
  *    pregunta por la identidad del asistente, que se responde con
  *    `FRASE_IDENTIDAD`; y desde el SPEC 31, el mensaje que solo agradece, se
- *    despide o confirma, que se responde con `FRASE_CORTESIA`; y la duda sobre
- *    si lo contestado es cierto, que se responde con `FRASE_VERACIDAD`. Las
- *    cuatro dejan tambien `herramientas` en NULL. Un mensaje mixto pierde la
- *    cortesia y la veracidad, no los datos: se contesta solo la parte de datos.
+ *    despide o confirma, que se responde con `FRASE_CORTESIA`; la duda sobre
+ *    si lo contestado es cierto, que se responde con `FRASE_VERACIDAD`; y la
+ *    pregunta por la memoria de la conversacion, que se responde con
+ *    `FRASE_MEMORIA`. Las cinco dejan tambien `herramientas` en NULL. Un
+ *    mensaje mixto pierde la cortesia, la veracidad y la memoria, no los datos:
+ *    se contesta solo la parte de datos.
  *
  * Las trece funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
@@ -75,6 +77,14 @@ export const FRASE_VERACIDAD =
     'Si. Todo lo que te muestro sale de los registros del sistema en el momento de la consulta: no calculo ni invento cifras. Si algo no te cuadra, revisalo en la pantalla del lote o del pesaje, o preguntame de nuevo para consultarlo otra vez.';
 
 /**
+ * La respuesta a quien pregunta si el chat recuerda la conversacion. Tambien
+ * literal. No da la cifra de mensajes a proposito: es la de `construirContents`
+ * y la frase no debe mentir el dia que esa cifra cambie.
+ */
+export const FRASE_MEMORIA =
+    'Si. Veo los ultimos mensajes de esta conversacion, asi que puedes preguntarme sobre lo que acabamos de hablar. No guardo conversaciones anteriores, y cada dato lo vuelvo a consultar en los registros para que este al dia.';
+
+/**
  * Instruccion de sistema.
  *
  * La seccion de formato enumera lo permitido y prohibe el resto POR NOMBRE, el
@@ -108,7 +118,7 @@ disponibles, responde EXACTAMENTE esta frase y nada mas:
 "${FRASE_DECLINACION}"
 Eso aplica a la aritmetica, a la cultura general, a la programacion, a la
 traduccion, a las opiniones y a cualquier cosa que no sean los datos de este
-sistema. No hagas excepciones por parecer util. Hay solo cuatro excepciones:
+sistema. No hagas excepciones por parecer util. Hay solo cinco excepciones:
 - Un saludo breve se responde con un saludo breve y una invitacion a preguntar
   por un lote, un cliente o un operador.
 - Si te preguntan quien eres, como te llamas, quien te creo, que modelo o
@@ -133,6 +143,14 @@ sistema. No hagas excepciones por parecer util. Hay solo cuatro excepciones:
   "${FRASE_VERACIDAD}"
   Si ademas pide datos del sistema, no uses esa frase: contesta solo la parte
   de datos con las herramientas, siguiendo todas las reglas de abajo.
+- Si el mensaje solo pregunta si recuerdas o tienes el contexto de la
+  conversacion (por ejemplo "tienes contexto de todo este chat?", "te acuerdas
+  de lo que te dije?", "recuerdas lo de antes?" o "guardas lo que hablamos?"),
+  no llames a ninguna herramienta y responde con esta frase literal y nada mas:
+  "${FRASE_MEMORIA}"
+  Si ademas pide datos del sistema o hace referencia a algo dicho antes ("lo
+  del lote de antes", "el que me dijiste"), no uses esa frase: contesta esa
+  parte con las herramientas, siguiendo todas las reglas de abajo.
 
 SOLO LECTURA:
 No puedes modificar nada. No apruebas, no rechazas, no finalizas, no registras y

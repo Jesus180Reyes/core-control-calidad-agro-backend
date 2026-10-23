@@ -2,6 +2,7 @@ import {
     FRASE_CORTESIA,
     FRASE_DECLINACION,
     FRASE_IDENTIDAD,
+    FRASE_MEMORIA,
     FRASE_SOLO_LECTURA,
     FRASE_VERACIDAD,
     INSTRUCCION_SISTEMA_CHAT,
@@ -80,9 +81,9 @@ describe('chat.prompt / agradecimientos y despedidas', () => {
         expect(posCortesia).toBeLessThan(posSoloLectura);
     });
 
-    it('la regla principal cuenta cuatro excepciones', () => {
-        expect(INSTRUCCION_SISTEMA_CHAT).toContain('Hay solo cuatro excepciones');
-        expect(INSTRUCCION_SISTEMA_CHAT).not.toContain('Hay solo tres excepciones');
+    it('la regla principal cuenta cinco excepciones', () => {
+        expect(INSTRUCCION_SISTEMA_CHAT).toContain('Hay solo cinco excepciones');
+        expect(INSTRUCCION_SISTEMA_CHAT).not.toContain('Hay solo cuatro excepciones');
     });
 
     it('la instruccion conserva las otras tres frases literales', () => {
@@ -125,6 +126,47 @@ describe('chat.prompt / dudas sobre la veracidad', () => {
         expect(posCortesia).toBeGreaterThan(-1);
         expect(posVeracidad).toBeGreaterThan(posCortesia);
         expect(posVeracidad).toBeLessThan(posSoloLectura);
+    });
+});
+
+/**
+ * Pruebas sobre el TEXTO de la excepcion de memoria (P62 del catalogo de
+ * preguntas). Como las de arriba, no comprueban que el modelo la use.
+ */
+describe('chat.prompt / memoria de la conversacion', () => {
+    it('la frase dice que ve esta conversacion y no las anteriores', () => {
+        expect(FRASE_MEMORIA).toContain('ultimos mensajes de esta conversacion');
+        expect(FRASE_MEMORIA).toContain('No guardo conversaciones anteriores');
+    });
+
+    it('la frase no promete una cifra de mensajes', () => {
+        expect(FRASE_MEMORIA).not.toMatch(/\d/);
+    });
+
+    it('la frase no nombra al modelo ni a su proveedor', () => {
+        expect(FRASE_MEMORIA).not.toMatch(/gemini|google|modelo de lenguaje/i);
+    });
+
+    it('la frase es distinta de las otras cinco', () => {
+        for (const otra of [
+            FRASE_DECLINACION,
+            FRASE_SOLO_LECTURA,
+            FRASE_IDENTIDAD,
+            FRASE_CORTESIA,
+            FRASE_VERACIDAD,
+        ]) {
+            expect(FRASE_MEMORIA).not.toBe(otra);
+        }
+    });
+
+    it('la frase va dentro de la regla principal, despues de la veracidad', () => {
+        const posMemoria = INSTRUCCION_SISTEMA_CHAT.indexOf(FRASE_MEMORIA);
+        const posVeracidad = INSTRUCCION_SISTEMA_CHAT.indexOf(FRASE_VERACIDAD);
+        const posSoloLectura = INSTRUCCION_SISTEMA_CHAT.indexOf('SOLO LECTURA:');
+
+        expect(posVeracidad).toBeGreaterThan(-1);
+        expect(posMemoria).toBeGreaterThan(posVeracidad);
+        expect(posMemoria).toBeLessThan(posSoloLectura);
     });
 });
 

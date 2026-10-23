@@ -107,7 +107,7 @@ Estado del código revisado: 13 herramientas (incluida `rechazos_por_destino`, s
 | P59 | quien eres? / quien te creo? / eres ChatGPT o Gemini? | observada ×10 | cubierta | `FRASE_IDENTIDAD`. Antes del spec 30 declinaba (5 turnos) | 30 |
 | P60 | gracias / ok / cheke | observada ×6 | cubierta | `FRASE_CORTESIA` | 31 |
 | P61 | es certera esta informacion? / entonces es veridica? | observada ×3 | cubierta | `FRASE_VERACIDAD`, sin herramienta. Antes era frágil: una vez declinó llamando a 3 herramientas | — |
-| P62 | pero tienes contexto de todo este chat? | observada ×1 | frágil | Contestó sin herramienta y bien. Depende del modelo | — |
+| P62 | pero tienes contexto de todo este chat? | observada ×1 | cubierta | `FRASE_MEMORIA`, sin herramienta. Antes contestaba bien pero dependía del modelo | — |
 | P63 | puedes darme el archivo pdf? | observada ×1 | cubierta | Declinación correcta: el chat no genera archivos | 28 |
 | P64 | quien invento apple / cual es la raiz cuadrada de 20 | observada ×5 | cubierta | Declinación correcta (`FRASE_DECLINACION`) | 28 |
 
@@ -115,7 +115,7 @@ Estado del código revisado: 13 herramientas (incluida `rechazos_por_destino`, s
 
 ## Totales de esta revisión
 
-64 preguntas (P01–P64): 28 cubiertas, 10 frágiles, 19 huecos y 7 fuera de alcance. 43 son intenciones observadas en `chat_log` (153 turnos entre el 2026-09-20 y el 2026-10-22) y 21 son anticipadas. Siguiente número libre: **P65**.
+64 preguntas (P01–P64): 29 cubiertas, 9 frágiles, 19 huecos y 7 fuera de alcance. 43 son intenciones observadas en `chat_log` (153 turnos entre el 2026-09-20 y el 2026-10-22) y 21 son anticipadas. Siguiente número libre: **P65**.
 
 Los huecos se concentran en tres familias:
 
