@@ -85,6 +85,15 @@ export const FRASE_MEMORIA =
     'Si. Veo los ultimos mensajes de esta conversacion, asi que puedes preguntarme sobre lo que acabamos de hablar. No guardo conversaciones anteriores, y cada dato lo vuelvo a consultar en los registros para que este al dia.';
 
 /**
+ * El texto que acompana a las preguntas sugeridas (SPEC 48). Tambien literal,
+ * pero esta no la escribe el modelo: la pone el backend en `respuesta` cuando
+ * corta el turno por una llamada valida a `sugerir_preguntas`. Por eso no nombra
+ * cliente ni lote; ese dato ya va en cada pregunta.
+ */
+export const FRASE_SUGERENCIAS =
+    'No me quedo del todo claro que quieres ver. Elige una de estas preguntas o escribela con tus palabras.';
+
+/**
  * Instruccion de sistema.
  *
  * La seccion de formato enumera lo permitido y prohibe el resto POR NOMBRE, el
