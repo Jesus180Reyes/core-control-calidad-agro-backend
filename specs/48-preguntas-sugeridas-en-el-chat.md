@@ -1,6 +1,6 @@
 # SPEC 48 — Preguntas sugeridas cuando el chat no entiende
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 28 (crea el chat, el bucle de herramientas y `chat_log`), SPEC 30 (patrón de frases literales en `chat.prompt.ts`)
 > **Date:** 2026-10-23
 > **Objective:** Que el chat, ante una pregunta del sistema que cabe en varias consultas, devuelva de 2 a 3 preguntas concretas en un campo `sugerencias` de `POST /chat` que el frontend pinta como botones.
