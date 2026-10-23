@@ -607,6 +607,15 @@ export class ChatRepository {
                     },
                 );
 
+            case 'sugerir_preguntas':
+                // No es una consulta: `preguntar` la intercepta antes de llegar
+                // aqui (SPEC 48). Si aun asi llega, se contesta como a cualquier
+                // nombre que no se despacha, pero sin el aviso de herramienta
+                // inventada, porque esta si esta declarada.
+                return {
+                    error: 'sugerir_preguntas no consulta datos y no se puede ejecutar aqui.',
+                };
+
             default:
                 // Incluye el caso que importa: una funcion de escritura que el
                 // modelo se invento. No existe, no se despacha y se registra.

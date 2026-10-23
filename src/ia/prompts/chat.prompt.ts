@@ -747,6 +747,26 @@ export const HERRAMIENTAS_CHAT = [
             },
         },
     },
+    // La unica declaracion que no consulta nada (SPEC 48). El despachador no la
+    // ejecuta: `ChatRepository.preguntar` la intercepta, valida las preguntas y
+    // corta el turno. Va la ultima para que no se confunda con las de datos.
+    {
+        name: 'sugerir_preguntas',
+        description:
+            'No consulta datos. Usala cuando la pregunta habla de este sistema pero cabe en dos o mas herramientas distintas o no dice que quiere ver. Propone de 2 a 3 preguntas completas, cada una contestable con UNA herramienta, con el cliente, lote o periodo que el usuario nombro.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                preguntas: {
+                    type: 'ARRAY',
+                    items: { type: 'STRING' },
+                    description:
+                        'De 2 a 3 preguntas cortas, sin markdown, escritas como las haria el usuario.',
+                },
+            },
+            required: ['preguntas'],
+        },
+    },
 ];
 
 /**
