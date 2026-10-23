@@ -774,7 +774,7 @@ export const HERRAMIENTAS_CHAT = [
         },
     },
     // La unica declaracion que no consulta nada (SPEC 48). El despachador no la
-    // ejecuta: `ChatRepository.preguntar` la intercepta, valida las preguntas y
+    // ejecuta: `ChatRepository.responder` la intercepta, valida las preguntas y
     // corta el turno. Va la ultima para que no se confunda con las de datos.
     {
         name: 'sugerir_preguntas',

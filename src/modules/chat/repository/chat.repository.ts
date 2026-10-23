@@ -6,6 +6,7 @@ import { GeminiService, LlamadaHerramienta } from 'src/ia/gemini.service';
 import {
     ContenidoGemini,
     ContextoChat,
+    FRASE_SUGERENCIAS,
     construirContents,
 } from 'src/ia/prompts/chat.prompt';
 import { PreguntarDto } from '../dto/preguntar.dto';
@@ -199,6 +200,16 @@ export class ChatRepository {
     /** La misma regla de `GeminiService`: un '<' suelto pasa, una etiqueta no. */
     private static readonly ETIQUETA_HTML = /<[a-z!/]/i;
 
+    /**
+     * Lo que recibe el modelo cuando `sugerir_preguntas` no corta el turno. Son
+     * `{ error }` como los de cualquier herramienta, para que corrija dentro de
+     * las vueltas que le queden en lugar de rendirse.
+     */
+    private static readonly ERROR_SUGERENCIAS_INVALIDAS =
+        'Las preguntas sugeridas no son validas: manda de 2 a 3 preguntas completas, sin HTML y de menos de 150 caracteres.';
+    private static readonly ERROR_SUGERENCIAS_NO_SOLA =
+        'sugerir_preguntas va sola, sin otras herramientas en la misma vuelta.';
+
     constructor(
         private readonly dbService: DatabaseService,
         private readonly gemini: GeminiService,
@@ -217,7 +228,8 @@ export class ChatRepository {
      * 1. El contexto se resuelve por SQL, sin IA. Es lo que el despachador usa
      *    despues para no creerse lo que proponga el modelo.
      * 2. El bucle, con tope de tres vueltas. Cada vuelta es una llamada a
-     *    Gemini que o pide herramientas o entrega el texto final.
+     *    Gemini que o pide herramientas o entrega el texto final. Una
+     *    `sugerir_preguntas` sola y valida tambien lo cierra (SPEC 48).
      * 3. Ese texto es la respuesta. Si las tres vueltas se fueron en pedir
      *    datos, una cuarta llamada SIN herramientas redacta con lo que ya se
      *    consulto, en vez de tirarlo; ver `redactarConLoQueHay`.
@@ -261,8 +273,10 @@ export class ChatRepository {
         const contents = construirContents(dto.mensaje, dto.historial);
         const usadas: LlamadaHerramienta[] = [];
 
-        // 2. El bucle. Se sale por el texto; agotar las vueltas es rendirse.
+        // 2. El bucle. Se sale por el texto o por unas preguntas sugeridas
+        // validas; agotar las vueltas es rendirse.
         let respuesta = ChatRepository.TEXTO_NO_CONVERGE;
+        let sugerencias: string[] = [];
 
         try {
             for (let vuelta = 1; vuelta <= ChatRepository.MAX_VUELTAS; vuelta++) {
@@ -271,6 +285,26 @@ export class ChatRepository {
                 if (turno.tipo === 'texto') {
                     respuesta = turno.texto;
                     break;
+                }
+
+                // SPEC 48. `sugerir_preguntas` sola y valida corta el turno aqui,
+                // sin devolverla a Gemini: la frase es fija y las preguntas ya
+                // estan, asi que otra llamada solo sumaria latencia. Si llega
+                // acompanada o no pasa la validacion, sigue el camino de
+                // cualquier herramienta y recibe un `{ error }` mas abajo.
+                const sugerirSola =
+                    turno.llamadas.length === 1 &&
+                    turno.llamadas[0].nombre === 'sugerir_preguntas';
+
+                if (sugerirSola) {
+                    const validas = this.validarSugerencias(
+                        turno.llamadas[0].argumentos,
+                    );
+                    if (validas) {
+                        respuesta = FRASE_SUGERENCIAS;
+                        sugerencias = validas;
+                        break;
+                    }
                 }
 
                 // El turno del modelo se reenvia TAL CUAL antes de los
@@ -282,6 +316,24 @@ export class ChatRepository {
 
                 const respuestas: ContenidoGemini['parts'] = [];
                 for (const llamada of turno.llamadas) {
+                    // Hay que contestarla igual, porque su peticion va en
+                    // `partes`; pero no se despacha ni entra en `usadas`, que
+                    // registra solo las consultas que trajeron datos. Con otras
+                    // llamadas al lado, los datos ganan.
+                    if (llamada.nombre === 'sugerir_preguntas') {
+                        respuestas.push({
+                            functionResponse: {
+                                name: llamada.nombre,
+                                response: {
+                                    error: sugerirSola
+                                        ? ChatRepository.ERROR_SUGERENCIAS_INVALIDAS
+                                        : ChatRepository.ERROR_SUGERENCIAS_NO_SOLA,
+                                },
+                            },
+                        });
+                        continue;
+                    }
+
                     const resultado = await this.despachar(llamada, contexto);
                     usadas.push(llamada);
                     respuestas.push({
@@ -318,9 +370,16 @@ export class ChatRepository {
         }
 
         // 4. La bitacora. Nunca puede tumbar el turno.
-        await this.registrar(dto, usuarioId, respuesta, usadas);
+        // Las sugerencias viajan dentro del texto: `chat_log` no tiene columna
+        // para ellas, por decision del SPEC 48.
+        await this.registrar(
+            dto,
+            usuarioId,
+            textoConSugerencias(respuesta, sugerencias),
+            usadas,
+        );
 
-        return { respuesta, sugerencias: [] };
+        return { respuesta, sugerencias };
     }
 
     /**
@@ -689,7 +748,7 @@ export class ChatRepository {
                 );
 
             case 'sugerir_preguntas':
-                // No es una consulta: `preguntar` la intercepta antes de llegar
+                // No es una consulta: `responder` la intercepta antes de llegar
                 // aqui (SPEC 48). Si aun asi llega, se contesta como a cualquier
                 // nombre que no se despacha, pero sin el aviso de herramienta
                 // inventada, porque esta si esta declarada.
