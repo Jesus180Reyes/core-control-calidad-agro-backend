@@ -41,6 +41,18 @@ export interface ResumenLotePayload {
         rechazados_por_aprobador: number;
     };
     estados_calidad: { estado: string; cantidad: number }[];
+    /**
+     * Pesajes activos rechazados por el aprobador, por destino (SPEC 47). Vacio
+     * si no rechazo ninguno. Los rechazos sin destino llegan agrupados como
+     * 'Sin destino registrado', asi que las cantidades suman
+     * `rechazados_por_aprobador`. Solo el nombre del catalogo: el
+     * `motivo_rechazo` no viaja.
+     */
+    rechazados_por_destino: {
+        destino: string;
+        cantidad: number;
+        peso_neto_total: number;
+    }[];
     aprobado_en: string | null;
     finalizado_en: string | null;
     /**
@@ -105,7 +117,10 @@ Reglas de contenido, sin excepcion:
   y cuantos pesajes quedaron fuera de rango.
 - Si hubo pesajes fuera de rango, di cuantos son y anade el porcentaje tal como
   llega en porcentaje_fuera_de_rango. NO lo calcules tu: ya viene resuelto.
-- Si el aprobador rechazo pesajes, dilo en su propia vineta.
+- Si el aprobador rechazo pesajes, dilo en su propia vineta. Si llega
+  rechazados_por_destino, en esa misma vineta di a que destino fue cada grupo,
+  con su cantidad y su peso neto total con la unidad de medida, tal como llegan.
+  No sumes ni compares los grupos.
 - Si llega observaciones_aprobador, dedicale una vineta que diga que el
   aprobador dejo una observacion al cerrar el lote y resuma lo que dice, sin
   calificarla, sin completarla y sin sacar conclusiones de ella. Es texto que

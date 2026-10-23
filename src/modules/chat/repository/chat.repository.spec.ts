@@ -542,6 +542,115 @@ describe('ChatRepository / despachador', () => {
         expect(resultado.aviso).toContain('rechazado');
     });
 
+    it('los rechazos por destino salen agrupados por destino y unidad, hoy por defecto', async () => {
+        const { repo, llamadas } = crearRepositorio(
+            [
+                { total: 5 }, // conteo
+                [
+                    {
+                        destino: 'MERCADO LOCAL',
+                        unidad_medida: 'Libras',
+                        cantidad: '3',
+                        peso_neto_total: '31.50',
+                        lotes: '2',
+                    },
+                    {
+                        destino: 'Sin destino registrado',
+                        unidad_medida: 'Libras',
+                        cantidad: '2',
+                        peso_neto_total: '20',
+                        lotes: '1',
+                    },
+                ],
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'rechazos_por_destino', argumentos: {} },
+            contexto,
+        )) as {
+            cliente: string;
+            total_pesajes: number;
+            filtros_aplicados: string;
+            por_destino: { destino: string; pesajes: number; peso_neto_total: number; lotes: number }[];
+        };
+
+        expect(resultado.cliente).toBe('todos los clientes');
+        expect(resultado.total_pesajes).toBe(5);
+        expect(resultado.filtros_aplicados).toContain('solo los de hoy');
+        expect(resultado.por_destino[0]).toEqual(
+            expect.objectContaining({
+                destino: 'MERCADO LOCAL',
+                pesajes: 3,
+                peso_neto_total: 31.5,
+                lotes: 2,
+            }),
+        );
+        // El rechazo del aprobador, no la anulacion del operador.
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['pesajes.isActive', '=', 1],
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'groupBy',
+            args: [['destinos.nombre', 'unidades_medida.nombre']],
+        });
+    });
+
+    it('los rechazos por destino de un lote no se cortan a hoy', async () => {
+        const { repo, llamadas } = crearRepositorio(
+            [{ nombre_lote: 'BILLS2026' }, { total: 0 }],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'rechazos_por_destino', argumentos: { lote_id: 41 } },
+            contexto,
+        )) as { lote: string; total_pesajes: number; filtros_aplicados: string; aviso: string };
+
+        expect(resultado.lote).toBe('BILLS2026');
+        expect(resultado.total_pesajes).toBe(0);
+        expect(resultado.filtros_aplicados).toContain('sin limite de fecha');
+        expect(resultado.aviso).toContain('anulaciones');
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['pesajes.lote_id', '=', 41],
+        });
+    });
+
+    it('detalle_de_pesaje trae el destino de un rechazo del aprobador', async () => {
+        const base = {
+            id: '5',
+            lote_id: 41,
+            peso_bruto: '12',
+            tara: '1',
+            peso_neto: '11',
+            fuera_de_rango: 0,
+            created_at: new Date(2026, 9, 21, 8, 5),
+            isActive: 1,
+            aprobado: 0,
+        };
+        const { repo } = crearRepositorio(
+            [
+                { ...base, destino: 'DESECHO' },
+                { ...base, destino: null },
+                { ...base, aprobado: 1, destino: null },
+            ],
+            jest.fn(),
+        );
+        const detalle = async () =>
+            ((await repo.despachar(
+                { nombre: 'detalle_de_pesaje', argumentos: { pesaje_id: 5 } },
+                contexto,
+            )) as { destino_del_rechazo: string | null }).destino_del_rechazo;
+
+        expect(await detalle()).toBe('DESECHO');
+        // Rechazado antes del SPEC 47: no es null, para no confundirlo con aprobado.
+        expect(await detalle()).toBe('Sin destino registrado');
+        expect(await detalle()).toBeNull();
+    });
+
     it('metricas_de_lote trae la observacion del aprobador solo si el lote esta finalizado', async () => {
         const lote = {
             id: 41,

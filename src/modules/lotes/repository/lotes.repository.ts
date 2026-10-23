@@ -324,6 +324,8 @@ export class LotesRepository {
         const datos = await this.getDatosLote(loteId);
         const pesajes = await this.getMetricasLote(loteId);
         const estados_calidad = await this.getEstadosCalidadLote(loteId);
+        const rechazados_por_destino =
+            await this.getRechazadosPorDestinoLote(loteId);
 
         const payload: ResumenLotePayload = {
             lote: datos.nombre_lote,
@@ -339,6 +341,7 @@ export class LotesRepository {
             },
             pesajes,
             estados_calidad,
+            rechazados_por_destino,
             aprobado_en: this.fechaEnLetra(datos.aprobado_en),
             finalizado_en: this.fechaEnLetra(datos.finalizado_en),
             // SPEC 46: la columna puede valer NULL o '' (SPEC 45); al modelo
@@ -627,6 +630,43 @@ export class LotesRepository {
         return filas.map((f) => ({
             estado: f.estado,
             cantidad: Number(f.cantidad),
+        }));
+    }
+
+    /**
+     * Pesajes activos que el aprobador rechazo, agrupados por destino (SPEC 47).
+     * Tercera consulta de agregados: depende del numero de destinos, no del de
+     * pesajes.
+     *
+     * `LEFT JOIN` a proposito: los rechazos anteriores al SPEC 47 tienen
+     * `destino_id` NULL y salen como 'Sin destino registrado', para que el
+     * reparto sume lo mismo que `rechazados_por_aprobador`. Un destino
+     * desactivado despues sigue saliendo con su nombre.
+     */
+    private async getRechazadosPorDestinoLote(loteId: number) {
+        const filas = await this.db
+            .selectFrom('pesajes')
+            .leftJoin('destinos', 'destinos.id', 'pesajes.destino_id')
+            .select([
+                sql<string>`COALESCE(destinos.nombre, 'Sin destino registrado')`.as(
+                    'destino',
+                ),
+                sql<number | string>`COUNT(*)`.as('cantidad'),
+                sql<number | string>`COALESCE(SUM(pesajes.peso_neto), 0)`.as(
+                    'peso_neto_total',
+                ),
+            ])
+            .where('pesajes.lote_id', '=', loteId)
+            .where('pesajes.isActive', '=', 1)
+            .where('pesajes.aprobado', '=', sql<boolean>`0`)
+            .groupBy('destinos.nombre')
+            .orderBy('cantidad', 'desc')
+            .execute();
+
+        return filas.map((f) => ({
+            destino: f.destino,
+            cantidad: Number(f.cantidad),
+            peso_neto_total: this.dosDecimales(f.peso_neto_total),
         }));
     }
 

@@ -595,6 +595,18 @@ export class ChatRepository {
                     this.aLimite(args.limite),
                 );
 
+            case 'rechazos_por_destino':
+                return await this.rechazosPorDestino(
+                    this.aEntero(args.cliente_id),
+                    this.aEntero(args.lote_id),
+                    {
+                        desde: this.aFecha(args.desde),
+                        hasta: this.aFecha(args.hasta),
+                        periodo: this.aPeriodo(args.periodo),
+                        limite: ChatRepository.MAX_FILAS_MODELO,
+                    },
+                );
+
             default:
                 // Incluye el caso que importa: una funcion de escritura que el
                 // modelo se invento. No existe, no se despacha y se registra.
@@ -1115,6 +1127,7 @@ export class ChatRepository {
                 'pesajes.estado_calidad_id',
             )
             .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
+            .leftJoin('destinos', 'destinos.id', 'pesajes.destino_id')
             .select([
                 'pesajes.id',
                 'pesajes.peso_bruto',
@@ -1125,6 +1138,7 @@ export class ChatRepository {
                 'usuarios.complete_name as registrado_por',
                 'pesajes.created_at',
                 'pesajes.aprobado',
+                'destinos.nombre as destino',
             ])
             .where('pesajes.lote_id', '=', loteId)
             .where('pesajes.isActive', '=', 1);
@@ -1205,6 +1219,7 @@ export class ChatRepository {
                 registrado_por: p.registrado_por,
                 registrado_en: this.fechaHora(p.created_at),
                 revision_del_aprobador: this.revision(p.aprobado),
+                destino_del_rechazo: this.destinoDelRechazo(p.aprobado, p.destino),
             })),
         };
     }
@@ -1440,6 +1455,7 @@ export class ChatRepository {
             )
             .leftJoin('etapas', 'etapas.id', 'lotes.etapa_id')
             .leftJoin('origenes', 'origenes.id', 'lotes.origen_id')
+            .leftJoin('destinos', 'destinos.id', 'pesajes.destino_id')
             .select([
                 'pesajes.id',
                 'pesajes.lote_id',
@@ -1462,6 +1478,7 @@ export class ChatRepository {
                 'pesajes.aprobado',
                 'pesajes.isActive',
                 'pesajes.motivo_rechazo',
+                'destinos.nombre as destino',
             ])
             .where('pesajes.id', '=', pesajeId)
             .executeTakeFirst();
@@ -1502,6 +1519,10 @@ export class ChatRepository {
             registrado_por: pesaje.registrado_por,
             registrado_en: this.fechaHora(pesaje.created_at),
             revision_del_aprobador: this.revision(pesaje.aprobado),
+            destino_del_rechazo: this.destinoDelRechazo(
+                pesaje.aprobado,
+                pesaje.destino,
+            ),
         };
     }
 
@@ -2059,6 +2080,145 @@ export class ChatRepository {
     }
 
     // ---------------------------------------------------------------------
+    // Herramienta 13: rechazos_por_destino
+    // ---------------------------------------------------------------------
+
+    /**
+     * Lo que el aprobador rechazo, agrupado por destino (SPEC 47): cuantos
+     * pesajes y cuanto peso neto fue a cada uno, de todos los clientes, de uno
+     * o de un lote.
+     *
+     * Existe para "cuanto se fue a mercado local este mes" sin recorrer lotes.
+     * Agrupa por destino Y por unidad de medida, por la misma razon que
+     * `por_lote` de `pesajes_de_cliente`: sumar quintales con libras es lo que
+     * el modelo tiene prohibido y lo que aqui tampoco se hace.
+     *
+     * Rechazo del aprobador es `aprobado = 0` con `isActive = 1`; la anulacion
+     * del operador (`isActive = 0`) no tiene destino y no cuenta. La ventana va
+     * sobre `pesajes.rechazado_en`, el dia del rechazo, no el del pesaje. Los
+     * rechazos anteriores al SPEC 47 salen como 'Sin destino registrado'.
+     *
+     * Sin periodo ni fechas se asume `hoy`, como `lotes_aprobados`, salvo que
+     * venga `lote_id`: un lote es ya un universo cerrado y cortarlo a hoy
+     * esconderia casi siempre sus rechazos.
+     */
+    private async rechazosPorDestino(
+        clienteId: number | undefined,
+        loteId: number | undefined,
+        filtros: FiltrosDePesajes,
+    ): Promise<ResultadoHerramienta> {
+        const sinVentana =
+            filtros.periodo === undefined &&
+            filtros.desde === undefined &&
+            filtros.hasta === undefined;
+        const conVentana: FiltrosDePesajes =
+            sinVentana && loteId === undefined
+                ? { ...filtros, periodo: 'hoy' }
+                : filtros;
+
+        const ventana = this.ventanaDelPeriodo(conVentana);
+
+        let cliente: { nombre: string } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
+        }
+
+        let lote: { nombre_lote: string } | undefined;
+        if (loteId !== undefined) {
+            lote = await this.db
+                .selectFrom('lotes')
+                .select(['nombre_lote'])
+                .where('id', '=', loteId)
+                .executeTakeFirst();
+
+            if (!lote) {
+                return { error: `No existe ningun lote con id ${loteId}.` };
+            }
+        }
+
+        let base = this.db
+            .selectFrom('pesajes')
+            .innerJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+            .leftJoin('destinos', 'destinos.id', 'pesajes.destino_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .where('pesajes.isActive', '=', 1)
+            .where('pesajes.aprobado', '=', sql<boolean>`0`);
+
+        if (clienteId !== undefined) {
+            base = base.where('lotes.cliente_id', '=', clienteId);
+        }
+        if (loteId !== undefined) {
+            base = base.where('pesajes.lote_id', '=', loteId);
+        }
+        if (ventana.desde !== undefined) {
+            base = base.where('pesajes.rechazado_en', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            base = base.where('pesajes.rechazado_en', '<', ventana.hasta);
+        }
+
+        const total = await this.contarFiltrados(base.select('pesajes.id'));
+
+        const cabecera = {
+            cliente: cliente?.nombre ?? 'todos los clientes',
+            ...(lote ? { lote: lote.nombre_lote } : {}),
+            filtros_aplicados: ventana.descripcion
+                ? `rechazados por el aprobador ${ventana.descripcion}`
+                : 'todos los rechazos del aprobador, sin limite de fecha',
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                por_destino: [],
+                total_pesajes: 0,
+                aviso: 'No hay ningun pesaje rechazado por el aprobador con esos criterios. Las anulaciones del operador no tienen destino y no se cuentan.',
+            };
+        }
+
+        const grupos = await base
+            .select([
+                sql<string>`COALESCE(destinos.nombre, 'Sin destino registrado')`.as(
+                    'destino',
+                ),
+                'unidades_medida.nombre as unidad_medida',
+                sql<number | string>`COUNT(*)`.as('cantidad'),
+                sql<number | string>`COALESCE(SUM(pesajes.peso_neto), 0)`.as(
+                    'peso_neto_total',
+                ),
+                sql<number | string>`COUNT(DISTINCT pesajes.lote_id)`.as('lotes'),
+            ])
+            .groupBy(['destinos.nombre', 'unidades_medida.nombre'])
+            .orderBy('cantidad', 'desc')
+            .limit(ChatRepository.MAX_FILAS_MODELO)
+            .execute();
+
+        return {
+            ...cabecera,
+            total_pesajes: total,
+            por_destino: grupos.map((g) => ({
+                destino: g.destino,
+                unidad_medida: g.unidad_medida,
+                pesajes: Number(g.cantidad),
+                peso_neto_total: this.dosDecimales(g.peso_neto_total),
+                lotes: Number(g.lotes),
+            })),
+        };
+    }
+
+    // ---------------------------------------------------------------------
     // Coercion de argumentos y formato
     // ---------------------------------------------------------------------
 
@@ -2352,6 +2512,23 @@ export class ChatRepository {
     private revision(aprobado: boolean | null): string {
         if (aprobado === null) return 'pendiente';
         return aprobado ? 'aprobado' : 'rechazado';
+    }
+
+    /**
+     * A donde va el producto de un pesaje que el aprobador rechazo (SPEC 47), o
+     * null si no lo rechazo. Solo el nombre del catalogo: `motivo_rechazo` es
+     * texto libre y no viaja a Google.
+     *
+     * Un rechazo anterior al SPEC 47 tiene `destino_id` NULL y sale como 'Sin
+     * destino registrado', no como null, para que el modelo no lo confunda con
+     * un pesaje sin rechazar.
+     */
+    private destinoDelRechazo(
+        aprobado: boolean | null,
+        destino: string | null,
+    ): string | null {
+        if (aprobado === null || aprobado) return null;
+        return destino ?? 'Sin destino registrado';
     }
 
     /** `true`/`false`, y tambien las cadenas, que es como a veces llegan. */

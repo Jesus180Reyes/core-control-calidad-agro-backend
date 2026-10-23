@@ -121,7 +121,7 @@ NestJS API (Express platform) backed by MySQL via Kysely (no ORM, no migration t
 
 **Markdown fields.** `resumen` (`/lotes/:id/resumen`) and `respuesta` (`POST /chat`) are **raw markdown** with real `\n`; the backend never renders them and the front must not enable its markdown package's raw-HTML mode. Swagger descriptions are the only place that tells a consumer.
 
-**Data leaving the company.** `POST /lotes/:id/resumen` and `POST /chat` send client names, products, weights, dates and the approver's notes to Google. `pesajes.observaciones` deliberately does not travel. If a contract forbids sending data to a third party, those features should not be enabled.
+**Data leaving the company.** `POST /lotes/:id/resumen` and `POST /chat` send client names, products, weights, dates, the approver's notes and the destination names of rejected weigh-ins to Google. `pesajes.observaciones` deliberately does not travel. If a contract forbids sending data to a third party, those features should not be enabled.
 
 ## Domain
 

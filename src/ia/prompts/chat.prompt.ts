@@ -26,7 +26,7 @@
  *    tambien `herramientas` en NULL. Un mensaje mixto pierde la cortesia, no
  *    los datos: se contesta solo la parte de datos.
  *
- * Las doce funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
+ * Las trece funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
  * `rechazar_lote`, no hay nada detras que despachar.
  */
@@ -179,6 +179,13 @@ probable y dilo en la respuesta.
   "cancelado" es un pesaje que el operador anulo: no aparece en ninguna lista y
   solo se ve con detalle_de_pesaje por su id. "Rechazado por el aprobador" o "no
   aprobado" es revision_del_aprobador rechazado, y ese pesaje si se lista.
+- Destino: "a donde fue lo rechazado", "que se hizo con lo malo", "lo que se
+  fue a mercado local", "lo que se boto" o "lo que fue a desecho" es el destino
+  que el aprobador le dio a un pesaje rechazado. Para cantidades y kilos por
+  destino usa rechazos_por_destino, de todos los clientes, de uno o de un lote,
+  en una llamada; no recorras lotes con pesajes_de_lote para sumarlos. Para un
+  pesaje concreto lee destino_del_rechazo. Las anulaciones del operador no
+  tienen destino.
 - Personas: "operador", "pesador" o "el que peso" es quien registro el pesaje.
   "Yo", "mis" o "lo mio" es el usuario del contexto: usa su id sin buscarlo.
 - Cliente: tambien "la empresa", "la exportadora", "la finca" o "el productor".
@@ -342,7 +349,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'pesajes_de_lote',
         description:
-            'Lista los pesajes de un lote, del mas reciente al mas antiguo. Los pesajes anulados quedan fuera.',
+            'Lista los pesajes de un lote, del mas reciente al mas antiguo. Los pesajes anulados quedan fuera. Cada pesaje que el aprobador rechazo trae destino_del_rechazo: a donde fue el producto; null si no lo rechazo.',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -481,7 +488,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'detalle_de_pesaje',
         description:
-            'Devuelve el detalle de un pesaje concreto por su id: pesos, estado de calidad, quien lo registro, cuando, y si el aprobador ya lo reviso.',
+            'Devuelve el detalle de un pesaje concreto por su id: pesos, estado de calidad, quien lo registro, cuando, si el aprobador ya lo reviso y, si lo rechazo, destino_del_rechazo: a donde fue el producto.',
         parameters: {
             type: 'OBJECT',
             properties: {
@@ -655,6 +662,48 @@ export const HERRAMIENTAS_CHAT = [
                 limite: {
                     type: 'INTEGER',
                     description: 'Cuantas filas devolver. Por defecto 10.',
+                },
+            },
+        },
+    },
+    {
+        name: 'rechazos_por_destino',
+        description:
+            'Agrupa los pesajes que el aprobador rechazo por su destino (por ejemplo mercado local o desecho): cuantos pesajes, el peso neto total y en cuantos lotes, por destino y unidad de medida. De todos los clientes, de uno o de un lote, en UNA llamada. Usala para "cuanto se fue a mercado local este mes", "a donde fue lo rechazado del lote X" o "que se boto esta semana". La fecha es la del rechazo. Sin periodo ni fechas devuelve los de hoy, salvo que pidas un lote: entonces trae todos sus rechazos. Los rechazados antes de que existiera el destino salen como Sin destino registrado. No suma entre unidades distintas.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                cliente_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Deja solo los rechazos de lotes de ese cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes.',
+                },
+                lote_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Deja solo los rechazos de ese lote. Resuelvelo antes con buscar_persona; nunca lo inventes.',
+                },
+                desde: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia.',
+                },
+                hasta: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia entero.',
+                },
+                periodo: {
+                    type: 'STRING',
+                    enum: [
+                        'hoy',
+                        'ayer',
+                        'esta_semana',
+                        'semana_pasada',
+                        'ultimos_7_dias',
+                        'este_mes',
+                        'mes_pasado',
+                    ],
+                    description:
+                        'Ventana relativa sobre la fecha del rechazo, resuelta por el sistema. Usala en vez de calcular la fecha tu. Por defecto hoy, salvo con lote_id.',
                 },
             },
         },
