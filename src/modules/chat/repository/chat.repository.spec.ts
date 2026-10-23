@@ -5,7 +5,7 @@ import { DatabaseService } from 'src/database/database.service';
 import { Database } from 'src/database/types/types';
 import { GeminiService, TurnoGemini } from 'src/ia/gemini.service';
 import { PreguntarDto } from '../dto/preguntar.dto';
-import { ChatRepository } from './chat.repository';
+import { ChatRepository, textoConSugerencias } from './chat.repository';
 
 /**
  * Evals del chat (SPEC 28), con las respuestas de Gemini SIMULADAS.
@@ -953,5 +953,69 @@ describe('ChatRepository / sugerencias', () => {
 
         expect(sugerencias).toHaveLength(4);
         expect(sugerencias.join(' ')).not.toContain('undefined');
+    });
+});
+
+/**
+ * La validacion de `sugerir_preguntas` y el formato de `chat_log` (SPEC 48).
+ * Aqui solo el metodo y el helper; el corte del turno se prueba con el bucle.
+ */
+describe('ChatRepository / preguntas sugeridas', () => {
+    const { repo } = crearRepositorio([], jest.fn());
+    const validar = (preguntas: unknown) =>
+        privado(repo).validarSugerencias({ preguntas }) as string[] | null;
+
+    it('acepta tres preguntas validas tal cual', () => {
+        expect(validar(['A?', 'B?', 'C?'])).toEqual(['A?', 'B?', 'C?']);
+    });
+
+    it('se queda con las tres primeras de cuatro', () => {
+        expect(validar(['A?', 'B?', 'C?', 'D?'])).toEqual(['A?', 'B?', 'C?']);
+    });
+
+    it('con una sola valida no alcanza', () => {
+        expect(validar(['A?'])).toBeNull();
+        expect(validar(['A?', '   ', '<b>B</b>'])).toBeNull();
+    });
+
+    it('quita las repetidas antes de contar', () => {
+        expect(validar(['A?', ' A? ', 'B?'])).toEqual(['A?', 'B?']);
+        expect(validar(['A?', 'A?'])).toBeNull();
+    });
+
+    it('descarta una de 151 caracteres y acepta una de 150', () => {
+        const de150 = 'x'.repeat(150);
+        const de151 = 'y'.repeat(151);
+        expect(validar([de150, de151, 'B?'])).toEqual([de150, 'B?']);
+    });
+
+    it('cambia los saltos de linea por espacios', () => {
+        expect(validar(['Que se\npeso hoy?', 'B?'])).toEqual([
+            'Que se peso hoy?',
+            'B?',
+        ]);
+    });
+
+    it('ignora lo que no es string y un argumento que no es arreglo', () => {
+        expect(validar(['A?', 3, null, 'B?'])).toEqual(['A?', 'B?']);
+        expect(validar('A?, B?')).toBeNull();
+        expect(validar(undefined)).toBeNull();
+    });
+
+    it('deja pasar un < suelto pero no una etiqueta', () => {
+        expect(validar(['Pesajes < 20 lb?', '<script>x</script>', 'B?'])).toEqual([
+            'Pesajes < 20 lb?',
+            'B?',
+        ]);
+    });
+
+    it('textoConSugerencias devuelve la respuesta intacta sin sugerencias', () => {
+        expect(textoConSugerencias('Hola', [])).toBe('Hola');
+    });
+
+    it('textoConSugerencias pone una linea en blanco y una vineta por pregunta', () => {
+        expect(textoConSugerencias('Frase', ['A?', 'B?'])).toBe(
+            'Frase\n\n- A?\n- B?',
+        );
     });
 });

@@ -78,6 +78,23 @@ interface Ventana {
 }
 
 /**
+ * El texto de un turno con preguntas sugeridas tal como se guarda en
+ * `chat_log.respuesta` (SPEC 48): la frase, una linea en blanco y una vineta
+ * por pregunta. Sin sugerencias devuelve la respuesta intacta, asi que se puede
+ * llamar en todos los turnos.
+ *
+ * Se exporta porque es tambien el formato que el frontend debe guardar en
+ * `historial` para que "la segunda" se resuelva: un solo sitio que lo define.
+ */
+export const textoConSugerencias = (
+    respuesta: string,
+    sugerencias: string[],
+): string =>
+    sugerencias.length === 0
+        ? respuesta
+        : `${respuesta}\n\n${sugerencias.map((s) => `- ${s}`).join('\n')}`;
+
+/**
  * El chat de consultas (SPEC 28).
  *
  * Como el resto del proyecto, la logica vive aqui y no en el servicio. Tres
@@ -159,6 +176,18 @@ export class ChatRepository {
      * dos pueden convivir sin estorbarse.
      */
     private static readonly LIMITE_DIARIO_POR_DEFECTO = 20;
+
+    /**
+     * Topes de `sugerir_preguntas` (SPEC 48). Una sola pregunta no es una
+     * eleccion, y mas de tres botones no caben en la pantalla de un telefono.
+     * Los 150 caracteres son para que cada boton quepa en dos lineas.
+     */
+    private static readonly MIN_SUGERENCIAS = 2;
+    private static readonly MAX_SUGERENCIAS = 3;
+    private static readonly MAX_CARACTERES_SUGERENCIA = 150;
+
+    /** La misma regla de `GeminiService`: un '<' suelto pasa, una etiqueta no. */
+    private static readonly ETIQUETA_HTML = /<[a-z!/]/i;
 
     constructor(
         private readonly dbService: DatabaseService,
@@ -316,6 +345,41 @@ export class ChatRepository {
         );
 
         return ChatRepository.TEXTO_NO_CONVERGE;
+    }
+
+    /**
+     * Las preguntas de `sugerir_preguntas`, limpias, o `null` si no alcanzan
+     * (SPEC 48). Vienen de un modelo que leyo nombres escritos por API, asi que
+     * se tratan como cualquier argumento: solo sale lo que cumple.
+     *
+     * El orden importa: se descarta y se deduplica ANTES de recortar a tres, de
+     * modo que una pregunta vacia o repetida no le quita el sitio a una buena.
+     */
+    private validarSugerencias(
+        argumentos: Record<string, unknown>,
+    ): string[] | null {
+        const crudas = Array.isArray(argumentos?.preguntas)
+            ? (argumentos.preguntas as unknown[])
+            : [];
+
+        const limpias = crudas
+            .filter((p): p is string => typeof p === 'string')
+            .map((p) => p.trim().replace(/\r?\n/g, ' '))
+            .filter(
+                (p) =>
+                    p.length > 0 &&
+                    p.length <= ChatRepository.MAX_CARACTERES_SUGERENCIA &&
+                    !ChatRepository.ETIQUETA_HTML.test(p),
+            );
+
+        const sugerencias = [...new Set(limpias)].slice(
+            0,
+            ChatRepository.MAX_SUGERENCIAS,
+        );
+
+        return sugerencias.length < ChatRepository.MIN_SUGERENCIAS
+            ? null
+            : sugerencias;
     }
 
     /**
