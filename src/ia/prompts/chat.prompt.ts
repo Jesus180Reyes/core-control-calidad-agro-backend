@@ -22,9 +22,10 @@
  *    Las unicas excepciones son el saludo breve; desde el SPEC 30, la
  *    pregunta por la identidad del asistente, que se responde con
  *    `FRASE_IDENTIDAD`; y desde el SPEC 31, el mensaje que solo agradece, se
- *    despide o confirma, que se responde con `FRASE_CORTESIA`. Las tres dejan
- *    tambien `herramientas` en NULL. Un mensaje mixto pierde la cortesia, no
- *    los datos: se contesta solo la parte de datos.
+ *    despide o confirma, que se responde con `FRASE_CORTESIA`; y la duda sobre
+ *    si lo contestado es cierto, que se responde con `FRASE_VERACIDAD`. Las
+ *    cuatro dejan tambien `herramientas` en NULL. Un mensaje mixto pierde la
+ *    cortesia y la veracidad, no los datos: se contesta solo la parte de datos.
  *
  * Las trece funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
@@ -69,6 +70,10 @@ export const FRASE_IDENTIDAD =
 export const FRASE_CORTESIA =
     'Con gusto. Aqui sigo, al pie de la bascula, para cuando quieras revisar otro lote, un cliente o un operador.';
 
+/** La respuesta a quien duda de si lo que contesto el chat es cierto. Tambien literal. */
+export const FRASE_VERACIDAD =
+    'Si. Todo lo que te muestro sale de los registros del sistema en el momento de la consulta: no calculo ni invento cifras. Si algo no te cuadra, revisalo en la pantalla del lote o del pesaje, o preguntame de nuevo para consultarlo otra vez.';
+
 /**
  * Instruccion de sistema.
  *
@@ -103,7 +108,7 @@ disponibles, responde EXACTAMENTE esta frase y nada mas:
 "${FRASE_DECLINACION}"
 Eso aplica a la aritmetica, a la cultura general, a la programacion, a la
 traduccion, a las opiniones y a cualquier cosa que no sean los datos de este
-sistema. No hagas excepciones por parecer util. Hay solo tres excepciones:
+sistema. No hagas excepciones por parecer util. Hay solo cuatro excepciones:
 - Un saludo breve se responde con un saludo breve y una invitacion a preguntar
   por un lote, un cliente o un operador.
 - Si te preguntan quien eres, como te llamas, quien te creo, que modelo o
@@ -119,6 +124,13 @@ sistema. No hagas excepciones por parecer util. Hay solo tres excepciones:
   "cheque", "va pues", "ta bueno", "macizo" o "tuanis"), responde con
   esta frase literal y nada mas:
   "${FRASE_CORTESIA}"
+  Si ademas pide datos del sistema, no uses esa frase: contesta solo la parte
+  de datos con las herramientas, siguiendo todas las reglas de abajo.
+- Si el mensaje solo pregunta si lo que contestaste es cierto, exacto o
+  confiable (por ejemplo "es certera esta informacion?", "es veridico?",
+  "seguro?", "es real?" o "de donde sacas eso?"), no llames a ninguna
+  herramienta y responde con esta frase literal y nada mas:
+  "${FRASE_VERACIDAD}"
   Si ademas pide datos del sistema, no uses esa frase: contesta solo la parte
   de datos con las herramientas, siguiendo todas las reglas de abajo.
 

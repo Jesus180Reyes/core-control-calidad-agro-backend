@@ -3,6 +3,7 @@ import {
     FRASE_DECLINACION,
     FRASE_IDENTIDAD,
     FRASE_SOLO_LECTURA,
+    FRASE_VERACIDAD,
     INSTRUCCION_SISTEMA_CHAT,
 } from './chat.prompt';
 
@@ -79,15 +80,51 @@ describe('chat.prompt / agradecimientos y despedidas', () => {
         expect(posCortesia).toBeLessThan(posSoloLectura);
     });
 
-    it('la regla principal cuenta tres excepciones, no dos', () => {
-        expect(INSTRUCCION_SISTEMA_CHAT).toContain('Hay solo tres excepciones');
-        expect(INSTRUCCION_SISTEMA_CHAT).not.toContain('Hay solo dos excepciones');
+    it('la regla principal cuenta cuatro excepciones', () => {
+        expect(INSTRUCCION_SISTEMA_CHAT).toContain('Hay solo cuatro excepciones');
+        expect(INSTRUCCION_SISTEMA_CHAT).not.toContain('Hay solo tres excepciones');
     });
 
     it('la instruccion conserva las otras tres frases literales', () => {
         expect(INSTRUCCION_SISTEMA_CHAT).toContain(FRASE_DECLINACION);
         expect(INSTRUCCION_SISTEMA_CHAT).toContain(FRASE_SOLO_LECTURA);
         expect(INSTRUCCION_SISTEMA_CHAT).toContain(FRASE_IDENTIDAD);
+    });
+});
+
+/**
+ * Pruebas sobre el TEXTO de la excepcion de veracidad (P61 del catalogo de
+ * preguntas). Como las de arriba, no comprueban que el modelo la use.
+ */
+describe('chat.prompt / dudas sobre la veracidad', () => {
+    it('la frase dice de donde salen los datos', () => {
+        expect(FRASE_VERACIDAD).toContain('registros del sistema');
+        expect(FRASE_VERACIDAD).toContain('no calculo ni invento');
+    });
+
+    it('la frase no nombra al modelo ni a su proveedor', () => {
+        expect(FRASE_VERACIDAD).not.toMatch(/gemini|google|modelo de lenguaje/i);
+    });
+
+    it('la frase es distinta de las otras cuatro', () => {
+        for (const otra of [
+            FRASE_DECLINACION,
+            FRASE_SOLO_LECTURA,
+            FRASE_IDENTIDAD,
+            FRASE_CORTESIA,
+        ]) {
+            expect(FRASE_VERACIDAD).not.toBe(otra);
+        }
+    });
+
+    it('la frase va dentro de la regla principal, despues de la cortesia', () => {
+        const posVeracidad = INSTRUCCION_SISTEMA_CHAT.indexOf(FRASE_VERACIDAD);
+        const posCortesia = INSTRUCCION_SISTEMA_CHAT.indexOf(FRASE_CORTESIA);
+        const posSoloLectura = INSTRUCCION_SISTEMA_CHAT.indexOf('SOLO LECTURA:');
+
+        expect(posCortesia).toBeGreaterThan(-1);
+        expect(posVeracidad).toBeGreaterThan(posCortesia);
+        expect(posVeracidad).toBeLessThan(posSoloLectura);
     });
 });
 
