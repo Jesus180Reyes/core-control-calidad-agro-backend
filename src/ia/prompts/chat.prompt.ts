@@ -801,14 +801,17 @@ export const HERRAMIENTAS_CHAT = [
  * - `temperature: 0.1` y no 0.2. La misma llamada sirve para elegir herramienta
  *   y para redactar, y la eleccion de herramienta es una decision, no una
  *   redaccion: cuanto menos margen, mejor.
- * - `maxOutputTokens: 1500` porque aqui si caben tablas de hasta 20 filas.
+ * - `maxOutputTokens: 2000` porque aqui si caben tablas de hasta 20 filas.
+ *   Con 1500 el modelo se cortaba a media tabla: los pipes y las cifras gastan
+ *   mas tokens por caracter que la prosa. El tope real de la respuesta sigue
+ *   siendo `MAX_CARACTERES_CHAT` en `GeminiService`.
  * - `thinkingConfig.thinkingBudget: 0` se mantiene por la misma razon que alli:
  *   esos tokens se facturan, suman latencia y este trabajo no los necesita.
  *   Omitir la linea es el error de coste mas facil de toda la integracion.
  */
 const GENERATION_CONFIG_CHAT = {
     temperature: 0.1,
-    maxOutputTokens: 1500,
+    maxOutputTokens: 2000,
     responseMimeType: 'text/plain',
     thinkingConfig: { thinkingBudget: 0 },
 };
