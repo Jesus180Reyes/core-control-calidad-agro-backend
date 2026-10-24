@@ -16,7 +16,7 @@ Specs: 01 (operator link), 08 (`/all`), 11 (rejection), 17 (filters), 29 (pagina
 
 **`cliente_operador`** — many-to-many between clients and operator users, `UNIQUE (cliente_id, usuario_id)`, **no `isActive`**. Written by `POST /clientes` and replaced as a set by `PATCH /clientes/:id/operadores`, which deletes physically — the only table in the project whose rows are deleted.
 
-**Uniqueness.** The live table carries real `UNIQUE KEY rtn (rtn)` and `UNIQUE KEY codigo_exportacion (codigo_exportacion)` (no spec records who added them). So `validateRtnDisponible` and `validateCodigoExportacionDisponible` **ignore `isActive`**, exactly as the `UNIQUE` does, and answer a dedicated 400 (`pertenece a un cliente rechazado`) when the holder is rejected. **Rejecting a client does not free its RTN or export code** — spec 11's decision to free them was never possible against this database. `nombre` is not unique.
+**Uniqueness.** `rtn` has a real `UNIQUE KEY rtn (rtn)` (no spec records who added it). `codigo_exportacion` has **no** `UNIQUE` and no index, by decision (dropped with `ALTER TABLE clientes DROP INDEX codigo_exportacion`): its uniqueness is **application code only**, with the usual race window — two simultaneous creates with the same code both succeed. Both `validateRtnDisponible` and `validateCodigoExportacionDisponible` **ignore `isActive`** and answer a dedicated 400 (`pertenece a un cliente rechazado`) when the holder is rejected, so **rejecting a client does not free its RTN or export code**. For `codigo_exportacion` that is now policy, not a constraint: keep the validator ignoring `isActive`. `nombre` is not unique.
 
 ## Routes
 

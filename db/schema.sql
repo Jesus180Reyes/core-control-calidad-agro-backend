@@ -119,7 +119,6 @@ CREATE TABLE `clientes` (
   `created_by` int DEFAULT NULL COMMENT 'Usuario que registró al cliente',
   PRIMARY KEY (`id`),
   UNIQUE KEY `rtn` (`rtn`),
-  UNIQUE KEY `codigo_exportacion` (`codigo_exportacion`),
   KEY `created_by` (`created_by`),
   KEY `fk_clientes_producto` (`producto_id`),
   KEY `fk_clientes_rechazado_por` (`rechazado_por`),

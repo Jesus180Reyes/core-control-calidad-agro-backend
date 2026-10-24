@@ -345,7 +345,8 @@ export class ClientesRepository {
             .where('codigo_exportacion', '=', codigoExportacion)
             .executeTakeFirst();
 
-        // Sin filtro de isActive: MySQL tiene UNIQUE (codigo_exportacion).
+        // Sin filtro de isActive: un cliente rechazado conserva su codigo. MySQL ya no
+        // tiene UNIQUE (codigo_exportacion); este validador es la unica garantia.
         if (existente) {
             throw new BadRequestException(
                 existente.isActive === 0

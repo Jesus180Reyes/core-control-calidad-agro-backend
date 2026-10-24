@@ -30,7 +30,7 @@ Conventions worth copying:
 
 ## Constraints — count the database, not the docs
 
-- **Uniqueness is application code by default.** Real `UNIQUE`s exist on: `clientes.rtn`, `clientes.codigo_exportacion` (added by nobody's spec), `catalogo_permisos.codigo`, `permisos (rol_id, permiso_id)`, `documentos_fiscales (pais_id, numero_completo)` and the other fiscal-table uniques of spec 25, `cliente_operador (cliente_id, usuario_id)`, `pines_supervisor.usuario_id` and `.pin`, `autorizaciones_pin.token` and `.pesaje_id`. Not unique in MySQL: `lotes.nombre_lote` per client, `origenes.nombre`, `usuarios.username`.
+- **Uniqueness is application code by default.** Real `UNIQUE`s exist on: `clientes.rtn` (added by nobody's spec), `catalogo_permisos.codigo`, `permisos (rol_id, permiso_id)`, `documentos_fiscales (pais_id, numero_completo)` and the other fiscal-table uniques of spec 25, `cliente_operador (cliente_id, usuario_id)`, `pines_supervisor.usuario_id` and `.pin`, `autorizaciones_pin.token` and `.pesaje_id`. Not unique in MySQL: `clientes.codigo_exportacion` (its `UNIQUE` was dropped on 2026-10-24), `lotes.nombre_lote` per client, `origenes.nombre`, `usuarios.username`.
 - **FKs**: the specs' running count reached 26 after spec 43, but `information_schema.REFERENTIAL_CONSTRAINTS` held **41** on 2026-10-18 — some FKs (the `*_ibfk_*` of the original tables, among others) were never in any spec's count. Count the table rather than trust any number.
 - Deliberately without FK: `log_errores.usuario_id` (a log must survive its user), `lotes.firma_aprobador`, `clientes.constancia_exonerado` (they point at nothing).
 

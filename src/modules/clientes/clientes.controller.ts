@@ -111,9 +111,10 @@ export class ClientesController {
         description:
             'Crea el cliente y, con usuario_ids, lo vincula a esos operadores en cliente_operador. ' +
             'Despues de crear el cliente, los vinculos se cambian con PATCH /clientes/:id/operadores. ' +
-            'El rtn y el codigo_exportacion deben estar libres, pero la unicidad se valida solo en ' +
-            'codigo, sin restriccion en MySQL, y los validadores ignoran a los clientes rechazados, ' +
-            'asi que un rtn rechazado se puede reutilizar. Devuelve el id creado, no el cliente. ' +
+            'El rtn y el codigo_exportacion deben estar libres, contando tambien a los clientes ' +
+            'rechazados: un rtn o codigo de un cliente rechazado no se puede reutilizar (400). ' +
+            'rtn tiene UNIQUE en MySQL; codigo_exportacion se valida solo en codigo. ' +
+            'Devuelve el id creado, no el cliente. ' +
             'No valida rol: un OPERADOR puede crear clientes.',
     })
     async create(@Body() dto: CreateClienteDto, @Req() req: Request) {
@@ -133,8 +134,8 @@ export class ClientesController {
             'Desactivacion logica del cliente: isActive = 0 mas el motivo y la auditoria de quien ' +
             'y cuando. Irreversible, y ningun endpoint lista clientes rechazados, asi que el ' +
             'cliente queda inalcanzable por API. NO hay cascada: sus lotes siguen abiertos, sus ' +
-            'pesajes siguen activos y sus vinculos cliente_operador quedan intactos. Libera el rtn ' +
-            'y el codigo_exportacion para reutilizarse. ' +
+            'pesajes siguen activos y sus vinculos cliente_operador quedan intactos. NO libera el ' +
+            'rtn ni el codigo_exportacion: siguen reservados para siempre. ' +
             'NO valida el vinculo cliente_operador: cualquier usuario autenticado puede rechazar ' +
             'el cliente de otro.',
     })
