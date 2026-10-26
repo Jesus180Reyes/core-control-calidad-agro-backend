@@ -47,8 +47,8 @@ timedatectl set-timezone America/Tegucigalpa
 ```
 
 > Ojo: Docker publica puertos **saltandose ufw**. Por eso
-> `docker-compose.prod.yml` no publica ni MySQL ni la API; no agregues
-> `ports:` a esos servicios.
+> `docker-compose.prod.yml` no publica la API y publica MySQL solo en
+> `127.0.0.1` (salvo `DB_BIND`, ver seccion 10); no agregues otros `ports:`.
 
 ## 3. DNS
 
@@ -153,13 +153,22 @@ previo. `db/schema.sql` solo sirve para BDs nuevas.
 
 ## 10. Entrar a MySQL desde tu PC
 
-MySQL no esta expuesto. Con un tunel SSH, phpMyAdmin/DBeaver/Workbench se
-conectan a `127.0.0.1:3308`:
+Por defecto MySQL solo escucha en el localhost del servidor
+(`127.0.0.1:3306`), invisible desde internet. Con un tunel SSH,
+DBeaver/Workbench se conectan a `127.0.0.1:3308` en tu PC:
 
 ```bash
-ssh -L 3308:IP_INTERNA_MYSQL:3306 deploy@IP
-# IP_INTERNA_MYSQL: docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' agro-mysql-1
+ssh -N -L 3308:127.0.0.1:3306 deploy@IP
 ```
+
+O, en el cliente, "TCP/IP over SSH" con `deploy` + tu llave y MySQL en
+`127.0.0.1:3306`.
+
+**Solo en dev**: `DB_BIND=0.0.0.0` en `.env` publica el 3306 a internet y
+cualquier cliente conecta directo a `IP:3306` con `agro_app`. Es aceptable
+solo con datos de prueba y contrasenas de `openssl rand`; Docker se salta
+ufw, asi que no hay firewall delante. **Nunca en produccion.** Despues de
+cambiarlo: `docker compose -f docker-compose.prod.yml up -d mysql`.
 
 ## Pendientes conocidos antes de produccion
 

@@ -26,9 +26,10 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       PORT: 4000
-      # Fijado aqui y no en .env: con cualquier otro valor se monta Swagger,
-      # y /docs no pasa por el JwtAuthGuard.
-      NODE_ENV: production
+      # No se lee NODE_ENV de .env a proposito: un .env copiado del local trae
+      # NODE_ENV=development, y eso monta Swagger, cuyo /docs no pasa por el
+      # JwtAuthGuard. API_NODE_ENV=development lo activa a conciencia: solo en dev.
+      NODE_ENV: ${API_NODE_ENV:-production}
     # Sin "ports": solo Caddy la alcanza, por la red interna.
     expose:
       - "4000"
@@ -50,8 +51,12 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
-    # Sin "ports": MySQL no queda expuesto a internet. Para entrar desde tu
-    # PC, usa un tunel SSH (ver README).
+    # Por defecto solo escucha en el localhost del servidor: no queda expuesto
+    # a internet y el tunel SSH apunta siempre a 127.0.0.1:3306. DB_BIND=0.0.0.0
+    # en .env lo abre a internet (Docker se salta ufw): solo en dev, nunca en
+    # produccion. Ver README, seccion 10.
+    ports:
+      - "${DB_BIND:-127.0.0.1}:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d:ro
