@@ -103,9 +103,22 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
           SSH_USER: ${{ secrets.DEV_SSH_USER }}
+          HAY_KEY: ${{ secrets.DEV_SSH_KEY != '' }}
+          HAY_KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS != '' }}
+          # Para detectar un secret guardado por error como variable.
+          VAR_HOST: ${{ vars.DEV_SSH_HOST != '' }}
+          VAR_USER: ${{ vars.DEV_SSH_USER != '' }}
         run: |
-          [ -n "$SSH_HOST" ] || { echo "::error::Falta el secret DEV_SSH_HOST (environment dev)"; exit 1; }
-          [ -n "$SSH_USER" ] || { echo "::error::Falta el secret DEV_SSH_USER (environment dev)"; exit 1; }
+          faltan=""
+          [ -n "$SSH_HOST" ] || faltan="$faltan DEV_SSH_HOST"
+          [ -n "$SSH_USER" ] || faltan="$faltan DEV_SSH_USER"
+          [ "$HAY_KEY" = true ] || faltan="$faltan DEV_SSH_KEY"
+          [ "$HAY_KNOWN_HOSTS" = true ] || faltan="$faltan DEV_SSH_KNOWN_HOSTS"
+          if [ -n "$faltan" ]; then
+            echo "DEV_SSH_HOST como variable: $VAR_HOST; DEV_SSH_USER como variable: $VAR_USER"
+            echo "::error::Faltan los secrets:$faltan (environment dev o repositorio, en Secrets, no en Variables)"
+            exit 1
+          fi
           ssh-keygen -y -f ~/.ssh/id_deploy > /dev/null \
             || { echo "::error::DEV_SSH_KEY no es una llave privada valida (incompleta o con contrasena)"; exit 1; }
           echo "Huella de la llave: $(ssh-keygen -lf ~/.ssh/id_deploy)"
