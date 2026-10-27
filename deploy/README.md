@@ -13,16 +13,18 @@ dev, está en `deploy/GUIA-PASO-A-PASO.md`.
 ## 0. Cómo funciona
 
 ```
-internet ──> Caddy ──> api-agrolibano ──┐
-               │                        ├──> MySQL (una base por empresa)
-               ├────> api-suragro ──────┘
+internet ──> Caddy ──> api-agrolibano ──────┐
+               │  └─> reporte-agrolibano ───┤   (/reportes/*)
+               │                            ├──> MySQL (una base por empresa)
+               ├────> api-suragro ──────────┤
+               │  └─> reporte-suragro ──────┘
                └────> Dozzle (logs)
 ```
 
 | Carpeta en el servidor | Qué tiene |
 | --- | --- |
 | `/opt/plataforma/` | Lo que existe **una sola vez**: Caddy (HTTPS), MySQL, Dozzle (logs), los scripts y los backups |
-| `/opt/<empresa>/` | **Una por empresa**: solo su API y su `.env` |
+| `/opt/<empresa>/` | **Una por empresa**: su API, su servicio de reportes y su `.env` |
 
 - Todas las empresas usan **la misma imagen** del API. Lo que las distingue es
   su `.env`: su base, su usuario de MySQL, su `JWT_SECRET` y su key de Gemini.
@@ -36,6 +38,9 @@ internet ──> Caddy ──> api-agrolibano ──┐
 - Cada push a `develop` corre el mismo CI, publica la imagen con los tags
   `develop` y `sha-<commit>` (nunca `latest`) y la despliega sola en la VPS
   de dev (sección 9).
+- El **servicio de reportes** (PDF/Excel) es otro repo con su propia imagen,
+  pero corre en el mismo `/opt/<empresa>` y bajo el mismo dominio
+  (sección 12).
 
 ---
 
@@ -201,7 +206,8 @@ chmod 600 .env && chmod +x backup.sh nuevo-tenant.sh && mkdir -p tenants
 
 ## 5. Acceso a la imagen 🖥️
 
-El paquete del API en GitHub es **privado**. Saca un token en GitHub:
+Los paquetes del API y del servicio de reportes en GitHub son **privados**
+(el mismo token sirve para los dos). Saca un token en GitHub:
 *Settings → Developer settings → Personal access tokens (classic)*, solo con
 el permiso `read:packages`. Luego:
 
@@ -259,7 +265,7 @@ una contraseña temporal) y la contraseña de `sudo`. Luego hace solo esto:
 | 2/5 | Carga las tablas y los catálogos (roles, permisos, etapas…) |
 | 3/5 | Crea el ADMIN con la contraseña vencida: en su primer login tiene que cambiarla |
 | 4/5 | Crea `/opt/agrolibano` con su `.env` y contraseñas generadas |
-| 5/5 | Levanta `api-agrolibano` y avisa a Caddy del dominio nuevo |
+| 5/5 | Levanta `api-agrolibano` y `reporte-agrolibano` y avisa a Caddy del dominio nuevo |
 
 Si falla a la mitad, te dice exactamente qué borrar para reintentar.
 
@@ -270,6 +276,8 @@ curl -i https://agrolibano.tudominio.com/
 ```
 
 Debe responder **401**: el API está vivo y pide token. Eso es lo correcto.
+`curl -i https://agrolibano.tudominio.com/reportes/lotes/finalizados-por-aprobador/pdf`
+también debe dar **401**, del servicio de reportes (sección 12).
 
 **Después, a mano:**
 
@@ -363,7 +371,9 @@ Merge a `main` → esperar el CI en verde → en el servidor:
 cd /opt/agrolibano && docker compose pull && docker compose up -d
 ```
 
-- `pull` baja la imagen nueva y `up -d` reinicia ese API con ella.
+- `pull` baja las imágenes nuevas y `up -d` reinicia el API y el servicio de
+  reportes con ellas. Para tocar solo uno: `docker compose pull api && docker
+  compose up -d api` (o `reporte`).
 
 **Todas las empresas:**
 
@@ -406,10 +416,11 @@ push a develop ──> lint, tests, build ──> imagen :develop ──> SSH a 
 - Un push a `develop` corre el CI y publica la imagen con los tags
   `develop` y `sha-<commit>`. Nunca mueve `latest`, que es de producción.
 - Después, el job `deploy-dev` de `.github/workflows/ci.yml` entra por SSH
-  como `deploy` y hace `docker compose pull && docker compose up -d` **solo
-  en las empresas cuyo `.env` tenga `API_IMAGE=...:develop`**. Las demás
-  (sin `API_IMAGE`, en `latest` o fijadas a un `sha-xxx`) no se tocan.
-- Solo actualiza los APIs. `db/`, `tenant/` y los archivos de
+  como `deploy` y hace `docker compose pull api && docker compose up -d api`
+  **solo en las empresas cuyo `.env` tenga `API_IMAGE=...:develop`**. Las
+  demás (sin `API_IMAGE`, en `latest` o fijadas a un `sha-xxx`) no se tocan.
+- Solo actualiza los APIs; el servicio de reportes tiene su propio deploy
+  igual, en su repo (sección 12). `db/`, `tenant/` y los archivos de
   `/opt/plataforma` se siguen subiendo a mano (sección 4), y un DDL se
   aplica a mano **antes** del push.
 
@@ -535,7 +546,7 @@ ssh -N -L 3308:127.0.0.1:3306 deploy@IP
 ## 11. Ver los logs (Dozzle)
 
 Dozzle muestra en vivo los logs de todos los contenedores: cada
-`api-<empresa>`, `caddy` y `mysql`.
+`api-<empresa>`, cada `reporte-<empresa>`, `caddy` y `mysql`.
 
 > ⚠️ Dozzle no tiene login propio, y los logs llevan datos de clientes. Lo
 > único que lo protege es el usuario y contraseña que pone Caddy delante.
@@ -572,6 +583,49 @@ DOZZLE_PASSWORD_HASH='$2a$14$...'
 
 Dozzle solo muestra los logs recientes (los últimos ~100 MB por contenedor).
 Los errores 500 quedan guardados en la tabla `log_errores` de cada base.
+
+---
+
+## 12. Servicio de reportes
+
+El repo `core-control-calidad-agro-report-service` genera los PDF y Excel
+(acta de entrega, etiqueta de pesaje, lotes finalizados). Cada empresa tiene el
+suyo, `reporte-<empresa>`, en el mismo `docker-compose.yml` que su API.
+
+- **Mismo dominio.** Caddy manda `/reportes/*` a `reporte-<empresa>:4001` y
+  todo lo demás al API (snippet `api_tenant` del `Caddyfile`). El front se
+  compila con `VITE_REPORT_SERVICE_URL` igual a `VITE_API_URL`.
+- **Mismo `.env`.** Lee la misma base con el mismo usuario MySQL y valida los
+  tokens con el mismo `JWT_SECRET`: no hay nada que generar al dar de alta.
+  El servicio solo hace `SELECT`, pero el usuario puede escribir: nada lo
+  impide fuera del código.
+- **Su propia imagen**, `ghcr.io/jesus180reyes/core-control-calidad-agro-report-service`,
+  con los mismos tags (`latest` en `main`, `develop`, `sha-<commit>`) y fijada
+  por empresa con `REPORTE_IMAGE=` en su `.env`, igual que `API_IMAGE=`.
+- Trae su propio Chromium para los PDF: la imagen pesa bastante más que la del
+  API. `GET /health` (sin token, solo dentro de la red) responde 503 si no
+  alcanza MySQL, y el healthcheck de Docker lo usa.
+
+**Agregarlo a una empresa que ya existía** 🖥️ (las nuevas lo traen de
+`nuevo-tenant.sh`):
+
+1. 💻 Subir `deploy/tenant/` y el `Caddyfile` nuevos (sección 4).
+2. 🖥️ `cp /opt/plataforma/tenant/docker-compose.yml /opt/<empresa>/`
+3. 🖥️ En `/opt/<empresa>/.env`, agregar
+   `REPORTE_IMAGE=ghcr.io/jesus180reyes/core-control-calidad-agro-report-service:latest`
+   (o `:develop` en dev).
+4. 🖥️ `cd /opt/<empresa> && docker compose pull reporte && docker compose up -d reporte`
+5. 🖥️ `cd /opt/plataforma && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`
+6. 💻 `curl -i https://<dominio>/reportes/lotes/finalizados-por-aprobador/pdf`
+   debe dar **401**. Un **404** es del API: Caddy todavía no enruta
+   `/reportes/*` (paso 5).
+
+**Deploy automático a dev:** el repo del reporte tiene el mismo job
+`deploy-dev` que el API. Hay que cargar **otra vez** los 4 secrets
+`DEV_SSH_*` en *Settings → Environments → `dev`* de ese repo (mismos valores
+que en la sección 9, paso 3). Actualiza solo el servicio `reporte` de las
+empresas con `REPORTE_IMAGE=...:develop`, y avisa con `!! ... no tiene el
+servicio reporte` si su `docker-compose.yml` es el viejo (paso 2).
 
 ---
 

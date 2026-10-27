@@ -130,8 +130,9 @@ jobs:
           echo "Conexion SSH correcta"
 
       # Solo actualiza los tenants cuyo .env fija API_IMAGE=...:develop; uno
-      # fijado a un sha-xxx o sin API_IMAGE (latest) no se toca. Los archivos
-      # de /opt/plataforma no se sincronizan: siguen subiendose a mano.
+      # fijado a un sha-xxx o sin API_IMAGE (latest) no se toca. Solo el
+      # servicio "api": el de reportes lo despliega su propio repo. Los
+      # archivos de /opt/plataforma no se sincronizan: siguen subiendose a mano.
       - name: Pull y reinicio de los tenants en :develop
         env:
           SSH_DESTINO: ${{ secrets.DEV_SSH_USER }}@${{ secrets.DEV_SSH_HOST }}
@@ -144,7 +145,7 @@ jobs:
             grep -qs '^TENANT=.' "${t}.env" || continue
             grep -Eqs '^API_IMAGE=["'\'']?[^#[:space:]]*:develop["'\'']?[[:space:]]*$' "${t}.env" || continue
             echo "== ${t}"
-            if (cd "$t" && docker compose pull && docker compose up -d); then
+            if (cd "$t" && docker compose pull api && docker compose up -d api); then
               actualizados=$((actualizados + 1))
             else
               echo "!! fallo en ${t}"

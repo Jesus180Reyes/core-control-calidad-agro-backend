@@ -1,4 +1,4 @@
-# El API de un tenant. El mismo archivo para todos: lo que cambia entre
+# El API y el servicio de reportes de un tenant. El mismo archivo para todos: lo que cambia entre
 # tenants vive en el .env de al lado. Se usa desde /opt/<slug>, que tambien da
 # el nombre del proyecto de Compose. Lo copia ahi nuevo-tenant.sh.
 # Requiere la plataforma levantada (/opt/plataforma): MySQL y la red "agro".
@@ -24,6 +24,27 @@ services:
     # Sin "ports": solo Caddy la alcanza, por la red interna.
     expose:
       - "4000"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  # Servicio de reportes (PDF/Excel), repo core-control-calidad-agro-report-service.
+  # Caddy le manda /reportes/* del mismo dominio (snippet api_tenant). Usa la
+  # misma base, el mismo usuario MySQL y el mismo JWT_SECRET que el API: los
+  # toma del mismo .env, asi que los tokens del API valen aqui sin mas.
+  reporte:
+    image: ${REPORTE_IMAGE:-ghcr.io/jesus180reyes/core-control-calidad-agro-report-service:latest}
+    container_name: reporte-${TENANT:?falta TENANT en .env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      PORT: 4001
+      # Siempre production: su Swagger no es alcanzable por Caddy (/docs va al
+      # API) y en development recompila las plantillas en cada PDF.
+      NODE_ENV: production
+    expose:
+      - "4001"
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }

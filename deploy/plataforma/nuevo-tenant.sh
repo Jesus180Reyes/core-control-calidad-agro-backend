@@ -5,7 +5,8 @@
 #   2. db/schema.sql + db/seed.sql cargados en esa base
 #   3. primer usuario ADMIN (el seed no trae usuarios)
 #   4. /opt/<slug> con el compose del tenant y su .env (secretos generados)
-#   5. el API levantado y el dominio dado de alta en Caddy
+#   5. el API y el servicio de reportes levantados y el dominio dado de alta
+#      en Caddy
 #
 # Uso, en el servidor, como deploy y con la plataforma ya levantada:
 #   /opt/plataforma/nuevo-tenant.sh <slug> <dominio> [base]
@@ -143,7 +144,7 @@ cp tenant/docker-compose.yml "$DIR_TENANT/docker-compose.yml"
 )
 
 # --- 5. API y Caddy ---
-echo "[5/5] Levantando api-$SLUG y dando de alta $DOMINIO en Caddy"
+echo "[5/5] Levantando api-$SLUG y reporte-$SLUG y dando de alta $DOMINIO en Caddy"
 (cd "$DIR_TENANT" && docker compose up -d)
 
 mkdir -p tenants
@@ -153,6 +154,8 @@ docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapte
 echo
 echo "Listo: $SLUG en https://$DOMINIO"
 echo "  - Comprobar: curl -i https://$DOMINIO/   (debe responder 401)"
+echo "              curl -i https://$DOMINIO/reportes/lotes/finalizados-por-aprobador/pdf"
+echo "              (401 del servicio de reportes; un 404 es que Caddy no lo enruta)"
 echo "  - Entrar con $ADMIN_USER y la contrasena temporal: se le pedira cambiarla."
 echo "  - Pendiente a mano: GEMINI_API_KEY en $DIR_TENANT/.env (y luego"
 echo "    'cd $DIR_TENANT && docker compose up -d'), productos y paises_config."

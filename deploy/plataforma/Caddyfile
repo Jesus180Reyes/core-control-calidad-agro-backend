@@ -16,8 +16,17 @@
 		max_size 2MB
 	}
 
-	# container_name del compose del tenant (deploy/tenant/docker-compose.yml).
-	reverse_proxy api-{args[0]}:4000
+	# container_name de los servicios del compose del tenant
+	# (deploy/tenant/docker-compose.yml). /reportes/* es del servicio de
+	# reportes, que tiene todas sus rutas bajo ese prefijo; el API no tiene
+	# ninguna ahi. El front apunta VITE_REPORT_SERVICE_URL al mismo dominio.
+	handle /reportes/* {
+		reverse_proxy reporte-{args[0]}:4001
+	}
+
+	handle {
+		reverse_proxy api-{args[0]}:4000
+	}
 }
 
 # Un archivo por tenant. Sin ninguno todavia, Caddy arranca igual.
