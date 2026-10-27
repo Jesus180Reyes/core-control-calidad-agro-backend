@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -36,8 +36,9 @@ jobs:
   image:
     name: Imagen Docker
     needs: check
-    # Solo se publica lo que entra a main; en un PR basta con que compile.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Solo se publica lo que entra a main o develop; en un PR basta con que
+    # compile.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,10 +59,12 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           # sha-<commit> para desplegar o volver a una version exacta;
-          # latest para el despliegue normal.
+          # latest (main) para produccion; develop para la VPS de dev. Un push
+          # a develop nunca mueve latest.
           tags: |
             type=sha,format=short
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -71,3 +74,57 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-dev:
+    name: Deploy a la VPS de dev
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    # Los secrets DEV_SSH_* viven en el environment "dev" del repo.
+    environment: dev
+    # Nunca dos deploys a la vez; uno en curso termina antes de que entre el
+    # siguiente (no se cancela a medio "docker compose up").
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    steps:
+      - name: Llave SSH
+        env:
+          SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # Solo actualiza los tenants cuyo .env fija API_IMAGE=...:develop; uno
+      # fijado a un sha-xxx o sin API_IMAGE (latest) no se toca. Los archivos
+      # de /opt/plataforma no se sincronizan: siguen subiendose a mano.
+      - name: Pull y reinicio de los tenants en :develop
+        env:
+          SSH_DESTINO: ${{ secrets.DEV_SSH_USER }}@${{ secrets.DEV_SSH_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "$SSH_DESTINO" 'bash -s' <<'EOF'
+          set -u
+          actualizados=0
+          fallos=0
+          for t in /opt/*/; do
+            grep -qs '^TENANT=.' "${t}.env" || continue
+            grep -Eqs '^API_IMAGE=["'\'']?[^#[:space:]]*:develop["'\'']?[[:space:]]*$' "${t}.env" || continue
+            echo "== ${t}"
+            if (cd "$t" && docker compose pull && docker compose up -d); then
+              actualizados=$((actualizados + 1))
+            else
+              echo "!! fallo en ${t}"
+              fallos=$((fallos + 1))
+            fi
+          done
+          # Las imagenes viejas de :develop quedan sin tag en cada deploy.
+          docker image prune -f > /dev/null
+          echo "Tenants actualizados: ${actualizados}, con fallo: ${fallos}"
+          if [ "$actualizados" -eq 0 ] && [ "$fallos" -eq 0 ]; then
+            echo "::warning::Ningun tenant usa API_IMAGE=...:develop en la VPS"
+          fi
+          [ "$fallos" -eq 0 ]
+          EOF

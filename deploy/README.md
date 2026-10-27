@@ -33,6 +33,9 @@ internet ──> Caddy ──> api-agrolibano ──┐
 - Cada push a `main` corre el CI (lint, tests, build) y publica la imagen
   nueva en `ghcr.io/jesus180reyes/core-control-calidad-agro-backend`, con los
   tags `latest` y `sha-<commit>`.
+- Cada push a `develop` corre el mismo CI, publica la imagen con los tags
+  `develop` y `sha-<commit>` (nunca `latest`) y la despliega sola en la VPS
+  de dev (sección 9).
 
 ---
 
@@ -364,6 +367,41 @@ done
 
 Esa empresa se queda fija en esa versión hasta que le vuelvas a poner
 `latest`.
+
+### Deploy automático a dev (rama `develop`)
+
+Push a `develop` → CI en verde → el job `deploy-dev` de `ci.yml` entra por
+SSH a la VPS de dev y hace `docker compose pull && docker compose up -d` en
+**cada empresa cuyo `.env` tenga `API_IMAGE=...:develop`**. Las demás (sin
+`API_IMAGE`, en `latest` o fijadas a un `sha-xxx`) no se tocan. Solo
+actualiza los APIs: `db/`, `tenant/` y los archivos de `/opt/plataforma` se
+siguen subiendo a mano (sección 4), y un DDL se aplica a mano **antes** del
+push.
+
+**Configurarlo (una sola vez):**
+
+1. 💻 Una llave solo para el deploy, sin contraseña:
+   `ssh-keygen -t ed25519 -N "" -C github-deploy-dev -f deploy_dev`
+2. 🖥️ Añade `deploy_dev.pub` a `/home/deploy/.ssh/authorized_keys`.
+3. 💻 La huella del servidor: `ssh-keyscan IP`.
+4. En GitHub → *Settings → Environments* crea el environment **`dev`** y,
+   dentro, estos secrets:
+
+   | Secret | Valor |
+   | --- | --- |
+   | `DEV_SSH_HOST` | La IP de la VPS de dev |
+   | `DEV_SSH_USER` | `deploy` |
+   | `DEV_SSH_KEY` | El contenido de `deploy_dev` (la privada) |
+   | `DEV_SSH_KNOWN_HOSTS` | La salida completa de `ssh-keyscan IP` |
+
+5. 🖥️ En el `.env` de cada empresa de dev:
+   `API_IMAGE=ghcr.io/jesus180reyes/core-control-calidad-agro-backend:develop`.
+   El primer push a `develop` crea esa imagen; hasta entonces el `pull` de
+   esa empresa falla.
+6. Borra `deploy_dev` de tu PC cuando ya esté en GitHub.
+
+Si ninguna empresa usa `:develop`, el job pasa en verde con un aviso. Si
+falla una empresa, sigue con las demás y el job queda en rojo.
 
 **Cambios en las tablas (DDL):** no hay migraciones automáticas.
 
