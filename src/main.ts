@@ -37,7 +37,7 @@ async function bootstrap() {
       swaggerOptions: { persistAuthorization: true },
     });
 
-    logger.log('📚 Swagger disponible en /docs');
+    logger.log('📚 Documentacion Swagger disponible en /docs');
   }
 
   // El ZodValidationPipe y el JwtAuthGuard globales se registran solo en
