@@ -1,5 +1,7 @@
-# Produccion en una VPS: Caddy (HTTPS) -> API -> MySQL.
-# Se usa desde /opt/agro en el servidor, junto a .env, Caddyfile y db/.
+# Lo que existe una sola vez en la VPS: Caddy (HTTPS), MySQL compartido (una
+# base agro_<slug> por tenant) y Dozzle. Se usa desde /opt/plataforma, junto a
+# .env, Caddyfile, tenants/, db/, backup.sh y nuevo-tenant.sh.
+# Cada tenant es un compose aparte en /opt/<slug> (ver deploy/tenant/).
 # Ver deploy/README.md.
 
 services:
@@ -10,35 +12,15 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      DOMAIN: ${DOMAIN}
       DOZZLE_DOMAIN: ${DOZZLE_DOMAIN}
       DOZZLE_USER: ${DOZZLE_USER}
       DOZZLE_PASSWORD_HASH: ${DOZZLE_PASSWORD_HASH}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Un <slug>.caddy por tenant, escrito por nuevo-tenant.sh.
+      - ./tenants:/etc/caddy/tenants:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on:
-      - api
-
-  api:
-    image: ${API_IMAGE:-ghcr.io/jesus180reyes/core-control-calidad-agro-backend:latest}
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
-      PORT: 4000
-      # No se lee NODE_ENV de .env a proposito: un .env copiado del local trae
-      # NODE_ENV=development, y eso monta Swagger, cuyo /docs no pasa por el
-      # JwtAuthGuard. API_NODE_ENV=development lo activa a conciencia: solo en dev.
-      NODE_ENV: ${API_NODE_ENV:-production}
-    # Sin "ports": solo Caddy la alcanza, por la red interna.
-    expose:
-      - "4000"
-    depends_on:
-      mysql:
-        condition: service_healthy
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
@@ -49,11 +31,10 @@ services:
     # Hora de Honduras (UTC-6, sin horario de verano). La API ademas la fija en
     # cada sesion; esto cubre a quien consulte la base por fuera de la API.
     command: --default-time-zone=-06:00
+    # Solo root: las bases y los usuarios de cada tenant los crea
+    # nuevo-tenant.sh, nunca el arranque del contenedor.
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
     # Por defecto solo escucha en el localhost del servidor: no queda expuesto
     # a internet y el tunel SSH apunta siempre a 127.0.0.1:3306. DB_BIND=0.0.0.0
     # en .env lo abre a internet (Docker se salta ufw): solo en dev, nunca en
@@ -62,7 +43,6 @@ services:
       - "${DB_BIND:-127.0.0.1}:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 5s
@@ -72,9 +52,9 @@ services:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
 
-  # Visor web de los logs de los contenedores. Se entra por Caddy en
-  # DOZZLE_DOMAIN, con basic_auth, o por tunel SSH al 127.0.0.1:8080. Ver
-  # README, seccion 11.
+  # Visor web de los logs de todos los contenedores (plataforma y tenants). Se
+  # entra por Caddy en DOZZLE_DOMAIN, con basic_auth, o por tunel SSH al
+  # 127.0.0.1:8080. Ver README, seccion 11.
   dozzle:
     image: amir20/dozzle:latest
     restart: unless-stopped
@@ -87,6 +67,13 @@ services:
     logging:
       driver: json-file
       options: { max-size: "5m", max-file: "2" }
+
+# Red compartida con nombre fijo: los compose de los tenants se unen a ella
+# como externa, y asi Caddy alcanza a api-<slug> y cada API alcanza a "mysql".
+# Por eso esta plataforma se levanta antes que cualquier tenant.
+networks:
+  default:
+    name: agro
 
 volumes:
   mysql_data:

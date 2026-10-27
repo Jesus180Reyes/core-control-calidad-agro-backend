@@ -1,0 +1,35 @@
+# Caddy saca y renueva el certificado de Let's Encrypt de cada dominio solo,
+# siempre que su DNS ya apunte a la IP del servidor y los puertos 80/443 esten
+# abiertos.
+
+# Lo que comparte el sitio de cada tenant. Uso, en tenants/<slug>.caddy:
+#   agrolibano.tudominio.com {
+#   	import api_tenant agrolibano
+#   }
+# El snippet tiene que estar definido antes del import de tenants/.
+(api_tenant) {
+	encode gzip
+
+	# La API acepta JSON de hasta 1mb (main.ts); el proxy deja un poco mas
+	# para que el limite que se vea sea siempre el de la API.
+	request_body {
+		max_size 2MB
+	}
+
+	# container_name del compose del tenant (deploy/tenant/docker-compose.yml).
+	reverse_proxy api-{args[0]}:4000
+}
+
+# Un archivo por tenant. Sin ninguno todavia, Caddy arranca igual.
+import /etc/caddy/tenants/*.caddy
+
+# Dozzle (logs de los contenedores). Dozzle no tiene login propio: basic_auth
+# es lo unico entre internet y los logs, que llevan datos de clientes. El hash
+# sale de "caddy hash-password" (ver README, seccion 11).
+{$DOZZLE_DOMAIN} {
+	basic_auth {
+		{$DOZZLE_USER} {$DOZZLE_PASSWORD_HASH}
+	}
+
+	reverse_proxy dozzle:8080
+}

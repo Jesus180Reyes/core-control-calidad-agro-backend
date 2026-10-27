@@ -1,0 +1,34 @@
+# El API de un tenant. El mismo archivo para todos: lo que cambia entre
+# tenants vive en el .env de al lado. Se usa desde /opt/<slug>, que tambien da
+# el nombre del proyecto de Compose. Lo copia ahi nuevo-tenant.sh.
+# Requiere la plataforma levantada (/opt/plataforma): MySQL y la red "agro".
+# Ver deploy/README.md.
+
+services:
+  api:
+    image: ${API_IMAGE:-ghcr.io/jesus180reyes/core-control-calidad-agro-backend:latest}
+    # Nombre fijo y unico en la red compartida: es el host al que apunta Caddy
+    # (snippet api_tenant del Caddyfile) y el que se ve en Dozzle.
+    container_name: api-${TENANT:?falta TENANT en .env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # El servicio "mysql" de la plataforma, por la red compartida.
+      DB_HOST: mysql
+      DB_PORT: 3306
+      PORT: 4000
+      # No se lee NODE_ENV de .env a proposito: un .env copiado del local trae
+      # NODE_ENV=development, y eso monta Swagger, cuyo /docs no pasa por el
+      # JwtAuthGuard. API_NODE_ENV=development lo activa a conciencia: solo en dev.
+      NODE_ENV: ${API_NODE_ENV:-production}
+    # Sin "ports": solo Caddy la alcanza, por la red interna.
+    expose:
+      - "4000"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+networks:
+  default:
+    name: agro
+    external: true
