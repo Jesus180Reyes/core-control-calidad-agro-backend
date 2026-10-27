@@ -350,6 +350,7 @@ empresa.
 | Ver los logs de un tenant | Dozzle, o `docker logs -f api-demo` |
 | Reiniciar un tenant | `cd /opt/demo && docker compose restart` |
 | Actualizar un tenant a la última versión | `cd /opt/demo && docker compose pull && docker compose up -d` |
+| Que un tenant se actualice solo con cada push a `develop` | En `/opt/demo/.env`: `API_IMAGE=ghcr.io/jesus180reyes/core-control-calidad-agro-backend:develop` (README, sección 9, "Deploy automático a dev") |
 | Volver a una versión anterior | En `/opt/demo/.env`: `API_IMAGE=ghcr.io/jesus180reyes/core-control-calidad-agro-backend:sha-XXXXXXX`, y luego `pull` + `up -d` |
 | Dar de alta otra empresa | `cd /opt/plataforma && ./nuevo-tenant.sh <slug> <dominio> [base]` |
 | Hacer un backup ya | `/opt/plataforma/backup.sh` |
@@ -371,7 +372,9 @@ decir, con `TENANT=`), baja la imagen nueva y reinicia ese API.
 
 - [ ] **Copia de los backups fuera del servidor** (`rclone`). Si se pierde la
       VPS, hoy se pierden también los backups.
-- [ ] **Workflow de deploy**: que cada merge a `main` actualice los tenants
-      solo.
+- [x] **Deploy a dev**: cada push a `develop` actualiza solo los tenants en
+      `:develop`. Montarlo y qué hacer si falla: README, sección 9.
+- [ ] **Deploy a producción**: que cada merge a `main` actualice los tenants
+      de la VPS de producción.
 - [ ] **Runner de migraciones**: hoy un cambio de tablas hay que aplicarlo a
       mano en cada base.

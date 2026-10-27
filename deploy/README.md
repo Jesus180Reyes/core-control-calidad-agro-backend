@@ -387,41 +387,6 @@ done
 Esa empresa se queda fija en esa versión hasta que le vuelvas a poner
 `latest`.
 
-### Deploy automático a dev (rama `develop`)
-
-Push a `develop` → CI en verde → el job `deploy-dev` de `ci.yml` entra por
-SSH a la VPS de dev y hace `docker compose pull && docker compose up -d` en
-**cada empresa cuyo `.env` tenga `API_IMAGE=...:develop`**. Las demás (sin
-`API_IMAGE`, en `latest` o fijadas a un `sha-xxx`) no se tocan. Solo
-actualiza los APIs: `db/`, `tenant/` y los archivos de `/opt/plataforma` se
-siguen subiendo a mano (sección 4), y un DDL se aplica a mano **antes** del
-push.
-
-**Configurarlo (una sola vez):**
-
-1. 💻 Una llave solo para el deploy, sin contraseña:
-   `ssh-keygen -t ed25519 -N "" -C github-deploy-dev -f deploy_dev`
-2. 🖥️ Añade `deploy_dev.pub` a `/home/deploy/.ssh/authorized_keys`.
-3. 💻 La huella del servidor: `ssh-keyscan IP`.
-4. En GitHub → *Settings → Environments* crea el environment **`dev`** y,
-   dentro, estos secrets:
-
-   | Secret | Valor |
-   | --- | --- |
-   | `DEV_SSH_HOST` | La IP de la VPS de dev |
-   | `DEV_SSH_USER` | `deploy` |
-   | `DEV_SSH_KEY` | El contenido de `deploy_dev` (la privada) |
-   | `DEV_SSH_KNOWN_HOSTS` | La salida completa de `ssh-keyscan IP` |
-
-5. 🖥️ En el `.env` de cada empresa de dev:
-   `API_IMAGE=ghcr.io/jesus180reyes/core-control-calidad-agro-backend:develop`.
-   El primer push a `develop` crea esa imagen; hasta entonces el `pull` de
-   esa empresa falla.
-6. Borra `deploy_dev` de tu PC cuando ya esté en GitHub.
-
-Si ninguna empresa usa `:develop`, el job pasa en verde con un aviso. Si
-falla una empresa, sigue con las demás y el job queda en rojo.
-
 **Cambios en las tablas (DDL):** no hay migraciones automáticas.
 
 1. Haz un backup.
@@ -431,6 +396,109 @@ falla una empresa, sigue con las demás y el job queda en rojo.
 3. Solo después, despliega la imagen que usa ese cambio.
 4. Copia el cambio a `db/schema.sql` y vuelve a subir `db/`, para que las
    empresas nuevas nazcan con él.
+
+### Deploy automático a dev (rama `develop`)
+
+```
+push a develop ──> lint, tests, build ──> imagen :develop ──> SSH a la VPS ──> pull + up -d
+```
+
+- Un push a `develop` corre el CI y publica la imagen con los tags
+  `develop` y `sha-<commit>`. Nunca mueve `latest`, que es de producción.
+- Después, el job `deploy-dev` de `.github/workflows/ci.yml` entra por SSH
+  como `deploy` y hace `docker compose pull && docker compose up -d` **solo
+  en las empresas cuyo `.env` tenga `API_IMAGE=...:develop`**. Las demás
+  (sin `API_IMAGE`, en `latest` o fijadas a un `sha-xxx`) no se tocan.
+- Solo actualiza los APIs. `db/`, `tenant/` y los archivos de
+  `/opt/plataforma` se siguen subiendo a mano (sección 4), y un DDL se
+  aplica a mano **antes** del push.
+
+#### Configurarlo (una sola vez)
+
+**1. Crear la llave de deploy** 🖥️. Es más fácil hacerlo en la propia VPS,
+como `deploy`:
+
+```bash
+cd ~ && ssh-keygen -t ed25519 -N "" -C github-deploy-dev -f deploy_dev
+cat ~/deploy_dev.pub >> ~/.ssh/authorized_keys
+grep -c github-deploy-dev ~/.ssh/authorized_keys
+ssh -i ~/deploy_dev -o IdentitiesOnly=yes -o PasswordAuthentication=no deploy@127.0.0.1 echo ok
+```
+
+- `-N ""`: sin contraseña. GitHub no puede escribirla.
+- El `grep` debe dar `1` o más. Si da `0`, la llave no quedó autorizada y
+  el deploy falla con `Permission denied (publickey)`.
+- La última línea debe responder `ok` **sin pedir contraseña**. Si pide
+  contraseña, la llave no está funcionando.
+
+**2. Sacar los valores** 🖥️:
+
+```bash
+cat ~/deploy_dev                                     # -> DEV_SSH_KEY
+ssh-keyscan IP 2>/dev/null | grep -v '^#'            # -> DEV_SSH_KNOWN_HOSTS
+```
+
+- `DEV_SSH_KEY` es la llave **privada** (`deploy_dev`, no `deploy_dev.pub`),
+  completa: desde `-----BEGIN OPENSSH PRIVATE KEY-----` hasta
+  `-----END OPENSSH PRIVATE KEY-----`, esas dos líneas incluidas.
+- `DEV_SSH_KNOWN_HOSTS` son las 3 líneas que empiezan con la IP. Son
+  públicas: sirven para que GitHub compruebe que entra a tu servidor y no a
+  otro.
+
+**3. Guardarlos en GitHub.** Repo → **⚙️ Settings** (la pestaña del
+repositorio, no la de tu cuenta) → **Environments** → **`dev`** (si no
+existe, *New environment* → `dev`) → **Environment secrets** → *Add
+environment secret*, uno por uno:
+
+| Name (exacto) | Value |
+| --- | --- |
+| `DEV_SSH_HOST` | La IP de la VPS, por ejemplo `62.84.184.57` |
+| `DEV_SSH_USER` | `deploy` |
+| `DEV_SSH_KEY` | La salida de `cat ~/deploy_dev` |
+| `DEV_SSH_KNOWN_HOSTS` | La salida de `ssh-keyscan` |
+
+- Van en **Environment secrets**, no en *Environment variables* (están en la
+  misma página). Las variables no llegan al job.
+- Al terminar, la lista de Environments debe decir **`dev` · 4 secrets**.
+- Para cambiar uno que ya existe: el lápiz ✏️, borrar y pegar de nuevo.
+
+**4. Borrar la llave de la VPS** 🖥️, ya que está en GitHub:
+`rm ~/deploy_dev ~/deploy_dev.pub`. La pública sigue en `authorized_keys`.
+
+**5. Apuntar cada empresa de dev a `:develop`** 🖥️. En `/opt/<empresa>/.env`:
+
+```
+API_IMAGE=ghcr.io/jesus180reyes/core-control-calidad-agro-backend:develop
+```
+
+y la primera vez, a mano: `cd /opt/<empresa> && docker compose pull && docker compose up -d`.
+La imagen `:develop` existe a partir del primer push a `develop`; antes, el
+`pull` falla.
+
+**6. Probar.** En GitHub → *Actions* → el último run de `develop` → *Re-run
+all jobs*. El log del paso "Pull y reinicio de los tenants en :develop" debe
+terminar con `Tenants actualizados: 1, con fallo: 0` (o cuantas empresas
+haya). Y desde tu PC, `curl -i https://<dominio-de-la-empresa>/` debe
+responder 401.
+
+#### Si falla
+
+El paso **"Revisar secrets y conexion"** revisa todo antes de desplegar y
+deja el motivo en el log del job (y como anotación en el resumen del run):
+
+| Mensaje | Qué pasa | Cómo arreglarlo |
+| --- | --- | --- |
+| `Faltan los secrets: ...` | Esos secrets no existen, tienen otro nombre o se guardaron como variables | Paso 3: revisa el nombre exacto y que estén en *Environment secrets* de `dev` |
+| `DEV_SSH_KEY no es una llave privada valida` | Se pegó la pública, o la privada incompleta (sin `BEGIN`/`END`, cortada) | Paso 2: `cat ~/deploy_dev` y pegarla entera. Si ya la borraste, vuelve al paso 1 |
+| `DEV_SSH_KNOWN_HOSTS no tiene la huella de ...` | Huellas vacías, de otra IP, o el servidor se reinstaló | Paso 2: vuelve a sacar el `ssh-keyscan` |
+| `Permission denied (publickey)` | La pública no está en `authorized_keys` de `deploy` | Paso 1: el `grep -c` debe dar 1 o más |
+| `Host key verification failed` | `DEV_SSH_KNOWN_HOSTS` no coincide con el servidor | Paso 2 |
+| `Connection timed out` / `refused` | IP equivocada, o el firewall cierra el 22 | Revisa `DEV_SSH_HOST` y `ufw status` |
+| Aviso `Ningun tenant usa API_IMAGE=...:develop` | El deploy entró bien pero ninguna empresa usa `:develop` | Paso 5 |
+| `!! fallo en /opt/<empresa>/` | Falló el `pull` o el `up` de esa empresa; las demás siguen | En la VPS: `cd /opt/<empresa> && docker compose pull && docker compose up -d` y lee el error |
+
+Después de arreglarlo, *Re-run failed jobs* en el run: no hace falta otro
+push. GitHub lee los secrets otra vez en cada intento.
 
 ---
 
