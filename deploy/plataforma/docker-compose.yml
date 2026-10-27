@@ -1,5 +1,5 @@
 # Lo que existe una sola vez en la VPS: Caddy (HTTPS), MySQL compartido (una
-# base agro_<slug> por tenant) y Dozzle. Se usa desde /opt/plataforma, junto a
+# base por tenant) y Dozzle. Se usa desde /opt/plataforma, junto a
 # .env, Caddyfile, tenants/, db/, backup.sh y nuevo-tenant.sh.
 # Cada tenant es un compose aparte en /opt/<slug> (ver deploy/tenant/).
 # Ver deploy/README.md.

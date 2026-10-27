@@ -18,7 +18,8 @@ En el servidor:
 | `/opt/<slug>/` | Solo el API del tenant: `docker-compose.yml` + `.env` | lo crea `nuevo-tenant.sh` |
 
 - Todos los tenants corren **la misma imagen** de GHCR; lo que los distingue es
-  su `.env`: `TENANT`, base `agro_<slug>`, usuario MySQL `agro_<slug>`,
+  su `.env`: `TENANT`, su base y un usuario MySQL del mismo nombre
+  (`agro_<slug>` salvo que se elija otro),
   `JWT_SECRET` y `GEMINI_API_KEY` propios.
 - El usuario MySQL de cada tenant solo tiene `SELECT/INSERT/UPDATE/DELETE`
   sobre **su** base: si un `.env` se filtra, no abre las demas. Root solo vive
@@ -98,7 +99,8 @@ proxy (nube naranja), SSL/TLS en **Full (strict)**.
 Desde tu PC, en la raiz del repo:
 
 ```bash
-ssh deploy@IP "sudo mkdir -p /opt/plataforma && sudo chown deploy:deploy /opt/plataforma"
+# -t: sudo pide la contrasena y sin terminal no puede leerla
+ssh -t deploy@IP "sudo mkdir -p /opt/plataforma && sudo chown deploy:deploy /opt/plataforma"
 scp deploy/plataforma/docker-compose.yml deploy/plataforma/Caddyfile \
     deploy/plataforma/backup.sh deploy/plataforma/nuevo-tenant.sh deploy@IP:/opt/plataforma/
 scp -r db deploy/tenant deploy@IP:/opt/plataforma/
@@ -145,6 +147,14 @@ Con el DNS del dominio ya resolviendo:
 
 ```bash
 /opt/plataforma/nuevo-tenant.sh agrolibano agrolibano.tudominio.com
+```
+
+La base y su usuario MySQL se llaman `agro_<slug>`. Para otro nombre, un
+tercer argumento (minusculas, numeros o `_`, empieza con letra, 3 a 32
+caracteres):
+
+```bash
+/opt/plataforma/nuevo-tenant.sh agrolibano agrolibano.tudominio.com control_libano
 ```
 
 El script pide los datos del primer **ADMIN** (username, nombre, cedula y una
@@ -200,8 +210,9 @@ crontab -e
 0 3 * * * /opt/plataforma/backup.sh >> /opt/plataforma/backups/backup.log 2>&1
 ```
 
-Un `mysqldump` por cada base `agro_*` (un tenant nuevo entra solo, sin tocar
-el cron), en `/opt/plataforma/backups/agro_<slug>-AAAAMMDD-HHMMSS.sql.gz`,
+Un `mysqldump` por cada base que no sea del sistema de MySQL, se llame como se
+llame (un tenant nuevo entra solo, sin tocar el cron), en
+`/opt/plataforma/backups/<base>-AAAAMMDD-HHMMSS.sql.gz`,
 14 dias. Si falla una base sigue con las demas y sale con error. **Eso no
 basta**: si se pierde el servidor se pierden los backups. Copiarlos fuera
 (Contabo Object Storage, S3, Backblaze) con `rclone` es el siguiente paso.
@@ -236,7 +247,7 @@ O uno solo: `cd /opt/agrolibano && docker compose pull && docker compose up -d`.
 que se le vuelva a poner `latest`.
 
 **Cambios de esquema**: no hay migraciones. Una DDL nueva de un spec se aplica
-a mano **en cada base `agro_*`**, con backup previo, **antes** de desplegar
+a mano **en cada base de tenant** (`DB_NAME` de cada `/opt/<slug>/.env`), con backup previo, **antes** de desplegar
 la imagen que la usa (como root: el usuario de cada tenant no tiene permisos
 de DDL). `db/schema.sql` solo sirve para tenants nuevos, asi que hay que
 transcribir la DDL ahi y volver a subir `db/`.
@@ -252,8 +263,8 @@ ssh -N -L 3308:127.0.0.1:3306 deploy@IP
 ```
 
 O, en el cliente, "TCP/IP over SSH" con `deploy` + tu llave y MySQL en
-`127.0.0.1:3306`. Con el usuario `agro_<slug>` (contrasena en
-`/opt/<slug>/.env`) se ve solo esa base; con root, todas.
+`127.0.0.1:3306`. Con el usuario del tenant (`DB_USER` y
+`DB_PASSWORD` en `/opt/<slug>/.env`) se ve solo esa base; con root, todas.
 
 **Solo en dev**: `DB_BIND=0.0.0.0` en `/opt/plataforma/.env` publica el 3306 a
 internet y cualquier cliente conecta directo a `IP:3306`. Es aceptable solo

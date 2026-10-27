@@ -1,14 +1,18 @@
 #!/bin/sh
 # Alta de un tenant, de punta a punta:
-#   1. base agro_<slug> y usuario MySQL agro_<slug> con permisos SOLO sobre ella
+#   1. base (agro_<slug> o la que se pase) y un usuario MySQL del mismo nombre
+#      con permisos SOLO sobre ella
 #   2. db/schema.sql + db/seed.sql cargados en esa base
 #   3. primer usuario ADMIN (el seed no trae usuarios)
 #   4. /opt/<slug> con el compose del tenant y su .env (secretos generados)
 #   5. el API levantado y el dominio dado de alta en Caddy
 #
 # Uso, en el servidor, como deploy y con la plataforma ya levantada:
-#   /opt/plataforma/nuevo-tenant.sh <slug> <dominio>
+#   /opt/plataforma/nuevo-tenant.sh <slug> <dominio> [base]
 #   /opt/plataforma/nuevo-tenant.sh agrolibano agrolibano.tudominio.com
+#   /opt/plataforma/nuevo-tenant.sh agrolibano agrolibano.tudominio.com control_libano
+#
+# Sin [base], la base es agro_<slug>.
 #
 # Pide los datos del ADMIN por teclado y sudo para crear /opt/<slug>. El DNS
 # del dominio tiene que apuntar ya a la VPS, o Caddy no saca el certificado.
@@ -17,18 +21,24 @@ set -eu
 PLATAFORMA=/opt/plataforma
 SLUG=${1:-}
 DOMINIO=${2:-}
+BASE=${3:-agro_$SLUG}
 
 uso() {
-  echo "Uso: $0 <slug> <dominio>"
+  echo "Uso: $0 <slug> <dominio> [base]"
   echo "  slug: minusculas y numeros, empieza con letra, 2 a 20 caracteres"
+  echo "  base: opcional, minusculas, numeros o _, empieza con letra, 3 a 32"
+  echo "        caracteres (por defecto agro_<slug>)"
   exit 1
 }
 
 [ -n "$SLUG" ] && [ -n "$DOMINIO" ] || uso
 echo "$SLUG" | grep -Eq '^[a-z][a-z0-9]{1,19}$' || uso
 echo "$DOMINIO" | grep -Eq '^[a-z0-9.-]+$' || { echo "ERROR: dominio invalido: $DOMINIO"; exit 1; }
-
-BASE="agro_$SLUG"
+# 32 es el maximo de un usuario MySQL, que se llama igual que la base.
+echo "$BASE" | grep -Eq '^[a-z][a-z0-9_]{2,31}$' || uso
+case "$BASE" in
+  mysql|sys) echo "ERROR: $BASE es una base del sistema de MySQL"; exit 1 ;;
+esac
 DIR_TENANT="/opt/$SLUG"
 SITIO="$PLATAFORMA/tenants/$SLUG.caddy"
 
@@ -89,7 +99,7 @@ fi' EXIT
 
 # --- 1. Base y usuario ---
 # En GRANT el "_" del nombre de la base es comodin: se escapa para que el
-# permiso cubra solo agro_<slug> y no, por ejemplo, agroX<slug>.
+# permiso cubra solo esta base y no, por ejemplo, agroX<slug>.
 BASE_GRANT=$(printf '%s' "$BASE" | sed 's/_/\\_/g')
 echo "[1/5] Base $BASE y usuario $BASE"
 # Solo DML: el API no ejecuta DDL. Un futuro runner de migraciones necesitara

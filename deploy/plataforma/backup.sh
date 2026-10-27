@@ -1,6 +1,7 @@
 #!/bin/sh
-# Backup diario de MySQL: un dump por cada base agro_* (una por tenant). Se
-# programa con cron en el servidor (ver README):
+# Backup diario de MySQL: un dump por cada base que no sea del sistema (una
+# por tenant, con el nombre que se le haya dado). Se programa con cron en el
+# servidor (ver README):
 #   0 3 * * * /opt/plataforma/backup.sh >> /opt/plataforma/backups/backup.log 2>&1
 set -eu
 
@@ -15,11 +16,12 @@ mysql_root() {
   docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$@"' mysql "$@"
 }
 
-# "\_": en LIKE el "_" suelto es comodin.
-BASES=$(mysql_root -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME LIKE 'agro\\_%'")
+# Todas menos las de MySQL: una base creada a mano o de un alta a medias
+# tambien entra, en vez de quedarse sin backup sin que nadie lo note.
+BASES=$(mysql_root -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME NOT IN ('mysql', 'sys', 'information_schema', 'performance_schema')")
 
 if [ -z "$BASES" ]; then
-  echo "$(date) Sin bases agro_*: nada que respaldar"
+  echo "$(date) Sin bases de tenants: nada que respaldar"
   exit 0
 fi
 
@@ -43,6 +45,6 @@ for BASE in $BASES; do
   fi
 done
 
-find "$DESTINO" -name 'agro_*.sql.gz' -mtime +"$DIAS" -delete
+find "$DESTINO" -name '*.sql.gz' -mtime +"$DIAS" -delete
 
 [ "$FALLOS" -eq 0 ] || exit 1
