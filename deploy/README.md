@@ -75,6 +75,25 @@ systemctl restart ssh
 - ⚠️ Antes de cerrar la sesión, prueba en otra terminal que `ssh deploy@IP`
   funciona. Si no, te quedas fuera.
 
+**Comprobar que de verdad quedó apagado:**
+
+```bash
+sshd -T | grep -Ei '^(passwordauthentication|permitrootlogin)'
+```
+
+- Debe decir `passwordauthentication no` y `permitrootlogin no`.
+- Si dice `yes`, lo está pisando un archivo de `/etc/ssh/sshd_config.d/`
+  (en Ubuntu suele ser `50-cloud-init.conf`), que gana sobre `sshd_config`.
+  Búscalo con `grep -Ri 'passwordauthentication\|permitrootlogin' /etc/ssh/sshd_config.d/`
+  y corrígelo:
+
+```bash
+sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/; s/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config.d/*.conf
+systemctl restart ssh
+```
+
+- Repite el `sshd -T` y la prueba de `ssh deploy@IP` desde otra terminal.
+
 **Firewall:**
 
 ```bash
