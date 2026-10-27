@@ -170,6 +170,36 @@ solo con datos de prueba y contrasenas de `openssl rand`; Docker se salta
 ufw, asi que no hay firewall delante. **Nunca en produccion.** Despues de
 cambiarlo: `docker compose -f docker-compose.prod.yml up -d mysql`.
 
+## 11. Ver los logs (Dozzle)
+
+Dozzle muestra en vivo los logs de `api`, `caddy` y `mysql`. No tiene login
+propio, monta el socket de Docker y los logs llevan datos de clientes, asi que
+lo unico que lo protege en internet es el `basic_auth` de Caddy.
+
+**Desde el navegador**: `https://DOZZLE_DOMAIN`, con `DOZZLE_USER` y la
+contrasena. Para configurarlo, en el servidor:
+
+```bash
+docker run --rm caddy:2 caddy hash-password --plaintext 'CONTRASENA'
+```
+
+Copiar el hash a `DOZZLE_PASSWORD_HASH` en `.env`, **entre comillas simples**
+(lleva `$`), poner `DOZZLE_DOMAIN` (registro A propio, o
+`logs.IP-CON-GUIONES.sslip.io`) y recrear Caddy:
+`docker compose -f docker-compose.prod.yml up -d caddy`.
+
+**Por tunel SSH**, sin pasar por internet: Dozzle tambien escucha en
+`127.0.0.1:8080` del servidor.
+
+```bash
+ssh -N -L 8080:127.0.0.1:8080 deploy@IP
+```
+
+Y abrir `http://localhost:8080` en tu PC. Los dos tuneles caben en una sola
+conexion: `ssh -N -L 3308:127.0.0.1:3306 -L 8080:127.0.0.1:8080 deploy@IP`.
+Lo que Dozzle muestra es lo que retiene `json-file` (`max-size`/`max-file` de
+cada servicio), no un historico: los 5xx persistentes estan en `log_errores`.
+
 ## Pendientes conocidos antes de produccion
 
 - **`GET /health`**: el healthcheck actual acepta cualquier respuesta HTTP.

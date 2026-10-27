@@ -12,3 +12,14 @@
 
 	reverse_proxy api:4000
 }
+
+# Dozzle (logs de los contenedores). Dozzle no tiene login propio: basic_auth
+# es lo unico entre internet y los logs, que llevan datos de clientes. El hash
+# sale de "caddy hash-password" (ver README, seccion 11).
+{$DOZZLE_DOMAIN} {
+	basic_auth {
+		{$DOZZLE_USER} {$DOZZLE_PASSWORD_HASH}
+	}
+
+	reverse_proxy dozzle:8080
+}

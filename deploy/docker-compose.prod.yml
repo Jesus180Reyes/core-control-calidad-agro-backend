@@ -11,6 +11,9 @@ services:
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN}
+      DOZZLE_DOMAIN: ${DOZZLE_DOMAIN}
+      DOZZLE_USER: ${DOZZLE_USER}
+      DOZZLE_PASSWORD_HASH: ${DOZZLE_PASSWORD_HASH}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -68,6 +71,22 @@ services:
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
+
+  # Visor web de los logs de los contenedores. Se entra por Caddy en
+  # DOZZLE_DOMAIN, con basic_auth, o por tunel SSH al 127.0.0.1:8080. Ver
+  # README, seccion 11.
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
 
 volumes:
   mysql_data:
