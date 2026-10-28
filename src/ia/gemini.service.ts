@@ -109,7 +109,7 @@ export class GeminiService {
     private static readonly ETIQUETA_HTML = /<[a-z!/]/i;
 
     private static readonly MSG_SIN_CONFIGURAR =
-        'La integracion con Gemini no esta configurada';
+        'La integracion con La IA no esta configurada';
     private static readonly MSG_NO_RESPONDIO =
         'No se pudo generar el resumen: el servicio de IA no respondio correctamente';
     private static readonly MSG_NO_VALIDA =
