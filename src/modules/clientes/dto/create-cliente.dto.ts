@@ -4,7 +4,7 @@ import z from "zod";
 const createClienteSchema = z
     .object({
         nombre: z.string().min(1, 'El nombre es requerido'),
-        rtn: z.string().min(1, 'El RTN es requerido'),
+        rtn: z.string().min(1, 'La identificacion fiscal es requerida'),
         producto_id: z.number({ error: 'Producto requerido' }).int().positive('El producto_id debe ser un id valido'),
         codigo_exportacion: z.string({ error: 'Codigo de exportacion requerido' }),
         correo_contacto: z.email().optional(),

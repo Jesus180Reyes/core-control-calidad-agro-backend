@@ -329,8 +329,8 @@ export class ClientesRepository {
         if (existente) {
             throw new BadRequestException(
                 existente.isActive === 0
-                    ? `El RTN '${rtn}' pertenece a un cliente rechazado`
-                    : `El RTN '${rtn}' ya esta registrado`,
+                    ? `La identificacion fiscal '${rtn}' pertenece a un cliente rechazado`
+                    : `La identificacion fiscal '${rtn}' ya esta registrada`,
             );
         }
     }
