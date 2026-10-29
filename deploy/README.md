@@ -24,7 +24,8 @@ internet ──> Caddy ──> api-agrolibano ──────┐
 | Carpeta en el servidor | Qué tiene |
 | --- | --- |
 | `/opt/plataforma/` | Lo que existe **una sola vez**: Caddy (HTTPS), MySQL, Dozzle (logs), los scripts y los backups |
-| `/opt/<empresa>/` | **Una por empresa**: su API, su servicio de reportes y su `.env` |
+| `/opt/<empresa>/` | **Una por empresa**: su API, su servicio de reportes, su front (opcional) y su `.env` |
+| `/opt/frontend-src/` | El código del front, compartido por todas las empresas que lo llevan (sección 13) |
 
 - Todas las empresas usan **la misma imagen** del API. Lo que las distingue es
   su `.env`: su base, su usuario de MySQL, su `JWT_SECRET` y su key de Gemini.
@@ -41,6 +42,9 @@ internet ──> Caddy ──> api-agrolibano ──────┐
 - El **servicio de reportes** (PDF/Excel) es otro repo con su propia imagen,
   pero corre en el mismo `/opt/<empresa>` y bajo el mismo dominio
   (sección 12).
+- El **front** no viene de GHCR: se construye en el servidor con las URLs del
+  `.env` de cada empresa y se sirve en `app-<empresa>.tudominio.com`
+  (sección 13).
 
 ---
 
@@ -155,6 +159,7 @@ Crea un registro **A** apuntando a la IP del servidor:
 
 - uno para los logs (`logs.tudominio.com`)
 - uno por cada empresa (`agrolibano.tudominio.com`)
+- uno por cada empresa con front (`app-agrolibano.tudominio.com`, sección 13)
 
 Comprueba que ya resuelve con `nslookup agrolibano.tudominio.com` **antes**
 de dar de alta la empresa. Si no, Caddy no puede sacar el certificado HTTPS.
@@ -626,6 +631,143 @@ suyo, `reporte-<empresa>`, en el mismo `docker-compose.yml` que su API.
 que en la sección 9, paso 3). Actualiza solo el servicio `reporte` de las
 empresas con `REPORTE_IMAGE=...:develop`, y avisa con `!! ... no tiene el
 servicio reporte` si su `docker-compose.yml` es el viejo (paso 2).
+
+---
+
+## 13. Front por empresa
+
+El front (repo `core-control-calidad-agro`) de cada empresa vive en su propio
+subdominio, `app-<empresa>.tudominio.com`, y llama al API de su empresa en
+`<empresa>.tudominio.com`. Es `frontend-<empresa>`, en `/opt/<empresa>`, al
+lado de su API.
+
+```
+push a develop (front) ──> test + build en GitHub ──> SSH a la VPS
+    ──> git reset en /opt/frontend-src ──> build + up -d frontend en cada empresa
+```
+
+- **Se construye en el servidor, no viene de GHCR.** Vite escribe
+  `VITE_API_URL` dentro del código al compilar: una imagen hecha en GitHub
+  tendría una sola URL para todas. Aquí cada empresa construye la suya
+  (`frontend-<empresa>:local`) con las URLs de **su** `.env`.
+- **Los `.env` no los toca ningún deploy.** Las URLs se escriben a mano una
+  vez; el deploy solo las lee.
+- **Archivo aparte, `docker-compose.frontend.yml`.** Una empresa lo activa
+  con `COMPOSE_FILE` en su `.env`; sin esa línea, su compose es el de
+  siempre. No es un perfil del compose base porque Compose exige las `VITE_*`
+  aunque el perfil esté apagado, y rompería a las empresas sin front.
+- **Un solo código para todas**, en `/opt/frontend-src`: todas corren la
+  misma versión del front.
+- **Sin secretos.** `frontend-<empresa>` no recibe el `.env`: no ve
+  `DB_PASSWORD` ni `JWT_SECRET`.
+- Cada build gasta CPU y RAM del mismo servidor que MySQL y los APIs (un
+  `npm run build` por empresa, uno tras otro).
+
+### Preparar el servidor (una sola vez) 🖥️
+
+Como `deploy`, que es el usuario con el que entra el deploy automático.
+
+**1. Llave para leer el repo** (solo si el repo del front es privado):
+
+```bash
+ssh-keygen -t ed25519 -N "" -C frontend-src -f ~/.ssh/frontend_deploy
+cat ~/.ssh/frontend_deploy.pub
+```
+
+En GitHub, repo del front → **⚙️ Settings** → **Deploy keys** → *Add deploy
+key*: pega la pública, **sin** marcar *Allow write access*. Luego:
+
+```bash
+cat >> ~/.ssh/config <<'EOF'
+Host github-frontend
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/frontend_deploy
+  IdentitiesOnly yes
+EOF
+ssh -T github-frontend    # debe decir "successfully authenticated"
+```
+
+- Es otra llave, distinta de la del deploy (sección 9): esta la usa el
+  servidor para leer GitHub; aquella la usa GitHub para entrar al servidor.
+
+**2. Clonar el front:**
+
+```bash
+sudo mkdir -p /opt/frontend-src && sudo chown deploy:deploy /opt/frontend-src
+git clone -b develop git@github-frontend:Jesus180Reyes/core-control-calidad-agro.git /opt/frontend-src
+```
+
+- Si el repo es público: `https://github.com/Jesus180Reyes/core-control-calidad-agro.git`
+  y sin el paso 1.
+- ⚠️ No edites nada en `/opt/frontend-src`: cada deploy hace
+  `git reset --hard` y lo borra.
+
+### Activarlo en una empresa 🖥️
+
+1. 💻 Subir `deploy/tenant/` nuevo (sección 4).
+2. 🖥️ `cp /opt/plataforma/tenant/docker-compose.frontend.yml /opt/<empresa>/`
+   (`nuevo-tenant.sh` no lo copia: ninguna empresa nace con front).
+3. 🖥️ En `/opt/<empresa>/.env`, agregar **las tres juntas**:
+
+   ```
+   COMPOSE_FILE=docker-compose.yml:docker-compose.frontend.yml
+   VITE_API_URL=https://<empresa>.tudominio.com
+   VITE_REPORT_SERVICE_URL=https://<empresa>.tudominio.com
+   ```
+
+   - `VITE_REPORT_SERVICE_URL` es el mismo dominio del API: Caddy ya manda
+     `/reportes/*` al servicio de reportes (sección 12).
+   - Separador `:`, no `;` (eso es Windows).
+   - ⚠️ Con `COMPOSE_FILE` y sin las `VITE_*`, **todo** comando de Compose
+     de esa empresa falla (también el deploy del API) con
+     `falta VITE_API_URL en .env`.
+4. 🖥️ Primer build, a mano:
+
+   ```bash
+   cd /opt/<empresa>
+   docker compose config --services     # api, frontend, reporte
+   docker compose build frontend && docker compose up -d frontend
+   ```
+
+   Nombra siempre el servicio: `api` y `reporte` no se reinician.
+5. DNS: registro **A** de `app-<empresa>` a la IP del servidor (sección 3).
+6. 🖥️ Al final de `/opt/plataforma/tenants/<empresa>.caddy`:
+
+   ```
+   app-<empresa>.tudominio.com {
+   	encode gzip
+   	reverse_proxy frontend-<empresa>:3000
+   }
+   ```
+
+   y `cd /opt/plataforma && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+7. 💻 Abrir `https://app-<empresa>.tudominio.com`, iniciar sesión y revisar en
+   la pestaña *Network* del navegador que las llamadas vayan a
+   `https://<empresa>.tudominio.com`.
+
+### Deploy automático a dev
+
+El repo del front tiene su propio `.github/workflows/ci.yml`:
+
+- En cada PR y push: `npm ci`, `npm test`, `npm run build`. Un error de
+  compilación falla en GitHub, no en el servidor.
+- En cada push a `develop`, el job `deploy-dev` entra por SSH, hace
+  `git fetch` + `git reset --hard origin/develop` en `/opt/frontend-src` y,
+  en cada empresa cuyo `COMPOSE_FILE` incluye `docker-compose.frontend.yml`,
+  `docker compose build frontend && docker compose up -d frontend`.
+- Hay que cargar **otra vez** los 4 secrets `DEV_SSH_*` en *Settings →
+  Environments → `dev`* del repo del front (mismos valores que en la
+  sección 9, paso 3).
+- El log termina con `Tenants actualizados: N, con fallo: 0`. Un
+  `!! fallo en /opt/<empresa>/` se revisa en el servidor con el comando del
+  paso 4 de arriba.
+- El deploy del API (sección 9) solo toca `api`: no reinicia ningún
+  `frontend-<empresa>`.
+
+**Desactivarlo en una empresa** 🖥️: quitar las tres líneas del `.env`,
+`docker rm -f frontend-<empresa>`, borrar su bloque de
+`tenants/<empresa>.caddy` y recargar Caddy.
 
 ---
 
