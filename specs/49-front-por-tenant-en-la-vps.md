@@ -1,6 +1,6 @@
 # SPEC 49 — Front por tenant en la VPS
 
-> **Estado:** Approved
+> **Estado:** Implemented
 > **Depende de:** ninguno (usa el montaje multi-tenant de `deploy/`)
 > **Fecha:** 2026-10-29
 > **Objetivo:** Servir el front (`core-control-calidad-agro`) de cada tenant en su propio subdominio, construido en la VPS con las URLs del `.env` de ese tenant y actualizado solo con cada push a `develop` del front.
@@ -85,16 +85,16 @@ app-<slug>.<dominio> {
 
 ## Criterios de aceptación
 
-- [ ] En un tenant sin `COMPOSE_FILE` y sin `VITE_*`, `docker compose config --services` lista solo `api` y `reporte`, sin error.
-- [ ] En un tenant con `COMPOSE_FILE` y sin `VITE_API_URL`, `docker compose build frontend` falla con el mensaje `falta VITE_API_URL en .env`.
-- [ ] `docker inspect frontend-<slug>` no muestra `DB_PASSWORD` ni `JWT_SECRET` en su entorno.
-- [ ] `https://app-<slug>.<dominio>` responde con el front y un certificado válido.
-- [ ] Desde `app-<slug>`, el login llama a `https://<slug>.<dominio>/auth/login` (pestaña Network del navegador).
-- [ ] Con tres tenants activados, cada front llama al API de su propio tenant.
-- [ ] Un push a `develop` del front termina con `Tenants actualizados: 3, con fallo: 0`.
-- [ ] Después de ese push, el `sha256sum` de cada `/opt/<slug>/.env` es el mismo que antes.
-- [ ] Después de ese push, `docker ps` muestra que `api-<slug>` y `reporte-<slug>` no se reiniciaron.
-- [ ] Un push a `develop` del backend no reinicia ningún `frontend-<slug>`.
+- [X] En un tenant sin `COMPOSE_FILE` y sin `VITE_*`, `docker compose config --services` lista solo `api` y `reporte`, sin error.
+- [X] En un tenant con `COMPOSE_FILE` y sin `VITE_API_URL`, `docker compose build frontend` falla con el mensaje `falta VITE_API_URL en .env`.
+- [X] `docker inspect frontend-<slug>` no muestra `DB_PASSWORD` ni `JWT_SECRET` en su entorno.
+- [X] `https://app-<slug>.<dominio>` responde con el front y un certificado válido.
+- [X] Desde `app-<slug>`, el login llama a `https://<slug>.<dominio>/auth/login` (pestaña Network del navegador).
+- [X] Con tres tenants activados, cada front llama al API de su propio tenant.
+- [X] Un push a `develop` del front termina con `Tenants actualizados: 3, con fallo: 0`.
+- [X] Después de ese push, el `sha256sum` de cada `/opt/<slug>/.env` es el mismo que antes.
+- [X] Después de ese push, `docker ps` muestra que `api-<slug>` y `reporte-<slug>` no se reiniciaron.
+- [X] Un push a `develop` del backend no reinicia ningún `frontend-<slug>`.
 
 ## Decisiones
 
