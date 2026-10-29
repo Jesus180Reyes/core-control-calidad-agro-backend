@@ -1,0 +1,29 @@
+# El front de un tenant (repo core-control-calidad-agro), encima de
+# docker-compose.yml. Un tenant lo activa con esta linea en su .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.frontend.yml
+# Va en archivo aparte porque Compose interpola las variables de todos los
+# servicios que lee, aunque un perfil los apague: en el compose base, las
+# ${VITE_*:?} obligatorias romperian a los tenants sin front. Ver spec 49.
+#
+# A diferencia de api y reporte no viene de GHCR: Vite escribe VITE_API_URL
+# dentro del bundle al compilar, asi que se construye aqui, desde el clon
+# /opt/frontend-src, con las URLs del .env de este tenant. Caddy lo sirve en
+# app-<slug>.
+
+services:
+  frontend:
+    build:
+      context: /opt/frontend-src
+      args:
+        VITE_API_URL: ${VITE_API_URL:?falta VITE_API_URL en .env}
+        VITE_REPORT_SERVICE_URL: ${VITE_REPORT_SERVICE_URL:?falta VITE_REPORT_SERVICE_URL en .env}
+    image: frontend-${TENANT:?falta TENANT en .env}:local
+    container_name: frontend-${TENANT:?falta TENANT en .env}
+    restart: unless-stopped
+    # Sin env_file a proposito: el .env lleva DB_PASSWORD y JWT_SECRET, y el
+    # front no los necesita.
+    expose:
+      - "3000"
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
