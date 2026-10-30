@@ -618,10 +618,13 @@ export class ChatRepository {
      * 200 con lista vacia en ese caso.
      */
     private async contextoDe(usuarioId: number): Promise<ContextoChat> {
+        // El rol sale en la misma consulta, de la base y no del token, igual que
+        // `validateCallerEsAdmin`: quitarle el ADMIN a alguien surte efecto ya.
         const usuario = await this.db
             .selectFrom('usuarios')
-            .select(['id', 'complete_name'])
-            .where('id', '=', usuarioId)
+            .leftJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select(['usuarios.id', 'usuarios.complete_name', 'roles.nombre as rol'])
+            .where('usuarios.id', '=', usuarioId)
             .executeTakeFirst();
 
         const clientes = await this.db
@@ -643,6 +646,7 @@ export class ChatRepository {
                 nombre: usuario?.complete_name ?? 'Usuario',
             },
             clientes,
+            esAdmin: usuario?.rol === 'ADMIN',
         };
     }
 
@@ -675,7 +679,9 @@ export class ChatRepository {
                 return await this.buscarPersona(this.aTexto(args.texto));
 
             case 'mis_clientes':
-                return await this.misClientes(contexto.usuario.id);
+                return contexto.esAdmin
+                    ? await this.todosLosClientes()
+                    : await this.misClientes(contexto.usuario.id);
 
             case 'lotes_de_cliente':
                 return await this.lotesDeCliente(
@@ -942,6 +948,47 @@ export class ChatRepository {
         }
 
         return { clientes, total: clientes.length };
+    }
+
+    /**
+     * `mis_clientes` cuando pregunta un ADMIN: todos los clientes activos.
+     *
+     * Un ADMIN no tiene cartera, asi que "mis clientes" para el son todos. Lleva
+     * el tope de `MAX_FILAS_MODELO` y el total, como el resto de listados, para
+     * que la respuesta pueda decir "20 de 137".
+     */
+    private async todosLosClientes(): Promise<ResultadoHerramienta> {
+        const consulta = this.db
+            .selectFrom('clientes')
+            .leftJoin('productos', 'productos.id', 'clientes.producto_id')
+            .select([
+                'clientes.id',
+                'clientes.nombre',
+                'productos.nombre as producto',
+            ])
+            .where('clientes.isActive', '=', 1);
+
+        const total = await this.contarFiltrados(consulta);
+
+        if (total === 0) {
+            return {
+                clientes: [],
+                total: 0,
+                aviso: 'No hay ningun cliente activo en el sistema.',
+            };
+        }
+
+        const clientes = await consulta
+            .orderBy('clientes.nombre', 'asc')
+            .limit(ChatRepository.MAX_FILAS_MODELO)
+            .execute();
+
+        return {
+            alcance: 'todos los clientes activos (quien pregunta es administrador)',
+            total,
+            mostrados: clientes.length,
+            clientes,
+        };
     }
 
     // ---------------------------------------------------------------------

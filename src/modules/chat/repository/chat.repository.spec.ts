@@ -317,6 +317,33 @@ describe('ChatRepository / despachador', () => {
         expect(resultado.aviso).toContain('buscar_persona');
     });
 
+    it('a un ADMIN mis_clientes le devuelve todos los clientes activos', async () => {
+        const { repo, llamadas } = crearRepositorio(
+            [
+                { total: 2 },
+                [
+                    { id: 3, nombre: 'Agroexport', producto: 'Azucar' },
+                    { id: 5, nombre: 'Bananera', producto: null },
+                ],
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'mis_clientes', argumentos: {} },
+            { ...contexto, clientes: [], esAdmin: true },
+        )) as { total: number; mostrados: number };
+
+        expect(resultado.total).toBe(2);
+        expect(resultado.mostrados).toBe(2);
+        // Sin cartera de por medio: no se cruza con cliente_operador.
+        expect(
+            llamadas.some(
+                (l) => l.metodo === 'innerJoin' && l.args[0] === 'cliente_operador',
+            ),
+        ).toBe(false);
+    });
+
     it('encuentra un lote por su nombre, que es la pregunta mas natural del dominio', async () => {
         // Sin esto, "como va el lote X" obligaba al modelo a barrer
         // lotes_de_cliente cliente por cliente y se comia las tres vueltas.

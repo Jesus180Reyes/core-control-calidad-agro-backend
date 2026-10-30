@@ -6,6 +6,8 @@ Spec 28 (plus the chat-improvement specs after it; `docs/chat/` holds the questi
 
 Neither route validates `cliente_operador`: any authenticated user can ask about any client's lotes and weigh-ins. Filtering by cartera was considered and discarded (approvers and `ADMIN` have no `cliente_operador` rows, so they would see nothing). No permission row.
 
+**`mis_clientes` is the one place the chat reads the role.** `contextoDe` joins `roles` in the same user query (from the DB on every turn, like `validateCallerEsAdmin`) and sets `ContextoChat.esAdmin`; for an `ADMIN` the tool returns every active client (`todosLosClientes`, capped at `MAX_FILAS_MODELO` with `total`/`mostrados`) instead of the cartera. Every other role, approvers included, still gets its `cliente_operador` rows.
+
 ## `POST /chat`
 
 One conversation turn. `@HttpCode(200)` (a turn creates no resource). `{ ok, msg, respuesta, sugerencias }`, `respuesta` being **raw markdown** with real `\n`, like `resumen` — the front must not enable raw-HTML mode. `sugerencias` (spec 48) is a `string[]` that is **always present**: `[]` on every turn except the one where the chat did not understand, where it holds 2–3 plain-text questions and `respuesta` is exactly `FRASE_SUGERENCIAS`.

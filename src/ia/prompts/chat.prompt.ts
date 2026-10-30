@@ -51,6 +51,11 @@ export interface MensajeChat {
 export interface ContextoChat {
     usuario: { id: number; nombre: string };
     clientes: { id: number; nombre: string }[];
+    /**
+     * Rol ADMIN leido de la base en este turno. Solo cambia `mis_clientes`, que
+     * para un ADMIN devuelve todos los clientes activos en vez de su cartera.
+     */
+    esAdmin?: boolean;
 }
 
 /**
@@ -366,7 +371,7 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'mis_clientes',
         description:
-            'Devuelve los clientes de la cartera de quien esta preguntando. Sin argumentos. Usala cuando pregunten por "mis clientes" o para saber a que clientes puede referirse una consulta sin cliente explicito.',
+            'Devuelve los clientes de la cartera de quien esta preguntando; si es administrador, todos los clientes activos. Sin argumentos. Usala cuando pregunten por "mis clientes" o para saber a que clientes puede referirse una consulta sin cliente explicito.',
         parameters: { type: 'OBJECT', properties: {} },
     },
     {
