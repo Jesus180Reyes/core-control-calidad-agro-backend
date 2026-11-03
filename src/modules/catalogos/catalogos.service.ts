@@ -32,4 +32,8 @@ export class CatalogosService {
     async findDestinos() {
         return await this.catalogosRepository.getDestinos();
     }
+
+    async findRoles() {
+        return await this.catalogosRepository.getRoles();
+    }
 }

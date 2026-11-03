@@ -84,4 +84,13 @@ export class CatalogosRepository {
             .execute();
         return destinos;
     }
+
+    async getRoles() {
+        const roles = await this.db
+            .selectFrom('roles')
+            .select(['id', 'nombre'])
+            .orderBy('nombre', 'asc')
+            .execute();
+        return roles;
+    }
 }

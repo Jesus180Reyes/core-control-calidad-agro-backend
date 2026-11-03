@@ -139,4 +139,23 @@ export class CatalogosController {
             data,
         };
     }
+
+    @Get('roles')
+    @ApiOperation({
+        summary: 'Roles',
+        description:
+            'Lista de referencia para el selector del campo rol de POST /auth/register. Cada ' +
+            'elemento es { id, nombre } y la clave del payload es data. Devuelve todas las ' +
+            'filas, sin filtro (la tabla no tiene columna isActive), ADMIN y SOPORTE incluidos, ' +
+            'ordenadas por nombre. Abierto a cualquier usuario autenticado: listar los roles no ' +
+            'da permiso para asignarlos, POST /auth/register sigue exigiendo ADMIN o SOPORTE.',
+    })
+    async findRoles() {
+        const data = await this.catalogosService.findRoles();
+        return {
+            ok: true,
+            msg: 'Roles obtenidos correctamente',
+            data,
+        };
+    }
 }
