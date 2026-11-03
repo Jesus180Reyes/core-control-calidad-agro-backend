@@ -17,6 +17,7 @@ INSERT INTO `roles` (`id`, `nombre`, `descripcion`, `created_at`, `updated_at`, 
 INSERT INTO `roles` (`id`, `nombre`, `descripcion`, `created_at`, `updated_at`, `created_by`) VALUES (3,'SUPERVISOR','EL SUPERVISOR QUE GESTIONAR LOTE, CLIENTES Y PESAJES','2026-09-05 22:51:02','2026-09-05 22:51:02',17);
 INSERT INTO `roles` (`id`, `nombre`, `descripcion`, `created_at`, `updated_at`, `created_by`) VALUES (4,'APROBADOR','EL APROBADOR APRUEBA EN CLIENTE FINAL LOTES Y PESAJES','2026-09-05 22:51:44','2026-09-05 22:51:44',17);
 INSERT INTO `roles` (`id`, `nombre`, `descripcion`, `created_at`, `updated_at`, `created_by`) VALUES (5,'CONTADOR','El contador maneja los modulos de administracion','2026-09-14 14:19:19','2026-09-14 14:19:19',17);
+INSERT INTO `roles` (`id`, `nombre`, `descripcion`, `created_at`, `updated_at`, `created_by`) VALUES (6,'SOPORTE','EL SOPORTE QUE ATIENDE INCIDENCIAS DE LOS USUARIOS','2026-11-03 00:00:00','2026-11-03 00:00:00',NULL);
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -86,6 +87,7 @@ INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isAct
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (20,'VER-METRICAS','Ingresar al modulo Metricas','El que tenga el permiso puede ingresar al modulo de Metricas',1,'2026-10-10 00:59:45');
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (21,'EDITAR-CLIENTE','Editar cliente','PATCH /clientes/:id: editar los datos de un cliente activo',1,'2026-10-14 17:14:11');
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (22,'EDITAR-OPERADORES-CLIENTE','Editar operadores de un cliente','GET y PATCH /clientes/:id/operadores: cambiar los operadores vinculados a un cliente',1,'2026-10-14 20:12:55');
+INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (23,'MODULO-SOPORTE','Ingresar al modulo de Soporte','El que tenga el permiso puede ingresar al modulo de Soporte',1,'2026-11-03 00:00:00');
 /*!40000 ALTER TABLE `catalogo_permisos` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -137,6 +139,7 @@ INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) 
 INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (61,3,21,1,'2026-10-14 17:14:11');
 INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (63,2,22,1,'2026-10-14 20:12:55');
 INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (64,3,22,1,'2026-10-14 20:12:55');
+INSERT INTO `permisos` (`id`, `rol_id`, `permiso_id`, `isActive`, `created_at`) VALUES (65,6,23,1,'2026-11-03 00:00:00');
 /*!40000 ALTER TABLE `permisos` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
