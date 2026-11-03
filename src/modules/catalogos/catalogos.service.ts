@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogosRepository } from './repository/catalogos.repository';
+import { FiltrosUsuariosDto } from './dto/filtros-usuarios.dto';
 
 @Injectable()
 export class CatalogosService {
@@ -9,8 +10,8 @@ export class CatalogosService {
         return await this.catalogosRepository.getProductos();
     }
 
-    async findUsuarios() {
-        return await this.catalogosRepository.getUsuarios();
+    async findUsuarios(filtros: FiltrosUsuariosDto) {
+        return await this.catalogosRepository.getUsuarios(filtros);
     }
 
     async findOperadores() {

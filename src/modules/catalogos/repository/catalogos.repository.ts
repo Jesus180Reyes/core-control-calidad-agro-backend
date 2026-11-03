@@ -1,5 +1,6 @@
 import { DatabaseService } from 'src/database/database.service';
 import { Injectable } from '@nestjs/common';
+import { FiltrosUsuariosDto } from '../dto/filtros-usuarios.dto';
 
 @Injectable()
 export class CatalogosRepository {
@@ -19,8 +20,8 @@ export class CatalogosRepository {
         return productos;
     }
 
-    async getUsuarios() {
-        const usuarios = await this.db
+    async getUsuarios(filtros: FiltrosUsuariosDto) {
+        let query = this.db
             .selectFrom('usuarios')
             .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
             .select([
@@ -29,7 +30,19 @@ export class CatalogosRepository {
                 'usuarios.cedula',
                 'roles.nombre as rol',
             ])
-            .where('usuarios.isActive', '=', 1)
+            .where('usuarios.isActive', '=', 1);
+
+        if (filtros.nombre !== undefined) {
+            query = query.where('usuarios.complete_name', 'like', `%${filtros.nombre}%`);
+        }
+        if (filtros.cedula !== undefined) {
+            query = query.where('usuarios.cedula', '=', filtros.cedula);
+        }
+        if (filtros.rol_id !== undefined) {
+            query = query.where('usuarios.rol_id', '=', filtros.rol_id);
+        }
+
+        const usuarios = await query
             .orderBy('usuarios.complete_name', 'asc')
             .execute();
         return usuarios;

@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CatalogosService } from './catalogos.service';
+import { FiltrosUsuariosDto } from './dto/filtros-usuarios.dto';
 
 @ApiTags('catalogos')
 @ApiBearerAuth()
@@ -35,10 +36,12 @@ export class CatalogosController {
             'y roles.nombre aliasado a rol. La clave del payload es data. Devuelve TODOS los ' +
             'usuarios activos ordenados por nombre, sin filtro de rol y sin filtro por ' +
             'cliente_operador: cualquier usuario autenticado ve tambien las cuentas ADMIN y ' +
-            'la cedula de todos.',
+            'la cedula de todos. Filtros opcionales: ?nombre (LIKE parcial sobre complete_name), ' +
+            '?cedula (igualdad exacta) y ?rol_id (el id de GET /catalogos/roles). Siguen la ' +
+            'convencion del spec 16: un valor invalido o vacio se ignora, nunca un 400.',
     })
-    async findUsuarios() {
-        const data = await this.catalogosService.findUsuarios();
+    async findUsuarios(@Query() filtros: FiltrosUsuariosDto) {
+        const data = await this.catalogosService.findUsuarios(filtros);
         return {
             ok: true,
             msg: 'Usuarios obtenidos correctamente',
