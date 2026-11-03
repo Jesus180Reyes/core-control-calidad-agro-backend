@@ -4,15 +4,15 @@ Specs: 33 (password expiry), 34 (reset), 37 (admin-only register), 38 (superviso
 
 ## Role checks — the only ones in the project
 
-Exactly three endpoints discriminate by role, all here: `POST /auth/register`, `PATCH /auth/usuarios/:id/reset-password`, `PATCH /auth/usuarios/:id/pin`. Each answers **403** unless the caller's role is `ADMIN`, with its own message (`No tiene permisos para registrar usuarios` / `No tiene permisos para restablecer contraseñas` / `No tiene permisos para asignar PINs de supervisor`), because `validateCallerEsAdmin(userId, mensaje, db)` takes the message as a parameter.
+Exactly three endpoints discriminate by role, all here: `POST /auth/register`, `PATCH /auth/usuarios/:id/reset-password`, `PATCH /auth/usuarios/:id/pin`. Each answers **403** unless the caller's role is `ADMIN` or `SOPORTE` (`ROLES_GESTION_USUARIOS`), with its own message (`No tiene permisos para registrar usuarios` / `No tiene permisos para restablecer contraseñas` / `No tiene permisos para asignar PINs de supervisor`), because `validateCallerEsAdminOSoporte(userId, mensaje, db)` takes the message as a parameter. The two roles are equal here: a `SOPORTE` can create an `ADMIN` and reset an `ADMIN`'s password — by decision, not an oversight.
 
 - **The check lives in `AuthRepository`**, not in a guard or a `@Roles()` decorator — a generic mechanism was deliberately not built.
 - **The role is read from the DB on every request** (`usuarios` joined to `roles` by the token's `userId`), because the JWT does not carry it. Removing someone's `ADMIN` takes effect immediately; a token whose user no longer exists also gets 403.
-- **It compares `roles.nombre` against the literal `'ADMIN'`**, uppercase — not a `catalogo_permisos` code, so permissions are still unenforced.
+- **It compares `roles.nombre` against the literals `'ADMIN'` and `'SOPORTE'`**, uppercase — not a `catalogo_permisos` code, so permissions are still unenforced (`MODULO-SOPORTE` only tells the front to show the screen).
 - It is checked **first**, so a non-admin cannot probe which ids exist.
 - Bootstrap: if no `ADMIN` with a known password remains, creating users or resetting passwords needs a manual SQL change.
 - `SUPERVISOR` (id 3 in the current DB, seeded by hand) is read in two places and **gates no caller**: the PIN endpoint demands it of the *target* user (`validateUsuarioEsSupervisor`, a 400), and `POST /pesajes/validar-pin` demands it of the PIN's owner. Both compare against the literal `'SUPERVISOR'`; if the row is named differently, no user can receive a PIN and every PIN answers `PIN incorrecto` — it fails closed.
-- Role names are uppercase: `OPERADOR` (id 1), `ADMIN` (id 2), `SUPERVISOR` (id 3).
+- Role names are uppercase: `OPERADOR` (id 1), `ADMIN` (id 2), `SUPERVISOR` (id 3), `APROBADOR` (4), `CONTADOR` (5), `SOPORTE` (6, in the seed).
 
 ## `usuarios` columns of note
 

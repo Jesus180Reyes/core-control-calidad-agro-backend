@@ -19,6 +19,7 @@ export class AuthRepository {
     private static readonly NUMEROS = '23456789';
     private static readonly ALFABETO = `${AuthRepository.MAYUSCULAS}abcdefghijkmnpqrstuvwxyz${AuthRepository.NUMEROS}`;
     private static readonly INTENTOS_PIN = 20;
+    private static readonly ROLES_GESTION_USUARIOS = ['ADMIN', 'SOPORTE'];
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
@@ -68,7 +69,7 @@ export class AuthRepository {
         const { complete_name, rol, username, cedula } = data;
 
         return await this.db.transaction().execute(async (trx) => {
-            await this.validateCallerEsAdmin(createdBy, 'No tiene permisos para registrar usuarios', trx);
+            await this.validateCallerEsAdminOSoporte(createdBy, 'No tiene permisos para registrar usuarios', trx);
             await this.validateRolExiste(rol, trx);
 
             const user = await this.getUserByCedula(cedula, trx);
@@ -124,7 +125,7 @@ export class AuthRepository {
 
     async resetearPassword(id: number, userId: number) {
         return await this.db.transaction().execute(async (trx) => {
-            await this.validateCallerEsAdmin(userId, 'No tiene permisos para restablecer contraseñas', trx);
+            await this.validateCallerEsAdminOSoporte(userId, 'No tiene permisos para restablecer contraseñas', trx);
             this.validateNoEsMismoUsuario(id, userId);
             await this.validateUsuarioActivo(id, trx);
 
@@ -146,7 +147,7 @@ export class AuthRepository {
 
     async asignarPinSupervisor(id: number, userId: number) {
         return await this.db.transaction().execute(async (trx) => {
-            await this.validateCallerEsAdmin(userId, 'No tiene permisos para asignar PINs de supervisor', trx);
+            await this.validateCallerEsAdminOSoporte(userId, 'No tiene permisos para asignar PINs de supervisor', trx);
             await this.validateUsuarioActivo(id, trx);
             await this.validateUsuarioEsSupervisor(id, trx);
             await this.validateSinPin(id, trx);
@@ -234,7 +235,7 @@ export class AuthRepository {
         }
     }
 
-    private async validateCallerEsAdmin(userId: number, mensaje: string, db: Kysely<Database>) {
+    private async validateCallerEsAdminOSoporte(userId: number, mensaje: string, db: Kysely<Database>) {
         const caller = await db
             .selectFrom('usuarios')
             .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
@@ -242,7 +243,7 @@ export class AuthRepository {
             .where('usuarios.id', '=', userId)
             .executeTakeFirst();
 
-        if (!caller || caller.rol !== 'ADMIN') {
+        if (!caller || !AuthRepository.ROLES_GESTION_USUARIOS.includes(caller.rol)) {
             throw new ForbiddenException(mensaje);
         }
     }

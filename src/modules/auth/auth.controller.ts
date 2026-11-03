@@ -44,8 +44,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Registrar un usuario',
     description:
-      'Exige rol ADMIN, leido de la base en cada request; cualquier otro rol, o un token cuyo usuario ya no existe, responde 403. ' +
-      'El usuario creado queda con created_by igual al userId del que llama. Un admin puede crear otro admin. ' +
+      'Exige rol ADMIN o SOPORTE, leido de la base en cada request; cualquier otro rol, o un token cuyo usuario ya no existe, responde 403. ' +
+      'El usuario creado queda con created_by igual al userId del que llama. Un ADMIN o un SOPORTE puede crear un usuario de cualquier rol, ADMIN incluido. ' +
       'El body no lleva contraseña: el sistema genera una temporal de 10 caracteres y la devuelve en password_temporal una sola vez; no se guarda en texto plano. ' +
       'La temporal nace vencida: el login con ella responde 403 con passwordVencida: true, ' +
       'y el usuario debe renovarla con POST /auth/renovar-password. ' +
@@ -94,12 +94,12 @@ export class AuthController {
   @ApiOperation({
     summary: 'Restablecer la contraseña de un usuario',
     description:
-      'Exige rol ADMIN, leido de la base en cada request: es el unico endpoint del proyecto que discrimina por rol. ' +
+      'Exige rol ADMIN o SOPORTE, leido de la base en cada request. ' +
       'Cualquier otro rol, o un token cuyo usuario ya no existe, responde 403. ' +
       'Genera una contraseña temporal de 10 caracteres y la devuelve en password_temporal una sola vez; no se guarda en texto plano. ' +
       'La temporal nace vencida: el login con ella responde 403 con passwordVencida: true, ' +
       'y el usuario debe renovarla con POST /auth/renovar-password. ' +
-      'No acepta body. Un admin puede resetear a otro admin pero no a si mismo (400). ' +
+      'No acepta body. Un ADMIN o un SOPORTE puede resetear a cualquier usuario, ADMIN incluido, pero no a si mismo (400). ' +
       '400 si el usuario no existe o esta inactivo. ' +
       'No revoca los tokens vigentes del usuario reseteado.',
   })
@@ -120,7 +120,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Asignar el PIN de un supervisor',
     description:
-      'Exige rol ADMIN, leido de la base en cada request; cualquier otro rol, o un token cuyo usuario ya no existe, responde 403, ' +
+      'Exige rol ADMIN o SOPORTE, leido de la base en cada request; cualquier otro rol, o un token cuyo usuario ya no existe, responde 403, ' +
       'y se valida antes que el id, asi que no revela que usuarios son supervisores. ' +
       'El usuario destino debe tener rol SUPERVISOR. ' +
       'El sistema genera un PIN de 4 digitos unico en todo el sistema y lo devuelve en pin una sola vez; ninguna otra respuesta lo devuelve. ' +
