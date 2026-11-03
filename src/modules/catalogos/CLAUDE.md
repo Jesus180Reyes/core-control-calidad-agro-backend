@@ -2,13 +2,13 @@
 
 Specs: 09, 39, 40, 43, 47. Seven read-only selector lists. `CatalogosRepository` is plain `SELECT`s: no validation, no transaction, no input.
 
-- **Response shape:** `{ ok, msg, data }`, every element exactly `{ id, nombre }`. `data` instead of a named key is a recorded decision so all seven share one shape — if it is ever unified with the rest of the API, unify every `GET` in one spec.
+- **Response shape:** `{ ok, msg, data }`, every element `{ id, nombre }` — except `GET /catalogos/usuarios`, which adds `cedula` and `rol`. `data` instead of a named key is a recorded decision so all seven share one shape — if it is ever unified with the rest of the API, unify every `GET` in one spec.
 - **Access:** open to any authenticated user, no `cliente_operador` filter, no params, no pagination, no permission row — on purpose: every user needs these lists to fill the forms they are already allowed to use.
 
 | Route | Filter / order | Notes |
 | --- | --- | --- |
 | `GET /catalogos/productos` | `isActive = 1`, `nombre` ASC | |
-| `GET /catalogos/usuarios` | `isActive = 1`, `complete_name` ASC | `complete_name as nombre`; **every** active user, `ADMIN` accounts included, no role filter. Left unchanged by spec 39 on purpose |
+| `GET /catalogos/usuarios` | `isActive = 1`, `complete_name` ASC | `{ id, nombre, cedula, rol }`: `complete_name as nombre`, `INNER JOIN roles` with `roles.nombre as rol`; **every** active user, `ADMIN` accounts included, no role filter. Any authenticated user sees every `cedula`, by decision |
 | `GET /catalogos/unidades-medida` | unfiltered (no `isActive` column), `nombre` ASC | table key in `Database` is `unidades_medida` (plural) |
 | `GET /catalogos/operadores` (spec 39) | same as `usuarios` plus `INNER JOIN roles` with `roles.nombre = 'OPERADOR'` (literal) | for selectors like `usuario_ids` of `POST /clientes` and `?usuario_id` filters. If the role row is named differently, answers `data: []` — fails closed. `POST /clientes` still does not validate the role of its `usuario_ids`. `GET /clientes/:id/operadores` uses the same filter |
 | `GET /catalogos/estados-calidad` (spec 40) | every row (no `isActive`), **`id` ASC** | `codigo` is not returned, by decision. Same order as `por_estado_calidad` in `GET /metricas/calidad`. Feeds the `?estado_calidad_id` filters so the front stops hardcoding ids |

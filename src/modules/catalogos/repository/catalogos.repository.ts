@@ -22,9 +22,15 @@ export class CatalogosRepository {
     async getUsuarios() {
         const usuarios = await this.db
             .selectFrom('usuarios')
-            .select(['id', 'complete_name as nombre'])
-            .where('isActive', '=', 1)
-            .orderBy('complete_name', 'asc')
+            .innerJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .select([
+                'usuarios.id',
+                'usuarios.complete_name as nombre',
+                'usuarios.cedula',
+                'roles.nombre as rol',
+            ])
+            .where('usuarios.isActive', '=', 1)
+            .orderBy('usuarios.complete_name', 'asc')
             .execute();
         return usuarios;
     }
