@@ -27,6 +27,7 @@ export class CatalogosRepository {
             .select([
                 'usuarios.id',
                 'usuarios.complete_name as nombre',
+                'usuarios.username',
                 'usuarios.cedula',
                 'roles.nombre as rol',
             ])

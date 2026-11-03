@@ -32,7 +32,7 @@ export class CatalogosController {
         summary: 'Usuarios activos',
         description:
             'Lista de referencia para selectores, usada al vincular operadores a un cliente. ' +
-            'Cada elemento es { id, nombre, cedula, rol }, con complete_name aliasado a nombre ' +
+            'Cada elemento es { id, nombre, username, cedula, rol }, con complete_name aliasado a nombre ' +
             'y roles.nombre aliasado a rol. La clave del payload es data. Devuelve TODOS los ' +
             'usuarios activos ordenados por nombre, sin filtro de rol y sin filtro por ' +
             'cliente_operador: cualquier usuario autenticado ve tambien las cuentas ADMIN y ' +
