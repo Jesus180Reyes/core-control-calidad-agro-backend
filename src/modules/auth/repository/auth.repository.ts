@@ -43,6 +43,13 @@ export class AuthRepository {
             throw new UnauthorizedException('Usuario o contraseña incorrectas');
         }
 
+        // Despues de bcrypt, como el vencimiento: el mensaje propio solo lo ve
+        // quien sabe la contraseña (spec 50). `NULL` cuenta como activo, igual
+        // que en `validateUsuarioActivo`.
+        if (user.isActive === 0) {
+            throw new UnauthorizedException('El usuario esta inactivo');
+        }
+
         if (user.password_vencida) {
             throw new ForbiddenException({
                 statusCode: 403,
@@ -56,13 +63,14 @@ export class AuthRepository {
             user_id: user.id,
             username: user.username!,
         }
-        const accessToken = this.jwtService.sign(payload);
+        const { accessToken, refreshToken } = this.signTokenPair(payload);
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password: _, id: __, cedula: ____, username: _____, password_vencida: ______, ...currentUser } = user;
+        const { password: _, id: __, cedula: ____, username: _____, password_vencida: ______, isActive: _______, ...currentUser } = user;
 
         return {
             accessToken,
+            refreshToken,
             currentUser,
         };
     }
@@ -317,6 +325,7 @@ export class AuthRepository {
                 'usuarios.username',
                 'usuarios.complete_name',
                 'usuarios.password',
+                'usuarios.isActive',
                 'roles.nombre as rol',
                 sql<number>`usuarios.password_vence_en IS NOT NULL AND usuarios.password_vence_en <= NOW()`.as('password_vencida'),
             ])

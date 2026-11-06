@@ -25,7 +25,7 @@ Este spec mantiene la idea del refresh token. Agrega una sola consulta a `usuari
 
 - Nueva variable de entorno opcional `JWT_REFRESH_SECRET`, distinta de `JWT_SECRET`.
 - `POST /auth/login` devuelve `refreshToken` además de `accessToken`.
-- `POST /auth/login` rechaza a un usuario con `isActive = 0` con el mismo 401 de credenciales incorrectas.
+- `POST /auth/login` rechaza a un usuario con `isActive = 0` con un 401 `El usuario esta inactivo`.
 - Nuevo `POST /auth/refresh`, `@Public()`, con body `{ refreshToken }` validado por un DTO Zod.
 - `POST /auth/refresh` verifica la firma con `JWT_REFRESH_SECRET` y consulta `usuarios` por el id del token. Rechaza un usuario que no existe, está inactivo o tiene la contraseña vencida.
 - Rotación: cada refresh exitoso emite un `accessToken` nuevo (8h) y un `refreshToken` nuevo con 30 días completos (sesión deslizante).
@@ -100,7 +100,8 @@ Errores de `POST /auth/refresh`, en este orden:
 | `JWT_REFRESH_SECRET` ausente o igual a `JWT_SECRET` | **503** `El refresh de sesion no esta disponible` |
 | Body sin `refreshToken` o vacío | **400** (pipe Zod) |
 | Firma inválida, token expirado, mal formado o un access token | **401** `Refresh token inválido o expirado` |
-| El usuario del token no existe o tiene `isActive = 0` | **401** `Refresh token inválido o expirado` |
+| El usuario del token no existe | **401** `Refresh token inválido o expirado` |
+| El usuario del token tiene `isActive = 0` | **401** `El usuario esta inactivo`, igual que el login |
 | `password_vence_en <= NOW()` | **403** `{ statusCode: 403, message: 'La contraseña ha caducado', passwordVencida: true }`, igual que el login |
 
 ## Implementation plan
@@ -108,14 +109,15 @@ Errores de `POST /auth/refresh`, en este orden:
 1. Agregar `JWT_REFRESH_SECRET` a `.env.example` y al `.env` local, con un valor distinto de `JWT_SECRET`.
 2. En `AuthRepository`, agregar el método privado `resolverSecretoRefresh()`: lee `JWT_REFRESH_SECRET` con `ConfigService` y devuelve `null` si está vacía o es igual a `JWT_SECRET`. Mismo patrón que `resolverVigenciaDias()`.
 3. En `AuthRepository`, agregar el método privado `signTokenPair(payload)`. El access se firma con `this.jwtService.sign(payload)` (configuración global). El refresh se firma con `{ secret, expiresIn: REFRESH_TOKEN_EXPIRES_IN }`, o queda en `null` si no hay secreto.
-4. En `AuthRepository.login`: agregar `usuarios.isActive` al `select` de `getUserByUsername` y rechazar `isActive === 0` con `UnauthorizedException('Usuario o contraseña incorrectos')`. El chequeo va **después** de `bcrypt.compare` y **antes** del de vencimiento. Quitar `isActive` de `currentUser` y reemplazar la firma directa por `signTokenPair`.
+4. En `AuthRepository.login`: agregar `usuarios.isActive` al `select` de `getUserByUsername` y rechazar `isActive === 0` con `UnauthorizedException('El usuario esta inactivo')`. El chequeo va **después** de `bcrypt.compare` y **antes** del de vencimiento. Quitar `isActive` de `currentUser` y reemplazar la firma directa por `signTokenPair`.
 5. En `AuthController.login`, agregar `refreshToken` a la respuesta y actualizar la descripción de `@ApiOperation`: el par de tokens, `refreshToken` puede ser `null` y el 401 por usuario inactivo.
 6. Crear `src/modules/auth/dto/refresh-token.dto.ts` con `RefreshTokenDto` (`createZodDto`).
 7. En `AuthRepository`, agregar `refreshTokens(refreshToken)`, en este orden:
    - Sin secreto, lanzar `ServiceUnavailableException`.
    - Hacer `jwtService.verify<JwtPayload>` con el secreto de refresh dentro de un `try/catch`. El `catch` lanza el 401 genérico.
    - Leer de `usuarios` por `user_id ?? sub`: `id`, `username`, `isActive` y el mismo `password_vencida` calculado que usa `getUserByUsername`. Es una sola lectura, sin transacción.
-   - Si el usuario no existe o tiene `isActive === 0`, lanzar el 401 genérico.
+   - Si el usuario no existe, lanzar el 401 genérico.
+   - Si tiene `isActive === 0`, lanzar el 401 `El usuario esta inactivo` del login.
    - Si `password_vencida`, lanzar el 403 del login.
    - Devolver `signTokenPair({ sub: id, user_id: id, username })` con el `username` **leído de la base**, no copiado del token. Así no se arrastran ni `iat` ni `exp`.
 8. En `AuthService`, agregar `refresh(refreshToken)` como pass-through.
@@ -132,7 +134,8 @@ Errores de `POST /auth/refresh`, en este orden:
 
 - [ ] `POST /auth/login` con credenciales válidas responde 200 con `accessToken` y `refreshToken`, ambos strings no vacíos.
 - [ ] El `accessToken` del login expira a las 8 horas y el `refreshToken` a los 30 días (claim `exp`).
-- [ ] `POST /auth/login` de un usuario con `isActive = 0` y contraseña correcta responde 401 `Usuario o contraseña incorrectos`.
+- [ ] `POST /auth/login` de un usuario con `isActive = 0` y contraseña correcta responde 401 `El usuario esta inactivo`.
+- [ ] `POST /auth/login` de un usuario con `isActive = 0` y contraseña incorrecta responde el 401 de credenciales incorrectas, sin mencionar que está inactivo.
 - [ ] `POST /auth/login` de un usuario con `isActive = NULL` responde 200.
 - [ ] `POST /auth/refresh` con `{ refreshToken }` válido responde 200 con un `accessToken` y un `refreshToken` nuevos.
 - [ ] El `accessToken` emitido por `/auth/refresh` autentica `GET /clientes` y expira a las 8 horas, no a los 30 días.
@@ -141,7 +144,7 @@ Errores de `POST /auth/refresh`, en este orden:
 - [ ] `GET /clientes` con un **refresh token** como `Bearer` responde 401.
 - [ ] `POST /auth/refresh` con un string que no es JWT responde 401 `Refresh token inválido o expirado`.
 - [ ] `POST /auth/refresh` sin body o con `refreshToken: ""` responde 400.
-- [ ] Tras poner `isActive = 0` a un usuario, su refresh token responde 401.
+- [ ] Tras poner `isActive = 0` a un usuario, su refresh token responde 401 `El usuario esta inactivo`.
 - [ ] Tras poner `password_vence_en = NOW()` a un usuario, su refresh token responde 403 con `passwordVencida: true`.
 - [ ] Tras cambiar el `username` de un usuario en la base, el `accessToken` emitido por `/auth/refresh` lleva el nombre nuevo.
 - [ ] Sin `JWT_REFRESH_SECRET` en el `.env`, la app arranca, el login responde 200 con `refreshToken: null` y `/auth/refresh` responde 503.
@@ -157,7 +160,9 @@ Errores de `POST /auth/refresh`, en este orden:
 - **No:** tabla `refresh_tokens`. Requiere DDL aplicado a mano en cada tenant. Va en el spec de logout y revocación.
 - **No:** cortar las sesiones por reset (refresh emitido antes del último cambio de contraseña). Exige que el reset escriba una marca que hoy no escribe. Se deja fuera para no tocar el SPEC 34.
 - **Yes:** revisar `isActive` en el login y en el refresh a la vez. El SPEC 07 dejó dicho que se aplique en todos a la vez, y revisarlo solo en el refresh lo haría cosmético.
-- **Yes:** el 401 por usuario inactivo en el login usa el mismo mensaje que credenciales incorrectas y va después de `bcrypt.compare`. Solo quien sabe la contraseña distingue nada, como con el vencimiento.
+- **Yes:** el usuario inactivo recibe un 401 con mensaje propio, `El usuario esta inactivo`, en el login y en el refresh. El chequeo va después de `bcrypt.compare`, así que solo lo ve quien sabe la contraseña, como el vencimiento. Decidido durante la implementación: el usuario necesita saber por qué no entra.
+- **No:** el mismo mensaje que credenciales incorrectas. Era la idea original. Ocultaba el motivo sin ganar nada, porque quien llega a ese chequeo ya sabe la contraseña.
+- **No:** un 403 para el inactivo, como el de contraseña vencida. Se mantiene 401, y el front lo distingue por el mensaje.
 - **Yes:** el 403 por contraseña vencida en el refresh es idéntico al del login. El front reutiliza el manejo que ya tiene y manda a `/auth/renovar-password`.
 - **Yes:** `JWT_REFRESH_SECRET` aparte. Hace estructuralmente imposible que un refresh pase como `Bearer`, porque el `JwtStrategy` verifica con `JWT_SECRET`.
 - **No:** el mismo secreto con un claim `type: 'refresh'`. Depende de que el `JwtStrategy` nunca pierda ese chequeo.
