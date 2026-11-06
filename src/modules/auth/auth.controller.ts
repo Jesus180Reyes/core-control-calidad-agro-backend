@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register.dto';
 import { LoginUserDto } from './dto/login.dto';
 import { RenovarPasswordDto } from './dto/renovar-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Public } from 'src/decorators/public.decorator';
 
 @ApiTags('auth')
@@ -40,6 +41,34 @@ export class AuthController {
       accessToken,
       refreshToken,
       passwordVencida: false,
+    };
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: 'Renovar la sesion con el refresh token',
+    description:
+      'Canjea el refreshToken de POST /auth/login (o de un refresh anterior) por un par nuevo: ' +
+      'accessToken de 8h y refreshToken de 30 dias contados desde esta llamada (sesion deslizante). ' +
+      'Responde 200, no 201. Publica: no lleva Bearer, el token viaja en el body { refreshToken }. ' +
+      'Un refreshToken no sirve como Bearer en las demas rutas, ni un accessToken sirve aqui: se firman con secretos distintos. ' +
+      'El refreshToken anterior NO se invalida al rotar: sigue valiendo hasta su propio vencimiento. ' +
+      'No devuelve user. Consulta usuarios en cada llamada, y el username del token nuevo sale de la base. ' +
+      'Errores, en este orden: 503 "El refresh de sesion no esta disponible" si el servidor no tiene JWT_REFRESH_SECRET; ' +
+      '400 si falta refreshToken o viene vacio; ' +
+      '401 "Refresh token inválido o expirado" si la firma no es valida, el token vencio, esta mal formado, es un accessToken o su usuario ya no existe; ' +
+      '401 "El usuario esta inactivo" si el usuario tiene isActive = 0; ' +
+      '403 con message "La contraseña ha caducado" y passwordVencida: true si la contraseña vencio, igual que el login.',
+  })
+  async refresh(@Body() data: RefreshTokenDto) {
+    const { accessToken, refreshToken } = await this.authService.refresh(data.refreshToken);
+    return {
+      ok: true,
+      msg: 'Sesion renovada correctamente',
+      accessToken,
+      refreshToken,
     };
   }
 
