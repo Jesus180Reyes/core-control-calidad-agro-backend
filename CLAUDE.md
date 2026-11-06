@@ -51,10 +51,11 @@ Server listens on `process.env.PORT` (default 4000). No global route prefix (the
 - `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.1-flash-lite`), `GEMINI_TIMEOUT_MS` (default **45000**) — see `src/ia/CLAUDE.md`. Without the key, the routes that call Gemini answer 503 but the app starts.
 - `CHAT_LIMITE_DIARIO` — see `src/modules/chat/CLAUDE.md`.
 - `PASSWORD_VIGENCIA_DIAS` (default **90**) — see `src/modules/auth/CLAUDE.md`.
+- `JWT_REFRESH_SECRET` — signs the refresh token. Empty, missing or equal to `JWT_SECRET` counts as absent: login answers `refreshToken: null` and `POST /auth/refresh` answers 503. It has **no fallback literal**, unlike `JWT_SECRET`. Every tenant `.env` needs its own (`nuevo-tenant.sh` generates it; the loop for existing tenants is in `deploy/README.md`, section 9). See `src/modules/auth/CLAUDE.md`.
 
 **Swagger**: UI at `/docs`, OpenAPI JSON at `/docs-json`, mounted in `src/main.ts` **only when `NODE_ENV === 'development'`**. Three things to know. **First: the UI is express middleware, not a Nest route**, so the global `JwtAuthGuard` never sees it — `/docs` is open to anyone who reaches the port, which is the whole reason for the condition. **Second: `patchNestJsSwagger()` does not exist in `nestjs-zod@5`** and importing it breaks the build; in v5 `createZodDto` documents the DTOs on its own, and the only wiring is `cleanupOpenApiDoc()` around `SwaggerModule.createDocument`. **Third: `@nestjs/swagger` is pinned to `^11`** because 12.x requires `@nestjs/common@^12`; a plain `npm install @nestjs/swagger` fails with `ERESOLVE`. Controllers carry `@ApiTags` and `@ApiBearerAuth` per class, `@ApiOperation` (summary + description) per endpoint and `@ApiParam` on route params. **There are no response schemas and no `@ApiResponse` anywhere**, by decision (spec 22): `specs/` and these `CLAUDE.md` files are the only documentation of response shapes. The endpoint descriptions are where the access-control truth lives — every route that skips `validateVinculoOperador` says so in its own description. `AppController` carries `@ApiExcludeController()`: `GET /` stays mapped and still requires a token. Nothing validates the descriptions, so a new endpoint without `@ApiOperation` leaves the UI silently incomplete.
 
-**Route count** (trust the route log over this): Nest maps **51** routes — `auth` 5, `catalogos` 8, `origenes` 1, `clientes` 7, `lotes` 11, `permisos` 1, `pesajes` 8, `documentos-fiscales` 5, `chat` 2, `plantas` 1, `metricas` 1, plus `GET /`. The OpenAPI document holds **50** operations under **46** `paths` keys (`/clientes`, `/documentos-fiscales`, `/lotes/{id}/resumen` and `/clientes/{id}/operadores` each group two verbs). Update these numbers when adding a route.
+**Route count** (trust the route log over this): Nest maps **52** routes — `auth` 6, `catalogos` 8, `origenes` 1, `clientes` 7, `lotes` 11, `permisos` 1, `pesajes` 8, `documentos-fiscales` 5, `chat` 2, `plantas` 1, `metricas` 1, plus `GET /`. The OpenAPI document holds **51** operations under **47** `paths` keys (`/clientes`, `/documentos-fiscales`, `/lotes/{id}/resumen` and `/clientes/{id}/operadores` each group two verbs). Update these numbers when adding a route.
 
 ## Spec-driven workflow
 
@@ -65,7 +66,7 @@ This repo is developed spec-first via two local skills in `.agents/skills/` (mir
 
 `specs/` holds the source of truth for what was decided and, just as importantly, what was **deliberately deferred** (each spec has `Out of scope`, `Decisions`, `Risks` and `What is not in this spec` sections). Before adding a feature, check whether an existing spec already ruled it out and why — new work goes in a new spec rather than silently expanding an old one. Specs are written in Spanish; the codebase and the `CLAUDE.md` files are in English.
 
-Existing specs run from `01-vinculacion-cliente-operador.md` to `49-front-por-tenant-en-la-vps.md`; `18-filtros-de-lotes.md` is still `Draft`, which is why `lotes` has no query params.
+Existing specs run from `01-vinculacion-cliente-operador.md` to `50-refresh-token.md`, with no `05` (deleted unimplemented; older specs that cite "SPEC 05" refer to it); `18-filtros-de-lotes.md` is still `Draft`, which is why `lotes` has no query params.
 
 ## Architecture
 
@@ -79,7 +80,7 @@ NestJS API (Express platform) backed by MySQL via Kysely (no ORM, no migration t
 - Because the pool has one connection, **never make a network call inside a transaction** — it holds the request's only connection for the length of a third party's latency (see `POST /lotes/:id/resumen` in `src/modules/lotes/CLAUDE.md`).
 
 **Auth/guard flow:**
-- `JwtAuthGuard` (`src/guards/jwt-auth.guard.ts`) is registered globally via `APP_GUARD` in `AppModule`, so every route requires a valid JWT by default. `@Public()` (`src/decorators/public.decorator.ts`) opts out — only `POST /auth/login` and `POST /auth/renovar-password` use it.
+- `JwtAuthGuard` (`src/guards/jwt-auth.guard.ts`) is registered globally via `APP_GUARD` in `AppModule`, so every route requires a valid JWT by default. `@Public()` (`src/decorators/public.decorator.ts`) opts out — only `POST /auth/login`, `POST /auth/refresh` and `POST /auth/renovar-password` use it.
 - `JwtStrategy` (`src/strategy/jwt.stategy.ts`) returns `{ userId, username }` as `req.user`. Controllers read it as `const { userId } = req.user as { userId: number }`. The JWT does not carry the role.
 - `ZodValidationPipe` from `nestjs-zod` is registered as `APP_PIPE` in `AppModule`. DTOs are Zod schemas wrapped with `createZodDto()`, not `class-validator`.
 - **The pipe and the guard are registered only in `AppModule`. Do not add `useGlobalPipes`/`useGlobalGuards` to `main.ts` "for symmetry"**: until 2026-10-10 both were registered twice, every DTO was validated twice, and any `.transform()` that changed the type broke silently. Several DTO comments still mention "the pipe registered twice" — they describe the old state. Same for the filter: `RegistroErroresFilter` is `APP_FILTER` only; registering it twice would log every error twice.

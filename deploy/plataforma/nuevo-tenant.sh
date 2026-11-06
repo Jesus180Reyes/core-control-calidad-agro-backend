@@ -88,6 +88,7 @@ echo "$ADMIN_HASH" | grep -q '^\$2[aby]\$' || { echo "ERROR: no se pudo generar 
 
 DB_PASSWORD=$(openssl rand -hex 24)
 JWT_SECRET=$(openssl rand -hex 48)
+JWT_REFRESH_SECRET=$(openssl rand -hex 48)
 
 # Si algo falla de aqui en adelante, el alta queda a medias.
 trap 'R=$?; stty echo 2>/dev/null || true; if [ $R -ne 0 ]; then
@@ -140,6 +141,7 @@ cp tenant/docker-compose.yml "$DIR_TENANT/docker-compose.yml"
       -e "s|^DB_USER=.*|DB_USER=$BASE|" \
       -e "s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASSWORD|" \
       -e "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" \
+      -e "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET|" \
       tenant/.env.example > "$DIR_TENANT/.env"
 )
 

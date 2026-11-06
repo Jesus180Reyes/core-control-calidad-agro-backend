@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register.dto';
 import { LoginUserDto } from './dto/login.dto';
 import { RenovarPasswordDto } from './dto/renovar-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Public } from 'src/decorators/public.decorator';
 
 @ApiTags('auth')
@@ -17,24 +18,57 @@ export class AuthController {
   @ApiOperation({
     summary: 'Iniciar sesion',
     description:
-      'Unico endpoint que entrega un token. Responde 200, no 201. ' +
-      'El accessToken viaja en el primer nivel de la respuesta, no dentro de user. ' +
+      'Entrega el par de tokens; POST /auth/refresh lo renueva. Responde 200, no 201. ' +
+      'accessToken (8h) y refreshToken (30 dias) viajan en el primer nivel de la respuesta, no dentro de user. ' +
+      'refreshToken es null si el servidor no tiene JWT_REFRESH_SECRET configurado: ' +
+      'entonces no hay renovacion y al vencer el accessToken hay que volver a hacer login. ' +
       'El token no incluye permisos ni rol: ningun endpoint valida permisos hoy. ' +
       'La respuesta 200 lleva passwordVencida: false. ' +
       'Si la contraseña es correcta pero ya vencio (password_vence_en <= NOW()), responde 403 ' +
       'con message "La contraseña ha caducado" y passwordVencida: true, sin token; ' +
       'se renueva con POST /auth/renovar-password. ' +
       'Un usuario recien registrado nace vencido y debe renovar en su primer login. ' +
-      'Con una contraseña incorrecta responde 401 sin passwordVencida, este vencida o no.',
+      'Con una contraseña incorrecta responde 401 sin passwordVencida, este vencida o no. ' +
+      'Un usuario con isActive = 0 y la contraseña correcta responde 401 "El usuario esta inactivo"; ' +
+      'con la contraseña incorrecta recibe el 401 de credenciales, sin revelar que esta inactivo.',
   })
   async login(@Body() data: LoginUserDto) {
-    const { accessToken, currentUser } = await this.authService.login(data);
+    const { accessToken, refreshToken, currentUser } = await this.authService.login(data);
     return {
       ok: true,
       msg: 'Usuario logueado correctamente',
       user: currentUser,
       accessToken,
+      refreshToken,
       passwordVencida: false,
+    };
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({
+    summary: 'Renovar la sesion con el refresh token',
+    description:
+      'Canjea el refreshToken de POST /auth/login (o de un refresh anterior) por un par nuevo: ' +
+      'accessToken de 8h y refreshToken de 30 dias contados desde esta llamada (sesion deslizante). ' +
+      'Responde 200, no 201. Publica: no lleva Bearer, el token viaja en el body { refreshToken }. ' +
+      'Un refreshToken no sirve como Bearer en las demas rutas, ni un accessToken sirve aqui: se firman con secretos distintos. ' +
+      'El refreshToken anterior NO se invalida al rotar: sigue valiendo hasta su propio vencimiento. ' +
+      'No devuelve user. Consulta usuarios en cada llamada, y el username del token nuevo sale de la base. ' +
+      'Errores, en este orden: 503 "El refresh de sesion no esta disponible" si el servidor no tiene JWT_REFRESH_SECRET; ' +
+      '400 si falta refreshToken o viene vacio; ' +
+      '401 "Refresh token inválido o expirado" si la firma no es valida, el token vencio, esta mal formado, es un accessToken o su usuario ya no existe; ' +
+      '401 "El usuario esta inactivo" si el usuario tiene isActive = 0; ' +
+      '403 con message "La contraseña ha caducado" y passwordVencida: true si la contraseña vencio, igual que el login.',
+  })
+  async refresh(@Body() data: RefreshTokenDto) {
+    const { accessToken, refreshToken } = await this.authService.refresh(data.refreshToken);
+    return {
+      ok: true,
+      msg: 'Sesion renovada correctamente',
+      accessToken,
+      refreshToken,
     };
   }
 

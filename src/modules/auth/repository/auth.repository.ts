@@ -1,6 +1,6 @@
 import { DatabaseService } from "src/database/database.service";
 import { RegisterUserDto } from "../dto/register.dto";
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { LoginUserDto } from "../dto/login.dto";
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
@@ -20,6 +20,8 @@ export class AuthRepository {
     private static readonly ALFABETO = `${AuthRepository.MAYUSCULAS}abcdefghijkmnpqrstuvwxyz${AuthRepository.NUMEROS}`;
     private static readonly INTENTOS_PIN = 20;
     private static readonly ROLES_GESTION_USUARIOS = ['ADMIN', 'SOPORTE'];
+    private static readonly REFRESH_TOKEN_EXPIRES_IN = '30d';
+    private static readonly MENSAJE_REFRESH_INVALIDO = 'Refresh token inválido o expirado';
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
@@ -42,6 +44,13 @@ export class AuthRepository {
             throw new UnauthorizedException('Usuario o contraseña incorrectas');
         }
 
+        // Despues de bcrypt, como el vencimiento: el mensaje propio solo lo ve
+        // quien sabe la contraseña (spec 50). `NULL` cuenta como activo, igual
+        // que en `validateUsuarioActivo`.
+        if (user.isActive === 0) {
+            throw new UnauthorizedException('El usuario esta inactivo');
+        }
+
         if (user.password_vencida) {
             throw new ForbiddenException({
                 statusCode: 403,
@@ -55,16 +64,73 @@ export class AuthRepository {
             user_id: user.id,
             username: user.username!,
         }
-        const accessToken = this.jwtService.sign(payload);
+        const { accessToken, refreshToken } = this.signTokenPair(payload);
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password: _, id: __, cedula: ____, username: _____, password_vencida: ______, ...currentUser } = user;
+        const { password: _, id: __, cedula: ____, username: _____, password_vencida: ______, isActive: _______, ...currentUser } = user;
 
         return {
             accessToken,
+            refreshToken,
             currentUser,
         };
     }
+    /**
+     * POST /auth/refresh (spec 50). Una sola lectura de `usuarios`, sin
+     * transaccion. El orden es el del spec: 503 sin secreto, 401 generico por
+     * firma o usuario inexistente, 401 por inactivo y 403 por contraseña
+     * vencida, estos dos con los mismos cuerpos que el login.
+     */
+    async refreshTokens(refreshToken: string) {
+        const secreto = this.resolverSecretoRefresh();
+        if (!secreto) {
+            throw new ServiceUnavailableException('El refresh de sesion no esta disponible');
+        }
+
+        let payload: JwtPayload;
+        try {
+            payload = this.jwtService.verify<JwtPayload>(refreshToken, { secret: secreto });
+        } catch {
+            throw new UnauthorizedException(AuthRepository.MENSAJE_REFRESH_INVALIDO);
+        }
+
+        const userId = payload.user_id ?? payload.sub;
+        const user = userId
+            ? await this.db
+                .selectFrom('usuarios')
+                .select([
+                    'id',
+                    'username',
+                    'isActive',
+                    sql<number>`password_vence_en IS NOT NULL AND password_vence_en <= NOW()`.as('password_vencida'),
+                ])
+                .where('id', '=', userId)
+                .executeTakeFirst()
+            : undefined;
+
+        if (!user) {
+            throw new UnauthorizedException(AuthRepository.MENSAJE_REFRESH_INVALIDO);
+        }
+        if (user.isActive === 0) {
+            throw new UnauthorizedException('El usuario esta inactivo');
+        }
+        if (user.password_vencida) {
+            throw new ForbiddenException({
+                statusCode: 403,
+                message: 'La contraseña ha caducado',
+                passwordVencida: true,
+            });
+        }
+
+        // Payload nuevo, con el `username` leido de la base: no se copian
+        // `iat` ni `exp` del token verificado.
+        return this.signTokenPair({
+            sub: user.id,
+            user_id: user.id,
+            username: user.username!,
+        });
+    }
+
     async registerUser(data: RegisterUserDto, createdBy: number) {
         const { complete_name, rol, username, cedula } = data;
 
@@ -316,6 +382,7 @@ export class AuthRepository {
                 'usuarios.username',
                 'usuarios.complete_name',
                 'usuarios.password',
+                'usuarios.isActive',
                 'roles.nombre as rol',
                 sql<number>`usuarios.password_vence_en IS NOT NULL AND usuarios.password_vence_en <= NOW()`.as('password_vencida'),
             ])
@@ -336,6 +403,41 @@ export class AuthRepository {
         return Number.isInteger(valor) && valor > 0
             ? valor
             : AuthRepository.VIGENCIA_POR_DEFECTO_DIAS;
+    }
+
+    /**
+     * Par de tokens del login y del refresh (spec 50). El access usa la
+     * configuracion global de `JwtModule` (`JWT_SECRET`, 8h, en
+     * `src/app.module.ts`); el refresh, su propio secreto y 30 dias. Sin
+     * secreto de refresh, `refreshToken` es `null` y el login sigue como antes.
+     * El `payload` tiene que llegar sin `iat` ni `exp`: si trae `exp`,
+     * `jsonwebtoken` rechaza el `expiresIn` en lugar de usarlo.
+     */
+    private signTokenPair(payload: JwtPayload): { accessToken: string; refreshToken: string | null } {
+        const accessToken = this.jwtService.sign(payload);
+        const secreto = this.resolverSecretoRefresh();
+        const refreshToken = secreto
+            ? this.jwtService.sign(payload, {
+                secret: secreto,
+                expiresIn: AuthRepository.REFRESH_TOKEN_EXPIRES_IN,
+            })
+            : null;
+        return { accessToken, refreshToken };
+    }
+
+    /**
+     * `JWT_REFRESH_SECRET` (spec 50) es opcional para arrancar. Vacia, o igual
+     * a `JWT_SECRET`, cuenta como ausente y devuelve `null`: con el mismo
+     * secreto un refresh token pasaria como `Bearer` en el `JwtStrategy`. No
+     * hay literal de respaldo, a diferencia de `JWT_SECRET`, porque un secreto
+     * publico para el refresh seria peor que no tener refresh.
+     */
+    private resolverSecretoRefresh(): string | null {
+        const secreto = this.config.get<string>('JWT_REFRESH_SECRET');
+        if (!secreto || secreto === this.config.get<string>('JWT_SECRET')) {
+            return null;
+        }
+        return secreto;
     }
 
     /**
