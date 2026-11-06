@@ -20,6 +20,7 @@ export class AuthRepository {
     private static readonly ALFABETO = `${AuthRepository.MAYUSCULAS}abcdefghijkmnpqrstuvwxyz${AuthRepository.NUMEROS}`;
     private static readonly INTENTOS_PIN = 20;
     private static readonly ROLES_GESTION_USUARIOS = ['ADMIN', 'SOPORTE'];
+    private static readonly REFRESH_TOKEN_EXPIRES_IN = '30d';
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
@@ -336,6 +337,26 @@ export class AuthRepository {
         return Number.isInteger(valor) && valor > 0
             ? valor
             : AuthRepository.VIGENCIA_POR_DEFECTO_DIAS;
+    }
+
+    /**
+     * Par de tokens del login y del refresh (spec 50). El access usa la
+     * configuracion global de `JwtModule` (`JWT_SECRET`, 8h, en
+     * `src/app.module.ts`); el refresh, su propio secreto y 30 dias. Sin
+     * secreto de refresh, `refreshToken` es `null` y el login sigue como antes.
+     * El `payload` tiene que llegar sin `iat` ni `exp`: si trae `exp`,
+     * `jsonwebtoken` rechaza el `expiresIn` en lugar de usarlo.
+     */
+    private signTokenPair(payload: JwtPayload): { accessToken: string; refreshToken: string | null } {
+        const accessToken = this.jwtService.sign(payload);
+        const secreto = this.resolverSecretoRefresh();
+        const refreshToken = secreto
+            ? this.jwtService.sign(payload, {
+                secret: secreto,
+                expiresIn: AuthRepository.REFRESH_TOKEN_EXPIRES_IN,
+            })
+            : null;
+        return { accessToken, refreshToken };
     }
 
     /**
