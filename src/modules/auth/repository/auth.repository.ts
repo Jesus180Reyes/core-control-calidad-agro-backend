@@ -339,6 +339,21 @@ export class AuthRepository {
     }
 
     /**
+     * `JWT_REFRESH_SECRET` (spec 50) es opcional para arrancar. Vacia, o igual
+     * a `JWT_SECRET`, cuenta como ausente y devuelve `null`: con el mismo
+     * secreto un refresh token pasaria como `Bearer` en el `JwtStrategy`. No
+     * hay literal de respaldo, a diferencia de `JWT_SECRET`, porque un secreto
+     * publico para el refresh seria peor que no tener refresh.
+     */
+    private resolverSecretoRefresh(): string | null {
+        const secreto = this.config.get<string>('JWT_REFRESH_SECRET');
+        if (!secreto || secreto === this.config.get<string>('JWT_SECRET')) {
+            return null;
+        }
+        return secreto;
+    }
+
+    /**
      * Contraseña temporal del reset por admin (spec 34). Sin caracteres
      * ambiguos (0 O o 1 l I) para que se pueda dictar, y con al menos una
      * mayuscula y un numero garantizados: se toman primero, se completa con el
