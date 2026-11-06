@@ -412,6 +412,40 @@ Esa empresa se queda fija en esa versión hasta que le vuelvas a poner
 4. Copia el cambio a `db/schema.sql` y vuelve a subir `db/`, para que las
    empresas nuevas nazcan con él.
 
+**`JWT_REFRESH_SECRET` en las empresas que ya existen (spec 50):** las
+empresas dadas de alta antes del spec 50 no la tienen. Sin ella el API
+arranca igual, pero el login devuelve `refreshToken: null` y `POST
+/auth/refresh` responde 503: cada usuario vuelve a hacer login a las 8 horas.
+Se puede añadir antes o después de desplegar la imagen, porque una imagen
+anterior la ignora.
+
+```bash
+for t in /opt/*/; do
+  grep -qs '^TENANT=.' "${t}.env" || continue
+  grep -q '^JWT_REFRESH_SECRET=.' "${t}.env" && { echo "ya tiene: $t"; continue; }
+  S=$(openssl rand -hex 48)
+  if grep -q '^JWT_REFRESH_SECRET=$' "${t}.env"; then
+    sed -i "s|^JWT_REFRESH_SECRET=$|JWT_REFRESH_SECRET=$S|" "${t}.env"
+  else
+    printf '\nJWT_REFRESH_SECRET=%s\n' "$S" >> "${t}.env"
+  fi
+  (cd "$t" && docker compose up -d api) && echo "listo: $t"
+done
+```
+
+- Genera un secreto distinto por empresa y reinicia solo su `api`. Si se
+  corre dos veces, salta las empresas que ya lo tienen.
+- No le pongas el mismo valor que `JWT_SECRET`: el API lo trata como ausente.
+- Comprobar en una empresa: `docker compose exec api sh -c 'test -n
+  "$JWT_REFRESH_SECRET" && echo OK || echo FALTA'`, y un login que devuelva
+  `"refreshToken":"eyJ...`, no `null`.
+- Cambiar el valor más adelante cierra la sesión de todos los usuarios de
+  esa empresa en cuanto vence su access token. Es la forma de cortarlas si
+  se filtra un refresh token.
+- Después de este cambio, sube de nuevo `nuevo-tenant.sh` y `tenant/` a
+  `/opt/plataforma` (sección 4), para que las empresas nuevas nazcan con el
+  secreto.
+
 ### Deploy automático a dev (rama `develop`)
 
 ```
