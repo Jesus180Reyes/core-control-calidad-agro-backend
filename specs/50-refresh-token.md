@@ -1,6 +1,6 @@
 # SPEC 50 — Refresh token que revisa al usuario en cada renovación
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 33 (vencimiento de contraseña), SPEC 34 (reset por admin), SPEC 37 (registro solo por admin)
 > **Date:** 2026-11-06
 > **Objective:** Que `POST /auth/login` devuelva además un refresh token de 30 días y que un nuevo `POST /auth/refresh` lo canjee por un par nuevo solo si el usuario sigue existiendo, activo y con la contraseña vigente.
@@ -132,26 +132,26 @@ Errores de `POST /auth/refresh`, en este orden:
 
 ## Acceptance criteria
 
-- [ ] `POST /auth/login` con credenciales válidas responde 200 con `accessToken` y `refreshToken`, ambos strings no vacíos.
-- [ ] El `accessToken` del login expira a las 8 horas y el `refreshToken` a los 30 días (claim `exp`).
-- [ ] `POST /auth/login` de un usuario con `isActive = 0` y contraseña correcta responde 401 `El usuario esta inactivo`.
-- [ ] `POST /auth/login` de un usuario con `isActive = 0` y contraseña incorrecta responde el 401 de credenciales incorrectas, sin mencionar que está inactivo.
-- [ ] `POST /auth/login` de un usuario con `isActive = NULL` responde 200.
-- [ ] `POST /auth/refresh` con `{ refreshToken }` válido responde 200 con un `accessToken` y un `refreshToken` nuevos.
-- [ ] El `accessToken` emitido por `/auth/refresh` autentica `GET /clientes` y expira a las 8 horas, no a los 30 días.
-- [ ] El `refreshToken` emitido por `/auth/refresh` sirve para un segundo refresh y expira 30 días después de esa llamada.
-- [ ] `POST /auth/refresh` con un **access token** en `refreshToken` responde 401.
-- [ ] `GET /clientes` con un **refresh token** como `Bearer` responde 401.
-- [ ] `POST /auth/refresh` con un string que no es JWT responde 401 `Refresh token inválido o expirado`.
-- [ ] `POST /auth/refresh` sin body o con `refreshToken: ""` responde 400.
-- [ ] Tras poner `isActive = 0` a un usuario, su refresh token responde 401 `El usuario esta inactivo`.
-- [ ] Tras poner `password_vence_en = NOW()` a un usuario, su refresh token responde 403 con `passwordVencida: true`.
-- [ ] Tras cambiar el `username` de un usuario en la base, el `accessToken` emitido por `/auth/refresh` lleva el nombre nuevo.
-- [ ] Sin `JWT_REFRESH_SECRET` en el `.env`, la app arranca, el login responde 200 con `refreshToken: null` y `/auth/refresh` responde 503.
-- [ ] Con `JWT_REFRESH_SECRET` igual a `JWT_SECRET`, el comportamiento es el mismo que sin la variable.
-- [ ] `nuevo-tenant.sh` deja en el `.env` del tenant un `JWT_REFRESH_SECRET` generado y distinto de `JWT_SECRET`.
-- [ ] Swagger (`/docs`) muestra `POST /auth/refresh` sin candado, con su descripción y el DTO del body.
-- [ ] `npm run lint` no da errores.
+- [X] `POST /auth/login` con credenciales válidas responde 200 con `accessToken` y `refreshToken`, ambos strings no vacíos.
+- [X] El `accessToken` del login expira a las 8 horas y el `refreshToken` a los 30 días (claim `exp`).
+- [X] `POST /auth/login` de un usuario con `isActive = 0` y contraseña correcta responde 401 `El usuario esta inactivo`.
+- [X] `POST /auth/login` de un usuario con `isActive = 0` y contraseña incorrecta responde el 401 de credenciales incorrectas, sin mencionar que está inactivo.
+- [X] `POST /auth/login` de un usuario con `isActive = NULL` responde 200.
+- [X] `POST /auth/refresh` con `{ refreshToken }` válido responde 200 con un `accessToken` y un `refreshToken` nuevos.
+- [X] El `accessToken` emitido por `/auth/refresh` autentica `GET /clientes` y expira a las 8 horas, no a los 30 días.
+- [X] El `refreshToken` emitido por `/auth/refresh` sirve para un segundo refresh y expira 30 días después de esa llamada.
+- [X] `POST /auth/refresh` con un **access token** en `refreshToken` responde 401.
+- [X] `GET /clientes` con un **refresh token** como `Bearer` responde 401.
+- [X] `POST /auth/refresh` con un string que no es JWT responde 401 `Refresh token inválido o expirado`.
+- [X] `POST /auth/refresh` sin body o con `refreshToken: ""` responde 400.
+- [X] Tras poner `isActive = 0` a un usuario, su refresh token responde 401 `El usuario esta inactivo`.
+- [X] Tras poner `password_vence_en = NOW()` a un usuario, su refresh token responde 403 con `passwordVencida: true`.
+- [X] Tras cambiar el `username` de un usuario en la base, el `accessToken` emitido por `/auth/refresh` lleva el nombre nuevo.
+- [X] Sin `JWT_REFRESH_SECRET` en el `.env`, la app arranca, el login responde 200 con `refreshToken: null` y `/auth/refresh` responde 503.
+- [X] Con `JWT_REFRESH_SECRET` igual a `JWT_SECRET`, el comportamiento es el mismo que sin la variable.
+- [X] `nuevo-tenant.sh` deja en el `.env` del tenant un `JWT_REFRESH_SECRET` generado y distinto de `JWT_SECRET`.
+- [X] Swagger (`/docs`) muestra `POST /auth/refresh` sin candado, con su descripción y el DTO del body.
+- [X] `npm run lint` no da errores.
 
 ## Decisions
 
