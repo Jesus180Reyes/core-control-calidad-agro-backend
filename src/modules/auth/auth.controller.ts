@@ -17,23 +17,28 @@ export class AuthController {
   @ApiOperation({
     summary: 'Iniciar sesion',
     description:
-      'Unico endpoint que entrega un token. Responde 200, no 201. ' +
-      'El accessToken viaja en el primer nivel de la respuesta, no dentro de user. ' +
+      'Entrega el par de tokens; POST /auth/refresh lo renueva. Responde 200, no 201. ' +
+      'accessToken (8h) y refreshToken (30 dias) viajan en el primer nivel de la respuesta, no dentro de user. ' +
+      'refreshToken es null si el servidor no tiene JWT_REFRESH_SECRET configurado: ' +
+      'entonces no hay renovacion y al vencer el accessToken hay que volver a hacer login. ' +
       'El token no incluye permisos ni rol: ningun endpoint valida permisos hoy. ' +
       'La respuesta 200 lleva passwordVencida: false. ' +
       'Si la contraseña es correcta pero ya vencio (password_vence_en <= NOW()), responde 403 ' +
       'con message "La contraseña ha caducado" y passwordVencida: true, sin token; ' +
       'se renueva con POST /auth/renovar-password. ' +
       'Un usuario recien registrado nace vencido y debe renovar en su primer login. ' +
-      'Con una contraseña incorrecta responde 401 sin passwordVencida, este vencida o no.',
+      'Con una contraseña incorrecta responde 401 sin passwordVencida, este vencida o no. ' +
+      'Un usuario con isActive = 0 y la contraseña correcta responde 401 "El usuario esta inactivo"; ' +
+      'con la contraseña incorrecta recibe el 401 de credenciales, sin revelar que esta inactivo.',
   })
   async login(@Body() data: LoginUserDto) {
-    const { accessToken, currentUser } = await this.authService.login(data);
+    const { accessToken, refreshToken, currentUser } = await this.authService.login(data);
     return {
       ok: true,
       msg: 'Usuario logueado correctamente',
       user: currentUser,
       accessToken,
+      refreshToken,
       passwordVencida: false,
     };
   }
