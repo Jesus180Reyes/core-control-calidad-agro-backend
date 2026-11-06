@@ -12,6 +12,10 @@ export class AuthService {
         return await this.authRepository.login(data);
     }
 
+    async refresh(refreshToken: string) {
+        return await this.authRepository.refreshTokens(refreshToken);
+    }
+
     async registerUser(data: RegisterUserDto, userId: number) {
         return await this.authRepository.registerUser(data, userId);
     }
