@@ -36,7 +36,7 @@ Este spec mantiene la idea del refresh token. Agrega una sola consulta a `usuari
 **Out of scope (for future specs):**
 
 - Revocación por token: tabla `refresh_tokens`, logout, cierre de sesión en todos los dispositivos, detección de reuso de un refresh rotado.
-- Cortar las sesiones vivas de un usuario cuando un ADMIN le resetea la contraseña (SPEC 34). Con este spec, el usuario reseteado sigue renovando hasta que su contraseña temporal venza.
+- Cortar las sesiones vivas al cambiar la contraseña. Con este spec, el reset de un ADMIN (SPEC 34) sí corta el refresh en su siguiente uso (403), porque la contraseña temporal nace vencida, pero el access token sigue valiendo sus 8 horas. Que el usuario renueve su propia contraseña no corta nada.
 - Revisar `isActive` en `POST /auth/renovar-password` o en el `JwtStrategy`. Un access token ya emitido sigue valiendo sus 8 horas aunque el usuario se desactive.
 - Rate limiting de `/auth/refresh` y `/auth/login` (SPEC 23, no implementado).
 - Refresh token en cookie `httpOnly` y CORS con credenciales.
@@ -182,7 +182,8 @@ Errores de `POST /auth/refresh`, en este orden:
 | Risk | Mitigation |
 | --- | --- |
 | Un refresh token filtrado sirve hasta 30 días, y rotar no invalida el anterior | **Aceptado.** Desactivar al usuario (`isActive = 0`) lo corta en el siguiente refresh. Cambiar `JWT_REFRESH_SECRET` en el tenant corta todas las sesiones de ese tenant. La revocación por token va en su propio spec. |
-| Un ADMIN resetea la contraseña de una cuenta comprometida y la sesión robada sigue viva | **Aceptado.** Hoy se corta desactivando al usuario. Fuera de alcance por decisión. |
+| Un ADMIN resetea la contraseña de una cuenta comprometida y la sesión robada sigue viva | **Mitigado en parte.** La contraseña temporal nace vencida, así que el siguiente refresh de esa sesión responde 403. El access token vivo sigue valiendo hasta 8 horas. |
+| El usuario renueva su propia contraseña sospechando de una filtración y la sesión robada sigue renovando | **Aceptado.** Nada liga el token a la contraseña. Se corta desactivando al usuario o con el spec de revocación. |
 | Un access token ya emitido sigue valiendo hasta 8 horas tras desactivar al usuario | **Aceptado.** El `JwtStrategy` no consulta la base. Lo que cambia es que esa sesión ya no se renueva. |
 | Un tenant existente no recibe `JWT_REFRESH_SECRET` | Funciona como hoy (`refreshToken: null`, relogin a las 8h). El paso queda en `deploy/README.md`. |
 | Cambia el login: un usuario con `isActive = 0` que hoy entra deja de entrar | Es el objetivo. Antes de desplegar, revisar quién tiene `isActive = 0` en cada tenant (`SELECT id, username FROM usuarios WHERE isActive = 0`). |
