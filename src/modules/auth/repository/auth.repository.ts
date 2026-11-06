@@ -1,6 +1,6 @@
 import { DatabaseService } from "src/database/database.service";
 import { RegisterUserDto } from "../dto/register.dto";
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { LoginUserDto } from "../dto/login.dto";
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'crypto';
@@ -21,6 +21,7 @@ export class AuthRepository {
     private static readonly INTENTOS_PIN = 20;
     private static readonly ROLES_GESTION_USUARIOS = ['ADMIN', 'SOPORTE'];
     private static readonly REFRESH_TOKEN_EXPIRES_IN = '30d';
+    private static readonly MENSAJE_REFRESH_INVALIDO = 'Refresh token inválido o expirado';
     constructor(
         private readonly dbService: DatabaseService,
         private readonly jwtService: JwtService,
@@ -74,6 +75,62 @@ export class AuthRepository {
             currentUser,
         };
     }
+    /**
+     * POST /auth/refresh (spec 50). Una sola lectura de `usuarios`, sin
+     * transaccion. El orden es el del spec: 503 sin secreto, 401 generico por
+     * firma o usuario inexistente, 401 por inactivo y 403 por contraseña
+     * vencida, estos dos con los mismos cuerpos que el login.
+     */
+    async refreshTokens(refreshToken: string) {
+        const secreto = this.resolverSecretoRefresh();
+        if (!secreto) {
+            throw new ServiceUnavailableException('El refresh de sesion no esta disponible');
+        }
+
+        let payload: JwtPayload;
+        try {
+            payload = this.jwtService.verify<JwtPayload>(refreshToken, { secret: secreto });
+        } catch {
+            throw new UnauthorizedException(AuthRepository.MENSAJE_REFRESH_INVALIDO);
+        }
+
+        const userId = payload.user_id ?? payload.sub;
+        const user = userId
+            ? await this.db
+                .selectFrom('usuarios')
+                .select([
+                    'id',
+                    'username',
+                    'isActive',
+                    sql<number>`password_vence_en IS NOT NULL AND password_vence_en <= NOW()`.as('password_vencida'),
+                ])
+                .where('id', '=', userId)
+                .executeTakeFirst()
+            : undefined;
+
+        if (!user) {
+            throw new UnauthorizedException(AuthRepository.MENSAJE_REFRESH_INVALIDO);
+        }
+        if (user.isActive === 0) {
+            throw new UnauthorizedException('El usuario esta inactivo');
+        }
+        if (user.password_vencida) {
+            throw new ForbiddenException({
+                statusCode: 403,
+                message: 'La contraseña ha caducado',
+                passwordVencida: true,
+            });
+        }
+
+        // Payload nuevo, con el `username` leido de la base: no se copian
+        // `iat` ni `exp` del token verificado.
+        return this.signTokenPair({
+            sub: user.id,
+            user_id: user.id,
+            username: user.username!,
+        });
+    }
+
     async registerUser(data: RegisterUserDto, createdBy: number) {
         const { complete_name, rol, username, cedula } = data;
 
