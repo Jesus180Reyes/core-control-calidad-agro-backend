@@ -3,6 +3,7 @@ import { LotesRepository } from './repository/lotes.repository';
 import { CreateLoteDto } from './dto/create-lote.dto';
 import { RechazarLoteDto } from './dto/rechazar-lote.dto';
 import { FinalizarLoteDto } from './dto/finalizar-lote.dto';
+import { FiltrosLotesFinalizadosDto } from './dto/filtros-lotes-finalizados.dto';
 
 @Injectable()
 export class LotesService {
@@ -21,8 +22,14 @@ export class LotesService {
     async findAllLotesByClienteForApprover(clienteId: number) {
         return await this.lotesRepository.getAllLotesByClienteForApprover(clienteId);
     }
-    async findAllLotesFinalizadosByCliente(clienteId: number) {
-        return await this.lotesRepository.getLotesFinalizadosByCliente(clienteId);
+    async findAllLotesFinalizadosByCliente(
+        clienteId: number,
+        filtros: FiltrosLotesFinalizadosDto,
+    ) {
+        return await this.lotesRepository.getLotesFinalizadosByCliente(
+            clienteId,
+            filtros,
+        );
     }
 
     async rechazar(loteId: number, dto: RechazarLoteDto, userId: number) {

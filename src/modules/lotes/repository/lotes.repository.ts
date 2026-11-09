@@ -10,6 +10,7 @@ import { Database } from 'src/database/types/types';
 import { CreateLoteDto } from '../dto/create-lote.dto';
 import { RechazarLoteDto } from '../dto/rechazar-lote.dto';
 import { FinalizarLoteDto } from '../dto/finalizar-lote.dto';
+import { FiltrosLotesFinalizadosDto } from '../dto/filtros-lotes-finalizados.dto';
 import { GeminiService } from 'src/ia/gemini.service';
 import { ResumenLotePayload } from 'src/ia/prompts/resumen-lote.prompt';
 
@@ -107,10 +108,13 @@ export class LotesRepository {
         return lotes;
     }
 
-    async getLotesFinalizadosByCliente(clienteId: number) {
+    async getLotesFinalizadosByCliente(
+        clienteId: number,
+        filtros: FiltrosLotesFinalizadosDto,
+    ) {
         const etapa = await this.resolveEtapa('FINALIZADO', this.db);
 
-        const lotes = await this.db
+        let query = this.db
             .selectFrom('lotes')
             .leftJoin('productos', 'productos.id', 'lotes.producto_id')
             .leftJoin('unidades_medida', 'unidades_medida.id', 'lotes.unidad_medida_id')
@@ -136,10 +140,34 @@ export class LotesRepository {
                 'lotes.finalizado_en',
             ])
             .where('lotes.cliente_id', '=', clienteId)
-            .where('lotes.etapa_id', '=', etapa.id)
-            .orderBy('lotes.finalizado_en', 'desc')
-            .execute();
-        return lotes;
+            .where('lotes.etapa_id', '=', etapa.id);
+
+        if (filtros.nombre !== undefined) {
+            query = query.where('lotes.nombre_lote', 'like', `%${filtros.nombre}%`);
+        }
+        if (filtros.producto_id !== undefined) {
+            query = query.where('lotes.producto_id', '=', filtros.producto_id);
+        }
+        if (filtros.origen_id !== undefined) {
+            query = query.where('lotes.origen_id', '=', filtros.origen_id);
+        }
+        if (filtros.finalizado_por !== undefined) {
+            query = query.where('lotes.finalizado_por', '=', filtros.finalizado_por);
+        }
+        // Las fechas viajan como 'YYYY-MM-DD' y MySQL las interpreta en su propia
+        // zona horaria, la misma con la que NOW() escribe finalizado_en.
+        if (filtros.desde !== undefined) {
+            query = query.where('lotes.finalizado_en', '>=', sql<Date>`${filtros.desde}`);
+        }
+        if (filtros.hasta !== undefined) {
+            query = query.where(
+                'lotes.finalizado_en',
+                '<',
+                sql<Date>`DATE_ADD(${filtros.hasta}, INTERVAL 1 DAY)`,
+            );
+        }
+
+        return await query.orderBy('lotes.finalizado_en', 'desc').execute();
     }
 
     async createLote(data: CreateLoteDto, userId: number) {

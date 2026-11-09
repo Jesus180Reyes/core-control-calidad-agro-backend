@@ -7,6 +7,7 @@ import {
     ParseIntPipe,
     Patch,
     Post,
+    Query,
     Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { LotesService } from './lotes.service';
 import { CreateLoteDto } from './dto/create-lote.dto';
 import { RechazarLoteDto } from './dto/rechazar-lote.dto';
 import { FinalizarLoteDto } from './dto/finalizar-lote.dto';
+import { FiltrosLotesFinalizadosDto } from './dto/filtros-lotes-finalizados.dto';
 
 @ApiTags('lotes')
 @ApiBearerAuth()
@@ -111,16 +113,24 @@ export class LotesController {
             'La etapa se resuelve por el codigo FINALIZADO, no por un id hardcodeado, a diferencia ' +
             'de la bandeja del aprobador. Si esa fila falta en etapas, responde 400. ' +
             'Ordena por finalizado_en DESC, no por created_at como las otras tres. ' +
-            'No acepta ningun query param. Un cliente sin lotes finalizados, o un clienteId que no ' +
+            'Seis query params opcionales, combinados con AND, que solo acotan: nombre (LIKE ' +
+            'parcial sobre nombre_lote), producto_id, origen_id, finalizado_por (id del usuario ' +
+            'que finalizo; la respuesta trae su nombre, no el id), desde y hasta (YYYY-MM-DD ' +
+            'sobre finalizado_en, hasta inclusivo del dia completo). La etapa FINALIZADO sigue ' +
+            'siempre aplicada. Un valor invalido se ignora: ningun param produce un 400. ' +
+            'Un cliente sin lotes finalizados, o un clienteId que no ' +
             'existe, responden 200 con una lista vacia. ' +
             'NO valida el vinculo cliente_operador.',
     })
     @ApiParam({ name: 'clienteId', description: 'Id del cliente', example: 1 })
     async findAllLotesFinalizadosByCliente(
         @Param('clienteId', ParseIntPipe) clienteId: number,
+        @Query() filtros: FiltrosLotesFinalizadosDto,
     ) {
-        const lotes =
-            await this.lotesService.findAllLotesFinalizadosByCliente(clienteId);
+        const lotes = await this.lotesService.findAllLotesFinalizadosByCliente(
+            clienteId,
+            filtros,
+        );
         return {
             ok: !!lotes,
             msg: 'Lotes obtenidos correctamente',

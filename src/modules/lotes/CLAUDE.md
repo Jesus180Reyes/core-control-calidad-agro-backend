@@ -1,6 +1,6 @@
 # lotes module
 
-Specs: 02, 12 (rejection), 13 (approval), 18 (filters, still `Draft`), 19 (approver flow), 20 (finalization), 24 (finalized listing), 26 (signature), 27 (AI summary), 43 (origin), 45 (approver notes), 46 (notes to Gemini). Eleven routes, **no query params anywhere** (spec 18 owns `lotes` filters and is still `Draft`).
+Specs: 02, 12 (rejection), 13 (approval), 18 (filters, still `Draft`), 19 (approver flow), 20 (finalization), 24 (finalized listing), 26 (signature), 27 (AI summary), 43 (origin), 45 (approver notes), 46 (notes to Gemini). Eleven routes. The only query params are on `/finalizados` (added without a spec, 2026-11-08); spec 18 owns the filters of the other `cliente/...` listings and is still `Draft`.
 
 ## Access control
 
@@ -50,7 +50,7 @@ Tied to a client + product, with `peso_minimo`/`peso_ideal`/`peso_maximo`, `etap
 - `GET /lotes/cliente/:clienteId` — `estado = 'abierto'`, `created_at` DESC, **validates `cliente_operador`**.
 - `GET /lotes/cliente/:clienteId/all` — the **same query and fields** without the link check. Despite the name it also filters `estado = 'abierto'`.
 - `GET /lotes/cliente/:clienteId/all/approver` — the approver's inbox: `estado = 'cerrado'` plus the **hardcoded `etapa_id = 2`**. Entered `main` with no spec; documented by spec 19.
-- `GET /lotes/cliente/:clienteId/all/finalizados` (spec 24) — **the only read that shows a finalized lote**. Same eleven fields plus four: `aprobado_por`, `aprobado_en`, `finalizado_por`, `finalizado_en`, the ids resolved to `usuarios.complete_name` by two aliased `LEFT JOIN`s (`aprobador`, `finalizador`) — the raw ids never travel; the rejection trio is absent by design. Stage resolved with `resolveEtapa('FINALIZADO', this.db)` (one extra query; a **400** if the row is missing). Ordered **`finalizado_en` DESC**, deliberately (`NULL` sorts last). Never 404s: an unknown client answers 200 with `[]`.
+- `GET /lotes/cliente/:clienteId/all/finalizados` (spec 24) — **the only read that shows a finalized lote**. Same eleven fields plus four: `aprobado_por`, `aprobado_en`, `finalizado_por`, `finalizado_en`, the ids resolved to `usuarios.complete_name` by two aliased `LEFT JOIN`s (`aprobador`, `finalizador`) — the raw ids never travel; the rejection trio is absent by design. Stage resolved with `resolveEtapa('FINALIZADO', this.db)` (one extra query; a **400** if the row is missing). Ordered **`finalizado_en` DESC**, deliberately (`NULL` sorts last). Never 404s: an unknown client answers 200 with `[]`. Six optional filters (`FiltrosLotesFinalizadosDto`, spec 16 convention — never a 400, AND, only narrow): `nombre` (`LIKE` on `nombre_lote`), `producto_id`, `origen_id`, `finalizado_por` (the user id, though the response carries only the name), `desde`/`hasta` on **`finalizado_en`**, not `created_at` — the axis the list is ordered by; `hasta` inclusive of the whole day. `cliente_id` and the `FINALIZADO` stage always apply. No pagination, by decision.
 
 **`POST /lotes`** — inserts `estado: 'abierto'` and the hardcoded `etapa_id: 1`; validates the link. Optional `origen_id` (spec 43): without it `origen_id = NULL`; with it, `validateOrigen` runs after `validateUnidadMedida` and answers **400** `El origen con id 'X' no existe` / `El origen 'N' no esta activo`. Nothing ties the origin to the client — the catalogue is global.
 
@@ -85,4 +85,4 @@ Five validations, in order: the lote exists; it **was not already finalized** (i
 
 ## Deferred
 
-`GET /lotes/:id` (declined by specs 21 and 24 — fields and filters undecided), `lotes` filters (spec 18), closing a lote as a computed result, exposing per-lote aggregates as fields, regenerating/correcting/deleting a summary, generating it automatically on finalization, summaries for other entities (`src/ia/` is reusable), reading the signature or the notes over the API, undoing a finalization or reopening a lote, batch/offline weigh-in sync.
+`GET /lotes/:id` (declined by specs 21 and 24 — fields and filters undecided), filters on the other three `cliente/...` listings (spec 18), closing a lote as a computed result, exposing per-lote aggregates as fields, regenerating/correcting/deleting a summary, generating it automatically on finalization, summaries for other entities (`src/ia/` is reusable), reading the signature or the notes over the API, undoing a finalization or reopening a lote, batch/offline weigh-in sync.
