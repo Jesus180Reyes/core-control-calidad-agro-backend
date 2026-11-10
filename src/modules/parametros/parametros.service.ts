@@ -8,4 +8,8 @@ export class ParametrosService {
     async obtener(nombre: string) {
         return await this.parametrosRepository.obtenerParametro(nombre);
     }
+
+    async obtenerInfoPublica() {
+        return await this.parametrosRepository.obtenerInfoPublica();
+    }
 }
