@@ -262,6 +262,16 @@ export interface DestinosTable {
   created_at: Generated<Date | null>;
 }
 
+export interface ParametroTable {
+  id: Generated<number>;
+  clave: string;
+  valor: string | null;
+  descripcion: string | null;
+  isActive: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface BitacoraView {
   entidad: 'cliente' | 'lote' | 'pesaje' | 'usuario';
   entidad_id: string | number;
@@ -299,5 +309,6 @@ export interface Database {
   autorizaciones_pin: AutorizacionesPinTable;
   origenes: OrigenesTable;
   destinos: DestinosTable;
+  parametros: ParametroTable;
   bitacora: BitacoraView;
 }
