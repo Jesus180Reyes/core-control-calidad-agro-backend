@@ -63,6 +63,18 @@ INSERT INTO `paises_config` (`id`, `codigo_pais`, `nombre`, `moneda`, `etiqueta_
 /*!40000 ALTER TABLE `paises_config` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `parametros` WRITE;
+/*!40000 ALTER TABLE `parametros` DISABLE KEYS */;
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (1,'EMPRESA_NOMBRE_COMERCIAL',NULL,'Nombre comercial de la empresa',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (2,'EMPRESA_RAZON_SOCIAL',NULL,'Razón social registrada',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (3,'EMPRESA_RTN',NULL,'RTN de la empresa',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (4,'EMPRESA_DIRECCION',NULL,'Dirección fiscal de la empresa',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (5,'EMPRESA_TELEFONO',NULL,'Teléfono de contacto',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (6,'EMPRESA_CORREO',NULL,'Correo de contacto',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (7,'EMPRESA_SITIO_WEB',NULL,'Sitio web de la empresa',1);
+/*!40000 ALTER TABLE `parametros` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `catalogo_permisos` WRITE;
 /*!40000 ALTER TABLE `catalogo_permisos` DISABLE KEYS */;
 INSERT INTO `catalogo_permisos` (`id`, `codigo`, `nombre`, `descripcion`, `isActive`, `created_at`) VALUES (1,'MODULO-CONTROL-CALIDAD','Modulo de Control de Calidad','Ingreso al modulo de control de calidad',1,'2026-09-03 22:09:02');
