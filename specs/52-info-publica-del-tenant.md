@@ -1,6 +1,6 @@
 # SPEC 52 — Info pública del tenant (`GET /info`)
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 51 (tabla `parametros`)
 > **Date:** 2026-11-10
 > **Objective:** Agregar una ruta pública `GET /info` que devuelve `{ app, empresa }` leídos de las claves `APP_NOMBRE` y `EMPRESA_NOMBRE_COMERCIAL` de `parametros`, para que cualquiera que llegue al dominio sepa qué aplicación y qué empresa hay detrás.
@@ -103,18 +103,18 @@ Errores:
 
 ## Acceptance criteria
 
-- [ ] `SELECT clave FROM parametros` en la base local incluye `APP_NOMBRE`.
-- [ ] `db/seed.sql` siembra `APP_NOMBRE` con `valor` `NULL`.
-- [ ] `GET /info` **sin token** responde 200.
-- [ ] Con `APP_NOMBRE = 'metrika360'` y `EMPRESA_NOMBRE_COMERCIAL = 'AndesBerry'`, `GET /info` responde exactamente `{ "app": "metrika360", "empresa": "AndesBerry" }`, sin `ok`, `msg` ni otros campos.
-- [ ] Con `EMPRESA_NOMBRE_COMERCIAL` en `NULL`, `GET /info` responde 200 con `empresa: null`.
-- [ ] Tras `UPDATE parametros SET isActive = 0 WHERE clave = 'APP_NOMBRE'`, `GET /info` responde 200 con `app: null`.
-- [ ] Un cambio hecho con `UPDATE` se ve en la siguiente llamada, sin reiniciar el API.
-- [ ] `GET /info?nombre=EMPRESA_RTN` devuelve lo mismo que `GET /info`. El query se ignora y el RTN no aparece.
-- [ ] `GET /parametros?nombre=EMPRESA_RTN` sin token sigue respondiendo 401.
-- [ ] El log de rutas de Nest muestra 54 rutas, y `/docs-json` tiene 53 operaciones bajo 49 `paths`.
-- [ ] Swagger (`/docs`) muestra `GET /info` sin candado y con su descripción.
-- [ ] `npm run lint` no da errores.
+- [X] `SELECT clave FROM parametros` en la base local incluye `APP_NOMBRE`.
+- [X] `db/seed.sql` siembra `APP_NOMBRE` con `valor` `NULL`.
+- [X] `GET /info` **sin token** responde 200.
+- [X] Con `APP_NOMBRE = 'metrika360'` y `EMPRESA_NOMBRE_COMERCIAL = 'AndesBerry'`, `GET /info` responde exactamente `{ "app": "metrika360", "empresa": "AndesBerry" }`, sin `ok`, `msg` ni otros campos.
+- [X] Con `EMPRESA_NOMBRE_COMERCIAL` en `NULL`, `GET /info` responde 200 con `empresa: null`.
+- [X] Tras `UPDATE parametros SET isActive = 0 WHERE clave = 'APP_NOMBRE'`, `GET /info` responde 200 con `app: null`.
+- [X] Un cambio hecho con `UPDATE` se ve en la siguiente llamada, sin reiniciar el API.
+- [X] `GET /info?nombre=EMPRESA_RTN` devuelve lo mismo que `GET /info`. El query se ignora y el RTN no aparece.
+- [X] `GET /parametros?nombre=EMPRESA_RTN` sin token sigue respondiendo 401.
+- [X] El log de rutas de Nest muestra 54 rutas, y `/docs-json` tiene 53 operaciones bajo 49 `paths`.
+- [X] Swagger (`/docs`) muestra `GET /info` sin candado y con su descripción.
+- [X] `npm run lint` no da errores.
 
 ## Decisions
 
