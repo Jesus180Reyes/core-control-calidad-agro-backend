@@ -1,6 +1,6 @@
 # SPEC 51 — Parámetros del tenant (datos de la empresa)
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 25 (`paises_config`, el antecedente de tabla que se mantiene a mano), SPEC 49 (un tenant, una base)
 > **Date:** 2026-11-10
 > **Objective:** Crear una tabla clave-valor `parametros` con la identidad legal y el contacto de la empresa del tenant, cargada a mano, y una ruta `GET /parametros?nombre=` que devuelve una clave a cualquier usuario autenticado.
@@ -138,19 +138,19 @@ Errores:
 
 ## Acceptance criteria
 
-- [ ] `DESCRIBE parametros` en la base local muestra las siete columnas del DDL. `SHOW CREATE TABLE` muestra `uq_parametros_clave`.
+- [X] `DESCRIBE parametros` en la base local muestra las siete columnas del DDL. `SHOW CREATE TABLE` muestra `uq_parametros_clave`.
 - [ ] Un volumen nuevo de Docker (`docker compose down -v && docker compose up -d --build`) nace con `parametros` y las siete claves con `valor` `NULL`.
-- [ ] `GET /parametros?nombre=EMPRESA_RTN` con token responde 200 `{ ok, msg, parametro: { clave, valor } }`, y `valor` es `null` mientras nadie lo complete.
-- [ ] Tras `UPDATE parametros SET valor = 'Agro S.A.' WHERE clave = 'EMPRESA_NOMBRE_COMERCIAL'`, `GET /parametros?nombre=EMPRESA_NOMBRE_COMERCIAL` devuelve `valor: 'Agro S.A.'` sin reiniciar el API.
-- [ ] `GET /parametros?nombre=empresa_rtn` (minúsculas) devuelve la clave `EMPRESA_RTN`.
-- [ ] `GET /parametros?nombre=NO_EXISTE` responde 404 `Parametro no encontrado`.
-- [ ] Tras `UPDATE parametros SET isActive = 0 WHERE clave = 'EMPRESA_SITIO_WEB'`, `GET /parametros?nombre=EMPRESA_SITIO_WEB` responde 404.
-- [ ] `GET /parametros` sin `nombre`, y `GET /parametros?nombre=` vacío, responden 400.
-- [ ] `GET /parametros?nombre=EMPRESA_RTN` sin token responde 401.
-- [ ] La respuesta no incluye `id`, `descripcion`, `isActive` ni timestamps.
-- [ ] El log de rutas de Nest muestra 53 rutas, y `/docs-json` tiene 52 operaciones bajo 48 `paths`.
-- [ ] Swagger (`/docs`) muestra `GET /parametros` con candado, el query `nombre` obligatorio y su descripción.
-- [ ] `npm run lint` no da errores.
+- [X] `GET /parametros?nombre=EMPRESA_RTN` con token responde 200 `{ ok, msg, parametro: { clave, valor } }`, y `valor` es `null` mientras nadie lo complete.
+- [X] Tras `UPDATE parametros SET valor = 'Agro S.A.' WHERE clave = 'EMPRESA_NOMBRE_COMERCIAL'`, `GET /parametros?nombre=EMPRESA_NOMBRE_COMERCIAL` devuelve `valor: 'Agro S.A.'` sin reiniciar el API.
+- [X] `GET /parametros?nombre=empresa_rtn` (minúsculas) devuelve la clave `EMPRESA_RTN`.
+- [X] `GET /parametros?nombre=NO_EXISTE` responde 404 `Parametro no encontrado`.
+- [X] Tras `UPDATE parametros SET isActive = 0 WHERE clave = 'EMPRESA_SITIO_WEB'`, `GET /parametros?nombre=EMPRESA_SITIO_WEB` responde 404.
+- [X] `GET /parametros` sin `nombre`, y `GET /parametros?nombre=` vacío, responden 400.
+- [X] `GET /parametros?nombre=EMPRESA_RTN` sin token responde 401.
+- [X] La respuesta no incluye `id`, `descripcion`, `isActive` ni timestamps.
+- [X] El log de rutas de Nest muestra 53 rutas, y `/docs-json` tiene 52 operaciones bajo 48 `paths`.
+- [X] Swagger (`/docs`) muestra `GET /parametros` con candado, el query `nombre` obligatorio y su descripción.
+- [X] `npm run lint` no da errores.
 
 ## Decisions
 
