@@ -1,0 +1,26 @@
+# parametros module
+
+Spec 51. One route, read-only. The tenant's own company data, as key-value rows: with one database per tenant, this table is what tells one company from another without any tenant logic in `src/`.
+
+## `parametros`
+
+`clave VARCHAR(100)` with a real **`UNIQUE`** (`uq_parametros_clave`), `valor VARCHAR(500)` nullable, `descripcion VARCHAR(255)` (for whoever runs the `UPDATE`, never returned), `isActive`, `created_at`, `updated_at` (`ON UPDATE CURRENT_TIMESTAMP`).
+
+- **Key-value on purpose**: a new piece of data is an `INSERT` in each tenant database, not an `ALTER TABLE`. The cost is that `valor` is always text — no type, no format check per key (a malformed RTN or e-mail goes through). The code interprets no key.
+- **Written only by hand** (`UPDATE` in MySQL), like `paises_config`. No CRUD, no startup validation. The API sees a change on the next request.
+- `db/seed.sql` seeds seven keys with `valor` `NULL`: `EMPRESA_NOMBRE_COMERCIAL`, `EMPRESA_RAZON_SOCIAL`, `EMPRESA_RTN`, `EMPRESA_DIRECCION`, `EMPRESA_TELEFONO`, `EMPRESA_CORREO`, `EMPRESA_SITIO_WEB`. Keys are UPPER_SNAKE with a prefix, like catalog `codigo`s. `nuevo-tenant.sh` takes no company arguments; the values are filled in afterwards (`deploy/README.md`, sections 7 and 9).
+- **Never store a secret here**: any authenticated user reads any key. Secrets stay in `.env`.
+- Retiring a key is `isActive = 0` (the route then answers 404), never a `DELETE`.
+
+## `GET /parametros?nombre=<CLAVE>`
+
+`ObtenerParametroDto`: `nombre` trimmed, 1–100 — **mandatory**, so a missing or empty `nombre` is a **400**. It is the identifier of what is asked for, not a filter, so it does not follow spec 16's ignore-invalid convention. One `SELECT clave, valor` with `isActive = 1`, no transaction. The `utf8mb4_0900_ai_ci` collation makes the lookup case- and accent-insensitive (`empresa_rtn` finds `EMPRESA_RTN`).
+
+- **200** `{ ok, msg, parametro: { clave, valor } }`. `valor: null` means the key exists and nobody filled it in.
+- **404** `Parametro no encontrado` if the key does not exist or is inactive — so the front tells a typo from an empty value.
+- No `id`, `descripcion`, `isActive` or timestamps in the response.
+- Requires a JWT; **no `cliente_operador` check, no role, no permission row** — these are tenant data, not a client's.
+
+## Deferred
+
+A write route (`PATCH /parametros`, ADMIN/SOPORTE); listing every key in one call; a logo, colours or front branding; a `categoria` column; moving `.env` behaviour settings (`PASSWORD_VIGENCIA_DIAS`, `CHAT_LIMITE_DIARIO`, `GEMINI_MODEL`) or the per-tenant time zone here; any consumer inside the API — the chat prompt, the AI summary and the fiscal documents do not read this table (putting the company name in a Gemini prompt would send it to Google, which is its own spec).

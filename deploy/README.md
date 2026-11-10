@@ -294,6 +294,9 @@ también debe dar **401**, del servicio de reportes (sección 12).
 - [ ] **Productos**: la base nace sin productos y no hay endpoint para
       crearlos, así que van a mano con `INSERT INTO productos ...`.
 - [ ] Revisar que `paises_config` tenga solo los países que van a operar.
+- [ ] **Datos de la empresa** (spec 51): la base nace con las siete claves
+      `EMPRESA_*` de `parametros` vacías. Se completan a mano con `UPDATE`
+      (ver "Tabla `parametros`" en la sección 9).
 
 **Entrar a la base de una empresa como root:**
 
@@ -445,6 +448,64 @@ done
 - Después de este cambio, sube de nuevo `nuevo-tenant.sh` y `tenant/` a
   `/opt/plataforma` (sección 4), para que las empresas nuevas nazcan con el
   secreto.
+
+**Tabla `parametros` en las empresas que ya existen (spec 51):** guarda los
+datos de la empresa (nombre comercial, razón social, RTN, dirección,
+teléfono, correo y sitio web), que lee `GET /parametros?nombre=<CLAVE>`. Las
+empresas dadas de alta antes del spec 51 no la tienen, y en ellas esa ruta
+responde 500. El resto del API funciona igual. Hazlo antes de desplegar la
+imagen. Las empresas nuevas no lo necesitan, porque `nuevo-tenant.sh` carga
+`db/schema.sql` y `db/seed.sql`, siempre que hayas vuelto a subir `db/`
+(sección 4).
+
+Como root, en la base de cada empresa (cambia `agro_agrolibano` por su
+`DB_NAME`):
+
+```bash
+cd /opt/plataforma
+docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 agro_agrolibano' <<'SQL'
+CREATE TABLE IF NOT EXISTS `parametros` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `clave` varchar(100) NOT NULL,
+  `valor` varchar(500) DEFAULT NULL,
+  `descripcion` varchar(255) DEFAULT NULL,
+  `isActive` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_parametros_clave` (`clave`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT IGNORE INTO `parametros` (`clave`, `valor`, `descripcion`) VALUES
+  ('EMPRESA_NOMBRE_COMERCIAL', NULL, 'Nombre comercial de la empresa'),
+  ('EMPRESA_RAZON_SOCIAL',     NULL, 'Razón social registrada'),
+  ('EMPRESA_RTN',              NULL, 'RTN de la empresa'),
+  ('EMPRESA_DIRECCION',        NULL, 'Dirección fiscal de la empresa'),
+  ('EMPRESA_TELEFONO',         NULL, 'Teléfono de contacto'),
+  ('EMPRESA_CORREO',           NULL, 'Correo de contacto'),
+  ('EMPRESA_SITIO_WEB',        NULL, 'Sitio web de la empresa');
+SQL
+```
+
+- Se puede correr dos veces: `IF NOT EXISTS` e `INSERT IGNORE` no tocan lo
+  que ya está ni pisan un valor ya completado.
+- Comprobar: `SELECT clave, valor FROM parametros;` muestra las siete claves.
+
+Completar los datos, entrando a la base como root (sección 7):
+
+```sql
+UPDATE parametros SET valor = 'Agro Libano S.A.' WHERE clave = 'EMPRESA_NOMBRE_COMERCIAL';
+UPDATE parametros SET valor = '08019000123456'   WHERE clave = 'EMPRESA_RTN';
+```
+
+- El API lo lee en la siguiente petición, sin reiniciar nada.
+- Una clave vacía sale como `valor: null`. Para retirar una clave sin
+  borrarla: `UPDATE parametros SET isActive = 0 WHERE clave = '...'`, y la
+  ruta responde 404.
+- **Nunca guardes secretos aquí**: cualquier usuario con sesión lee
+  cualquier clave. Los secretos van en el `.env`.
+- Una clave nueva es un `INSERT INTO parametros (clave, descripcion) VALUES
+  (...)` en cada base, sin `ALTER TABLE`.
 
 ### Deploy automático a dev (rama `develop`)
 
