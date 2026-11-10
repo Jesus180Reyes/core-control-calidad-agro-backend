@@ -294,9 +294,11 @@ también debe dar **401**, del servicio de reportes (sección 12).
 - [ ] **Productos**: la base nace sin productos y no hay endpoint para
       crearlos, así que van a mano con `INSERT INTO productos ...`.
 - [ ] Revisar que `paises_config` tenga solo los países que van a operar.
-- [ ] **Datos de la empresa** (spec 51): la base nace con las siete claves
-      `EMPRESA_*` de `parametros` vacías. Se completan a mano con `UPDATE`
-      (ver "Tabla `parametros`" en la sección 9).
+- [ ] **Datos de la empresa** (specs 51 y 52): la base nace con las siete
+      claves `EMPRESA_*` y `APP_NOMBRE` de `parametros` vacías. Se completan a
+      mano con `UPDATE`, `APP_NOMBRE` incluida (`'metrika360'`): sin ella,
+      `GET /info` responde `app: null` (ver "Tabla `parametros`" en la
+      sección 9).
 
 **Entrar a la base de una empresa como root:**
 
@@ -483,20 +485,28 @@ INSERT IGNORE INTO `parametros` (`clave`, `valor`, `descripcion`) VALUES
   ('EMPRESA_DIRECCION',        NULL, 'Dirección fiscal de la empresa'),
   ('EMPRESA_TELEFONO',         NULL, 'Teléfono de contacto'),
   ('EMPRESA_CORREO',           NULL, 'Correo de contacto'),
-  ('EMPRESA_SITIO_WEB',        NULL, 'Sitio web de la empresa');
+  ('EMPRESA_SITIO_WEB',        NULL, 'Sitio web de la empresa'),
+  ('APP_NOMBRE',               NULL, 'Nombre de la aplicación');
 SQL
 ```
 
 - Se puede correr dos veces: `IF NOT EXISTS` e `INSERT IGNORE` no tocan lo
   que ya está ni pisan un valor ya completado.
-- Comprobar: `SELECT clave, valor FROM parametros;` muestra las siete claves.
+- **Empresas que ya tenían la tabla (spec 51) y no tienen `APP_NOMBRE`
+  (spec 52):** basta con volver a correr el mismo bloque. Solo agrega la
+  fila que falta. Sin ella, `GET /info` responde `app: null`, no un error.
+- Comprobar: `SELECT clave, valor FROM parametros;` muestra las ocho claves.
 
 Completar los datos, entrando a la base como root (sección 7):
 
 ```sql
+UPDATE parametros SET valor = 'metrika360'       WHERE clave = 'APP_NOMBRE';
 UPDATE parametros SET valor = 'Agro Libano S.A.' WHERE clave = 'EMPRESA_NOMBRE_COMERCIAL';
 UPDATE parametros SET valor = '08019000123456'   WHERE clave = 'EMPRESA_RTN';
 ```
+
+- `APP_NOMBRE` y `EMPRESA_NOMBRE_COMERCIAL` son las únicas claves que se ven
+  **sin token**, en `GET /info` (spec 52). El resto solo se lee con sesión.
 
 - El API lo lee en la siguiente petición, sin reiniciar nada.
 - Una clave vacía sale como `valor: null`. Para retirar una clave sin

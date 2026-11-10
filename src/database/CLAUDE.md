@@ -36,4 +36,4 @@ Conventions worth copying:
 
 ## Hand-maintained tables
 
-No CRUD and nothing validates them at startup; a missing row surfaces as a 400 at request time: `etapas`, `estados_calidad`, `roles`, `catalogo_permisos`/`permisos`, `paises_config`, `parametros` (spec 51; seeded with seven empty `EMPRESA_*` keys, a missing key is a 404, not a 400), `destinos` (spec 47; `db/seed.sql` seeds two rows, and with no active row every approver rejection of a weigh-in answers 400), plus `productos` and `usuarios`, which `db/seed.sql` does not include.
+No CRUD and nothing validates them at startup; a missing row surfaces as a 400 at request time: `etapas`, `estados_calidad`, `roles`, `catalogo_permisos`/`permisos`, `paises_config`, `parametros` (specs 51 and 52; seeded with eight empty keys, the seven `EMPRESA_*` plus `APP_NOMBRE`; a missing key is a 404 on `GET /parametros` and a `null` field on `GET /info`, never a 400), `destinos` (spec 47; `db/seed.sql` seeds two rows, and with no active row every approver rejection of a weigh-in answers 400), plus `productos` and `usuarios`, which `db/seed.sql` does not include.
