@@ -72,6 +72,7 @@ INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VAL
 INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (5,'EMPRESA_TELEFONO',NULL,'Teléfono de contacto',1);
 INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (6,'EMPRESA_CORREO',NULL,'Correo de contacto',1);
 INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (7,'EMPRESA_SITIO_WEB',NULL,'Sitio web de la empresa',1);
+INSERT INTO `parametros` (`id`, `clave`, `valor`, `descripcion`, `isActive`) VALUES (8,'APP_NOMBRE',NULL,'Nombre de la aplicación',1);
 /*!40000 ALTER TABLE `parametros` ENABLE KEYS */;
 UNLOCK TABLES;
 
