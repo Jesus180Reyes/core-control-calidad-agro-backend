@@ -257,6 +257,26 @@ describe('chat.prompt / preguntas sugeridas', () => {
     });
 });
 
+describe('chat.prompt / pesajes de la planta entera', () => {
+    it('pesajes_de_cliente ya no exige el cliente', () => {
+        const declaracion = HERRAMIENTAS_CHAT.find(
+            (h) => h.name === 'pesajes_de_cliente',
+        );
+        expect(
+            (declaracion?.parameters as { required?: string[] }).required,
+        ).toBeUndefined();
+    });
+
+    it('la regla de a quien pertenecen los pesajes gana al cliente unico', () => {
+        expect(INSTRUCCION_SISTEMA_CHAT).toContain(
+            'es pesajes_de_cliente SIN cliente_id',
+        );
+        expect(INSTRUCCION_SISTEMA_CHAT).toContain(
+            'Excepcion: una pregunta de pesajes que no nombra a nadie',
+        );
+    });
+});
+
 describe('chat.prompt / comparar_lotes', () => {
     it('esta declarada, sin argumentos obligatorios', () => {
         const declaracion = HERRAMIENTAS_CHAT.find(

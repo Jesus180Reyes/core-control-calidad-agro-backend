@@ -488,16 +488,102 @@ describe('ChatRepository / despachador', () => {
         expect(resultado.aviso).toContain('Agroexport');
     });
 
-    it('los pesajes de un cliente exigen el cliente', async () => {
-        const { repo, llamadas } = crearRepositorio([], jest.fn());
+    it('sin cliente son los pesajes de la planta entera, hoy por defecto', async () => {
+        // "que se peso hoy" sin nombrar a nadie: antes el modelo asumia los de
+        // quien preguntaba o recorria los clientes uno por uno.
+        const { repo, llamadas } = crearRepositorio(
+            [
+                { total: 1 }, // conteo, sin consultar ningun cliente antes
+                [
+                    {
+                        id: '91',
+                        lote_id: 41,
+                        nombre_lote: 'BILLS2026',
+                        cliente: 'Agroexport',
+                        unidad_medida: 'Libras',
+                        peso_neto: '10.50',
+                        fuera_de_rango: 1,
+                        estado_calidad: 'PESO MAXIMO',
+                        registrado_por: 'Carlos',
+                        created_at: new Date(2026, 10, 12, 8, 5),
+                        aprobado: null,
+                    },
+                ],
+                [
+                    {
+                        lote_id: 41,
+                        nombre_lote: 'BILLS2026',
+                        cliente: 'Agroexport',
+                        unidad_medida: 'Libras',
+                        cantidad: 1,
+                        peso_neto_total: '10.50',
+                        fuera_de_rango: '1',
+                    },
+                ],
+                { total: 1 },
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'pesajes_de_cliente', argumentos: { fuera_de_rango: true } },
+            contexto,
+        )) as {
+            cliente: string;
+            cliente_rechazado?: boolean;
+            filtros_aplicados: string;
+            pesajes: { cliente: string }[];
+            por_lote: { cliente: string }[];
+        };
+
+        expect(resultado.cliente).toContain('todos los clientes');
+        expect(resultado.cliente_rechazado).toBeUndefined();
+        expect(resultado.filtros_aplicados).toContain('solo los de hoy');
+        expect(resultado.filtros_aplicados).toContain('solo fuera de rango');
+        // Sin cliente en la cabecera, cada fila dice de quien es.
+        expect(resultado.pesajes[0].cliente).toBe('Agroexport');
+        expect(resultado.por_lote[0].cliente).toBe('Agroexport');
+        expect(
+            llamadas.some((l) => l.metodo === 'where' && l.args[0] === 'lotes.cliente_id'),
+        ).toBe(false);
+    });
+
+    it('con cliente no corta a hoy ni repite el cliente en cada fila', async () => {
+        const { repo } = crearRepositorio(
+            [
+                { nombre: 'Agroexport', isActive: 1 },
+                { total: 1 },
+                [{ id: '92', lote_id: 41, nombre_lote: 'BILLS2026', cliente: 'Agroexport', peso_neto: '1', fuera_de_rango: 0, created_at: new Date(2026, 10, 1), aprobado: 1 }],
+                [{ lote_id: 41, nombre_lote: 'BILLS2026', cliente: 'Agroexport', cantidad: 1, peso_neto_total: '1', fuera_de_rango: '0' }],
+                { total: 1 },
+            ],
+            jest.fn(),
+        );
+
+        const resultado = (await repo.despachar(
+            { nombre: 'pesajes_de_cliente', argumentos: { cliente_id: 3 } },
+            contexto,
+        )) as {
+            filtros_aplicados: string;
+            pesajes: Record<string, unknown>[];
+            por_lote: Record<string, unknown>[];
+        };
+
+        expect(resultado.filtros_aplicados).not.toContain('hoy');
+        expect(resultado.pesajes[0]).not.toHaveProperty('cliente');
+        expect(resultado.por_lote[0]).not.toHaveProperty('cliente');
+    });
+
+    it('la planta sin pesajes lo dice sin nombrar un cliente', async () => {
+        const { repo } = crearRepositorio([{ total: 0 }], jest.fn());
 
         const resultado = (await repo.despachar(
             { nombre: 'pesajes_de_cliente', argumentos: {} },
             contexto,
-        )) as { error: string };
+        )) as { total: number; aviso: string };
 
-        expect(resultado.error).toBe('Falta el id del cliente.');
-        expect(llamadas).toHaveLength(0);
+        expect(resultado.total).toBe(0);
+        expect(resultado.aviso).toContain('en la planta');
     });
 
     it('la bandeja del aprobador sale de todos los clientes en una llamada, la mas vieja primero', async () => {

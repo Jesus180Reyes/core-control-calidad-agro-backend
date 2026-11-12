@@ -1902,24 +1902,39 @@ export class ChatRepository {
      * No filtra `lotes.estado` ni `clientes.isActive`, igual que
      * `pesajes_de_usuario`: un pesaje de un lote ya cerrado sigue siendo algo
      * que se peso ese dia.
+     *
+     * **Sin `cliente_id` es la planta entera**: "que se peso hoy", "que salio
+     * fuera de rango hoy" o "en general" no nombran cliente, y sin esta via el
+     * modelo asumia los pesajes de quien pregunta o recorria clientes uno por
+     * uno. Se mantuvo el nombre de la herramienta para no mover las preguntas
+     * que ya funcionaban. Sin cliente y sin fechas se asume `hoy`, como en
+     * `lotes_finalizados`: el historial entero de la planta no contesta nada y
+     * llenaria el contexto. Con cliente no hay default, como hasta ahora.
      */
     private async pesajesDeCliente(
         clienteId: number | undefined,
-        filtros: FiltrosDePesajes,
+        filtrosPedidos: FiltrosDePesajes,
     ): Promise<ResultadoHerramienta> {
-        if (clienteId === undefined) {
-            return { error: 'Falta el id del cliente.' };
+        let cliente: { nombre: string; isActive: number | null } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre', 'isActive'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
         }
 
-        const cliente = await this.db
-            .selectFrom('clientes')
-            .select(['id', 'nombre', 'isActive'])
-            .where('id', '=', clienteId)
-            .executeTakeFirst();
-
-        if (!cliente) {
-            return { error: `No existe ningun cliente con id ${clienteId}.` };
-        }
+        const filtros: FiltrosDePesajes =
+            clienteId === undefined &&
+                filtrosPedidos.periodo === undefined &&
+                filtrosPedidos.desde === undefined &&
+                filtrosPedidos.hasta === undefined
+                ? { ...filtrosPedidos, periodo: 'hoy' }
+                : filtrosPedidos;
 
         const ventana = this.ventanaDelPeriodo(filtros);
 
@@ -1934,15 +1949,18 @@ export class ChatRepository {
                 'estados_calidad.id',
                 'pesajes.estado_calidad_id',
             )
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
             .leftJoin('usuarios', 'usuarios.id', 'pesajes.usuario_id')
             .leftJoin(
                 'unidades_medida',
                 'unidades_medida.id',
                 'lotes.unidad_medida_id',
             )
-            .where('lotes.cliente_id', '=', clienteId)
             .where('pesajes.isActive', '=', 1);
 
+        if (clienteId !== undefined) {
+            base = base.where('lotes.cliente_id', '=', clienteId);
+        }
         if (filtros.lote_id !== undefined) {
             base = base.where('pesajes.lote_id', '=', filtros.lote_id);
         }
@@ -1982,6 +2000,7 @@ export class ChatRepository {
             'pesajes.id',
             'pesajes.lote_id',
             'lotes.nombre_lote',
+            'clientes.nombre as cliente',
             'unidades_medida.nombre as unidad_medida',
             'pesajes.peso_neto',
             'pesajes.fuera_de_rango',
@@ -1993,11 +2012,18 @@ export class ChatRepository {
 
         const total = await this.contarFiltrados(consulta);
 
-        const cabecera = {
-            cliente: cliente.nombre,
-            cliente_rechazado: cliente.isActive !== 1,
-            filtros_aplicados: this.filtrosEnPalabras(filtros, ventana),
-        };
+        // Con un cliente, su nombre va una vez en la cabecera. Sin cliente, cada
+        // fila y cada lote dicen de quien son, o el modelo no podria atribuirlos.
+        const cabecera = cliente
+            ? {
+                cliente: cliente.nombre,
+                cliente_rechazado: cliente.isActive !== 1,
+                filtros_aplicados: this.filtrosEnPalabras(filtros, ventana),
+            }
+            : {
+                cliente: 'todos los clientes (la planta entera)',
+                filtros_aplicados: this.filtrosEnPalabras(filtros, ventana),
+            };
 
         if (total === 0) {
             return {
@@ -2005,7 +2031,9 @@ export class ChatRepository {
                 pesajes: [],
                 por_lote: [],
                 total: 0,
-                aviso: `No hay ningun pesaje activo de los lotes del cliente ${cliente.nombre} con esos criterios. Los pesajes anulados no se listan.`,
+                aviso: cliente
+                    ? `No hay ningun pesaje activo de los lotes del cliente ${cliente.nombre} con esos criterios. Los pesajes anulados no se listan.`
+                    : 'No hay ningun pesaje activo en la planta con esos criterios. Los pesajes anulados no se listan.',
             };
         }
 
@@ -2019,6 +2047,7 @@ export class ChatRepository {
             .select([
                 'pesajes.lote_id',
                 'lotes.nombre_lote',
+                'clientes.nombre as cliente',
                 'unidades_medida.nombre as unidad_medida',
                 sql<number | string>`COUNT(*)`.as('cantidad'),
                 sql<number | string>`COALESCE(SUM(pesajes.peso_neto), 0)`.as(
@@ -2031,6 +2060,7 @@ export class ChatRepository {
             .groupBy([
                 'pesajes.lote_id',
                 'lotes.nombre_lote',
+                'clientes.nombre',
                 'unidades_medida.nombre',
             ])
             .orderBy('cantidad', 'desc')
@@ -2051,6 +2081,7 @@ export class ChatRepository {
             por_lote: porLote.map((l) => ({
                 lote_id: l.lote_id,
                 lote: l.nombre_lote,
+                ...(cliente ? {} : { cliente: l.cliente }),
                 unidad_medida: l.unidad_medida,
                 pesajes: Number(l.cantidad),
                 peso_neto_total: this.dosDecimales(l.peso_neto_total),
@@ -2060,6 +2091,7 @@ export class ChatRepository {
                 id: Number(p.id),
                 lote_id: p.lote_id,
                 lote: p.nombre_lote,
+                ...(cliente ? {} : { cliente: p.cliente }),
                 peso_neto: this.dosDecimales(p.peso_neto),
                 unidad_medida: p.unidad_medida,
                 fuera_de_rango: !!p.fuera_de_rango,

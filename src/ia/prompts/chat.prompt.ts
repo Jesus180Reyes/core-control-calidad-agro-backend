@@ -218,6 +218,15 @@ SUGERIDAS.
   sus lotes uno por uno con pesajes_de_lote. Para los totales usa por_lote, que
   ya viene sumado por lote; no sumes entre lotes, porque cada uno tiene su
   unidad. Si por_lote trae menos lotes que total_lotes, di cuantos hay en total.
+- De quien son los pesajes: si la pregunta dice "mis", "yo", "lo mio" o "mi
+  turno", es pesajes_de_usuario con el id del contexto. Si nombra una persona,
+  es pesajes_de_usuario con su id. Si nombra un cliente, es pesajes_de_cliente
+  con su cliente_id. Si no nombra a nadie ("que se peso hoy", "que pesajes
+  hubo", "que salio fuera de rango hoy", "que actividad hubo hoy", "en
+  general", "en la planta"), es pesajes_de_cliente SIN cliente_id: la planta
+  entera, en una llamada. No asumas que son los de quien pregunta y no
+  recorras los clientes uno por uno. Para estas preguntas esta regla gana a
+  la de asumir el unico cliente de la cartera.
 - "Que tengo pendiente", "que me falta por aprobar", "que esta esperando firma"
   o "mi bandeja" es lotes_pendientes, de todos los clientes en una llamada. No
   recorras los clientes con lotes_de_cliente para eso.
@@ -319,7 +328,8 @@ SUPUESTOS Y REPREGUNTAS:
   preguntar. Con dos a cuatro, lista las opciones y pide que elija. Con cinco o
   mas, pide un nombre mas preciso.
 - Si no se menciona cliente y la cartera de quien pregunta tiene uno solo,
-  asumelo y dilo.
+  asumelo y dilo. Excepcion: una pregunta de pesajes que no nombra a nadie es
+  de la planta entera (ver VOCABULARIO).
 - Puedes hacer UNA repregunta por turno como maximo. Si ya repreguntaste y
   siguen sin concretar, toma la opcion mas amplia y declara cual tomaste.
 - Si una consulta no devuelve filas, nunca respondas "no hay datos": di que
@@ -626,14 +636,14 @@ export const HERRAMIENTAS_CHAT = [
     {
         name: 'pesajes_de_cliente',
         description:
-            'Lista los pesajes de TODOS los lotes de un cliente, de cualquier operador, del mas reciente al mas antiguo, y ademas trae por_lote: cuantos pesajes, el peso neto total y cuantos fuera de rango tiene cada lote con esos filtros. Usala para "que se peso hoy del cliente X" o "las pesadas de X esta semana", en UNA llamada y sin recorrer sus lotes. Los pesajes anulados quedan fuera.',
+            'Lista los pesajes de TODOS los lotes de un cliente, o de la planta entera si no mandas cliente_id, de cualquier operador, del mas reciente al mas antiguo, y ademas trae por_lote: cuantos pesajes, el peso neto total y cuantos fuera de rango tiene cada lote con esos filtros. Usala para "que se peso hoy del cliente X" o "las pesadas de X esta semana" y, sin cliente_id, para "que se peso hoy", "que salio fuera de rango hoy", "que pesajes hubo en la planta" o "en general", en UNA llamada y sin recorrer clientes ni lotes. Sin cliente_id ni fechas devuelve los de hoy. Los pesajes anulados quedan fuera.',
         parameters: {
             type: 'OBJECT',
             properties: {
                 cliente_id: {
                     type: 'INTEGER',
                     description:
-                        'Id del cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes.',
+                        'Opcional. Id del cliente; resuelvelo antes con buscar_persona o mis_clientes y nunca lo inventes. Sin el, trae los pesajes de todos los clientes (la planta entera).',
                 },
                 lote_id: {
                     type: 'INTEGER',
@@ -685,7 +695,6 @@ export const HERRAMIENTAS_CHAT = [
                     description: 'Cuantas filas devolver. Por defecto 10.',
                 },
             },
-            required: ['cliente_id'],
         },
     },
     {
