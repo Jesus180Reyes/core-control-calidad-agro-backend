@@ -29,7 +29,7 @@
  *    mensaje mixto pierde la cortesia, la veracidad y la memoria, no los datos:
  *    se contesta solo la parte de datos.
  *
- * Las catorce funciones de datos son de SOLO LECTURA, y eso esta escrito aqui y tambien en
+ * Las quince funciones de datos son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
  * `rechazar_lote`, no hay nada detras que despachar.
  */
@@ -247,6 +247,17 @@ SUGERIDAS.
   resultado trae aviso, repitelo. "Cuantos lotes" se contesta con
   total_lotes. Lotes con posicion null no tienen pesajes: van al final y no
   compiten.
+- Comparar operadores: "quien peso mas", "quien peso menos", "que operadores
+  pesaron", "lo que peso cada operador", "compara a Carlos con Pedro", "los
+  operadores activos", "quien no ha pesado" o "a quien le rechazan mas" es
+  pesajes_por_operador, en UNA llamada, de la planta, de un cliente o de un
+  lote. No recorras personas con pesajes_de_usuario ni lotes con
+  pesajes_de_lote para eso. Copia la posicion tal como llega y los empates
+  como empates. El peso de cada operador esta en por_unidad: nunca lo sumes
+  entre unidades. Para comparar dos personas, muestra las cifras de las dos
+  tal como llegan y no calcules la diferencia. Si el resultado trae aviso,
+  repitelo. pesajes_de_usuario es para listar los pesajes de UNA persona;
+  para comparar, ordenar o contar varias personas, esta regla gana.
 - Anulado no es lo mismo que rechazado. "Anulado", "borrado", "eliminado" o
   "cancelado" es un pesaje que el operador anulo: no aparece en ninguna lista y
   solo se ve con detalle_de_pesaje por su id. "Rechazado por el aprobador" o "no
@@ -869,6 +880,71 @@ export const HERRAMIENTAS_CHAT = [
                 limite: {
                     type: 'INTEGER',
                     description: 'Cuantos lotes devolver. Por defecto 10, maximo 20.',
+                },
+            },
+        },
+    },
+    {
+        name: 'pesajes_por_operador',
+        description:
+            'Lo que peso cada operador, en UNA llamada y ya ordenado: cada operador trae su posicion, cuantos pesajes activos registro, en cuantos lotes, el peso neto en por_unidad (separado por unidad de medida, nunca sumado entre unidades), cuantos y que porcentaje quedaron fuera de rango, y cuantos aprobo y rechazo el aprobador con su porcentaje. De la planta entera, de un cliente o de un lote. Usala para "quien peso mas hoy", "que operadores pesaron en el lote X", "lo que peso cada operador", "compara a Carlos con Pedro", "que operador tiene mas fuera de rango" o "a quien le rechazan mas". Sin cliente ni lote lista tambien a los operadores activos que no pesaron, al final y sin posicion: sirve para "los operadores activos" y "quien no ha pesado hoy". Sin cliente, lote ni fechas devuelve los de hoy.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                cliente_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Solo los pesajes de lotes de ese cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes.',
+                },
+                lote_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Solo los pesajes de ese lote. Resuelvelo antes con buscar_persona; nunca lo inventes. Con lote no hay limite de fecha por defecto.',
+                },
+                orden_por: {
+                    type: 'STRING',
+                    enum: [
+                        'pesajes',
+                        'peso_neto_total',
+                        'fuera_de_rango',
+                        'porcentaje_fuera_de_rango',
+                        'rechazados_por_aprobador',
+                        'porcentaje_rechazado_por_aprobador',
+                    ],
+                    description:
+                        'El criterio del orden. Por defecto pesajes. peso_neto_total solo se aplica si todo el resultado tiene una unidad; si no, el sistema ordena por pesajes y lo avisa.',
+                },
+                direccion: {
+                    type: 'STRING',
+                    enum: ['desc', 'asc'],
+                    description:
+                        'desc pone primero el valor mas alto ("quien peso mas", "a quien le rechazan mas"); asc el mas bajo. Por defecto desc.',
+                },
+                desde: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia.',
+                },
+                hasta: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia entero.',
+                },
+                periodo: {
+                    type: 'STRING',
+                    enum: [
+                        'hoy',
+                        'ayer',
+                        'esta_semana',
+                        'semana_pasada',
+                        'ultimos_7_dias',
+                        'este_mes',
+                        'mes_pasado',
+                    ],
+                    description:
+                        'Ventana relativa sobre la fecha del pesaje, resuelta por el sistema. Usala en vez de calcular la fecha tu. Sin cliente ni lote, por defecto hoy.',
+                },
+                limite: {
+                    type: 'INTEGER',
+                    description: 'Cuantos operadores devolver. Por defecto 10, maximo 20.',
                 },
             },
         },

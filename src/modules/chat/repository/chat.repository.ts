@@ -66,6 +66,23 @@ const CRITERIOS_COMPARACION = [
 type CriterioComparacion = (typeof CRITERIOS_COMPARACION)[number];
 
 /**
+ * Los criterios de `pesajes_por_operador`. `peso_neto_total` solo ordena de
+ * verdad cuando todo el resultado tiene una unidad; si no, cae a `pesajes`.
+ */
+const CRITERIOS_OPERADOR = [
+    'pesajes',
+    'peso_neto_total',
+    'fuera_de_rango',
+    'porcentaje_fuera_de_rango',
+    'rechazados_por_aprobador',
+    'porcentaje_rechazado_por_aprobador',
+] as const;
+type CriterioOperador = (typeof CRITERIOS_OPERADOR)[number];
+
+/** El nombre literal del rol, el mismo que usa `GET /catalogos/operadores`. */
+const ROL_OPERADOR = 'OPERADOR';
+
+/**
  * La ventana relativa que el modelo puede pedir. Se resuelve SIEMPRE en MySQL
  * con `CURDATE()`, nunca en Node y menos en el modelo: el reloj que cuenta es
  * el mismo con el que `NOW()` escribio los `created_at`.
@@ -797,6 +814,22 @@ export class ChatRepository {
                         limite: this.aLimite(args.limite),
                     },
                 });
+
+            case 'pesajes_por_operador':
+                return await this.pesajesPorOperador(
+                    this.aEntero(args.cliente_id),
+                    this.aEntero(args.lote_id),
+                    {
+                        orden_por: this.aCriterioOperador(args.orden_por),
+                        ascendente: args.direccion === 'asc',
+                        ventana: {
+                            desde: this.aFecha(args.desde),
+                            hasta: this.aFecha(args.hasta),
+                            periodo: this.aPeriodo(args.periodo),
+                            limite: this.aLimite(args.limite),
+                        },
+                    },
+                );
 
             case 'sugerir_preguntas':
                 // No es una consulta: `responder` la intercepta antes de llegar
@@ -2728,8 +2761,13 @@ export class ChatRepository {
             }
         }
 
-        let posicionAnterior = 0;
-        let valorAnterior: string | undefined;
+        const posiciones = this.posiciones(
+            filas.map((fila) =>
+                sinPesajesAlFinal && Number(fila.pesajes) === 0
+                    ? null
+                    : (fila.valor_orden ?? ''),
+            ),
+        );
 
         const lotes = filas.map((fila, indice) => {
             const pesajes = Number(fila.pesajes);
@@ -2737,21 +2775,8 @@ export class ChatRepository {
             const aprobados = Number(fila.aprobados);
             const rechazados = Number(fila.rechazados);
 
-            let posicion: number | null;
-            if (sinPesajesAlFinal && pesajes === 0) {
-                posicion = null;
-            } else {
-                const valor = this.valorComparable(fila.valor_orden);
-                posicion =
-                    indice > 0 && valor === valorAnterior
-                        ? posicionAnterior
-                        : indice + 1;
-                posicionAnterior = posicion;
-                valorAnterior = valor;
-            }
-
             return {
-                posicion,
+                posicion: posiciones[indice],
                 id: fila.id,
                 nombre_lote: fila.nombre_lote,
                 cliente: fila.cliente,
@@ -2785,6 +2810,307 @@ export class ChatRepository {
         };
     }
 
+    // ---------------------------------------------------------------------
+    // Herramienta 15: pesajes_por_operador
+    // ---------------------------------------------------------------------
+
+    /**
+     * Lo que peso cada operador, ya contado y ordenado: "quien peso mas hoy",
+     * "que operadores pesaron en el lote X", "lo que peso cada operador" o "los
+     * operadores activos".
+     *
+     * Existe porque esas preguntas no tenian herramienta: el modelo sacaba los
+     * nombres de las filas de `pesajes_de_lote` lote por lote (12 llamadas y
+     * `TEXTO_NO_CONVERGE` en `chat_log`) o declinaba.
+     *
+     * **Una fila por operador.** Lo que no tiene unidad —pesajes, fuera de
+     * rango, revision del aprobador, lotes distintos— va en la fila; el peso va
+     * en `por_unidad`, separado por unidad de medida, porque un operador que
+     * peso un lote en libras y otro en quintales no tiene un total que sumar.
+     * Ordenar por `peso_neto_total` solo se hace cuando todo el resultado tiene
+     * una unidad; si no, se ordena por `pesajes` y se dice.
+     *
+     * **Quien sale.** Sin cliente ni lote, los operadores activos (rol
+     * `OPERADOR`, por nombre, como `GET /catalogos/operadores`) aparecen aunque
+     * no hayan pesado —al final, sin posicion—, que es lo que contesta "los
+     * operadores activos" y "Pedro no peso hoy". Con cliente o lote solo salen
+     * quienes pesaron ahi: listar a todos los operadores de la planta en cero
+     * contra un lote seria ruido. En los dos casos sale tambien cualquier otro
+     * usuario que haya registrado pesajes, sea cual sea su rol, porque el
+     * pesaje es suyo aunque no sea operador.
+     *
+     * Sin cliente, lote ni fechas se asume `hoy`, igual que `pesajes_de_cliente`
+     * sin cliente. Con lote no hay ventana por defecto, como en
+     * `rechazos_por_destino`, y con cliente tampoco, como en `pesajes_de_cliente`.
+     */
+    private async pesajesPorOperador(
+        clienteId: number | undefined,
+        loteId: number | undefined,
+        opciones: {
+            orden_por: CriterioOperador;
+            ascendente: boolean;
+            ventana: FiltrosDePesajes;
+        },
+    ): Promise<ResultadoHerramienta> {
+        const { ascendente } = opciones;
+        let criterio = opciones.orden_por;
+
+        let cliente: { nombre: string } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
+        }
+
+        let lote: { nombre_lote: string } | undefined;
+        if (loteId !== undefined) {
+            lote = await this.db
+                .selectFrom('lotes')
+                .select(['nombre_lote'])
+                .where('id', '=', loteId)
+                .executeTakeFirst();
+
+            if (!lote) {
+                return { error: `No existe ningun lote con id ${loteId}.` };
+            }
+        }
+
+        const planta = clienteId === undefined && loteId === undefined;
+        const filtros: FiltrosDePesajes =
+            planta &&
+                opciones.ventana.periodo === undefined &&
+                opciones.ventana.desde === undefined &&
+                opciones.ventana.hasta === undefined
+                ? { ...opciones.ventana, periodo: 'hoy' }
+                : opciones.ventana;
+        const ventana = this.ventanaDelPeriodo(filtros);
+
+        // Los pesajes que cuentan, con todos los filtros. De aqui salen el
+        // agregado por operador, el desglose por unidad y el conteo de unidades,
+        // asi que los tres cuentan exactamente lo mismo.
+        const pesajesFiltrados = () => {
+            let base = this.db
+                .selectFrom('pesajes')
+                .innerJoin('lotes', 'lotes.id', 'pesajes.lote_id')
+                .where('pesajes.isActive', '=', 1);
+
+            if (clienteId !== undefined) {
+                base = base.where('lotes.cliente_id', '=', clienteId);
+            }
+            if (loteId !== undefined) {
+                base = base.where('pesajes.lote_id', '=', loteId);
+            }
+            if (ventana.desde !== undefined) {
+                base = base.where('pesajes.created_at', '>=', ventana.desde);
+            }
+            if (ventana.hasta !== undefined) {
+                base = base.where('pesajes.created_at', '<', ventana.hasta);
+            }
+            return base;
+        };
+
+        // Ordenar por peso mezclando unidades no compara lo mismo.
+        let avisoUnidades: string | undefined;
+        if (criterio === 'peso_neto_total') {
+            const unidades = await pesajesFiltrados()
+                .select(
+                    sql<number | string>`COUNT(DISTINCT lotes.unidad_medida_id)`.as(
+                        'total',
+                    ),
+                )
+                .executeTakeFirst();
+
+            if (Number(unidades?.total ?? 0) > 1) {
+                criterio = 'pesajes';
+                avisoUnidades =
+                    'Los pesajes usan unidades de medida distintas, asi que no se puede ordenar por peso: se ordeno por cantidad de pesajes. El peso de cada operador va en por_unidad, separado por unidad. Dilo en la respuesta.';
+            }
+        }
+
+        const agregados = pesajesFiltrados()
+            .select([
+                'pesajes.usuario_id',
+                sql<number | string>`COUNT(*)`.as('pesajes'),
+                sql<number | string>`COUNT(DISTINCT pesajes.lote_id)`.as('lotes'),
+                sql<number | string>`SUM(pesajes.peso_neto)`.as('peso_neto_total'),
+                sql<number | string>`SUM(pesajes.fuera_de_rango = 1)`.as(
+                    'fuera_de_rango',
+                ),
+                sql<number | string>`SUM(pesajes.aprobado = 1)`.as('aprobados'),
+                sql<number | string>`SUM(pesajes.aprobado = 0)`.as('rechazados'),
+            ])
+            .groupBy('pesajes.usuario_id')
+            .as('agg');
+
+        const expresiones: Record<CriterioOperador, RawBuilder<unknown>> = {
+            pesajes: sql`COALESCE(agg.pesajes, 0)`,
+            peso_neto_total: sql`COALESCE(agg.peso_neto_total, 0)`,
+            fuera_de_rango: sql`COALESCE(agg.fuera_de_rango, 0)`,
+            porcentaje_fuera_de_rango: sql`agg.fuera_de_rango * 100 / NULLIF(agg.pesajes, 0)`,
+            rechazados_por_aprobador: sql`COALESCE(agg.rechazados, 0)`,
+            porcentaje_rechazado_por_aprobador: sql`agg.rechazados * 100 / NULLIF(agg.pesajes, 0)`,
+        };
+        const expresion = expresiones[criterio];
+
+        const consulta = this.db
+            .selectFrom('usuarios')
+            .leftJoin('roles', 'roles.id', 'usuarios.rol_id')
+            .leftJoin(agregados, 'agg.usuario_id', 'usuarios.id')
+            .select([
+                'usuarios.id',
+                'usuarios.complete_name as nombre',
+                'roles.nombre as rol',
+                sql<number | string>`COALESCE(agg.pesajes, 0)`.as('pesajes'),
+                sql<number | string>`COALESCE(agg.lotes, 0)`.as('lotes'),
+                sql<number | string>`COALESCE(agg.fuera_de_rango, 0)`.as(
+                    'fuera_de_rango',
+                ),
+                sql<number | string>`COALESCE(agg.aprobados, 0)`.as('aprobados'),
+                sql<number | string>`COALESCE(agg.rechazados, 0)`.as('rechazados'),
+                expresion.as('valor_orden'),
+            ])
+            .where(
+                planta
+                    ? sql<boolean>`((roles.nombre = ${ROL_OPERADOR} AND usuarios.isActive = 1) OR agg.usuario_id IS NOT NULL)`
+                    : sql<boolean>`agg.usuario_id IS NOT NULL`,
+            );
+
+        const total = await this.contarFiltrados(consulta);
+
+        const alcance = lote
+            ? `el lote ${lote.nombre_lote}`
+            : cliente
+                ? `los lotes del cliente ${cliente.nombre}`
+                : 'la planta entera';
+
+        const cabecera = {
+            alcance,
+            filtros_aplicados: ventana.descripcion
+                ? `pesajes activos ${ventana.descripcion}`
+                : 'todos los pesajes activos, sin limite de fecha',
+            criterio: this.criterioOperadorEnPalabras(criterio, ascendente),
+            quien_sale: planta
+                ? 'todos los operadores activos, hayan pesado o no, y cualquier otro usuario que haya pesado'
+                : 'solo quienes registraron pesajes en ese alcance',
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                operadores: [],
+                total_operadores: 0,
+                aviso: planta
+                    ? 'Nadie registro pesajes activos en la planta en esas fechas, y no hay operadores activos que listar.'
+                    : `Nadie registro pesajes activos en ${alcance}${ventana.descripcion ? ' en esas fechas' : ''}. Los pesajes anulados no se cuentan.`,
+            };
+        }
+
+        const filas = await consulta
+            .orderBy(sql`COALESCE(agg.pesajes, 0) = 0`, 'asc')
+            .orderBy(expresion, ascendente ? 'asc' : 'desc')
+            .orderBy('usuarios.complete_name', 'asc')
+            .limit(Math.min(filtros.limite, ChatRepository.MAX_FILAS_MODELO))
+            .execute();
+
+        // El peso, por operador y unidad, solo de los operadores mostrados.
+        const conPesajes = filas
+            .filter((f) => Number(f.pesajes) > 0)
+            .map((f) => f.id);
+
+        const desglose =
+            conPesajes.length === 0
+                ? []
+                : await pesajesFiltrados()
+                    .leftJoin(
+                        'unidades_medida',
+                        'unidades_medida.id',
+                        'lotes.unidad_medida_id',
+                    )
+                    .select([
+                        'pesajes.usuario_id',
+                        'unidades_medida.nombre as unidad_medida',
+                        sql<number | string>`COUNT(*)`.as('pesajes'),
+                        sql<number | string>`COALESCE(SUM(pesajes.peso_neto), 0)`.as(
+                            'peso_neto_total',
+                        ),
+                    ])
+                    .where('pesajes.usuario_id', 'in', conPesajes)
+                    .groupBy(['pesajes.usuario_id', 'unidades_medida.nombre'])
+                    .orderBy('pesajes', 'desc')
+                    .execute();
+
+        const posiciones = this.posiciones(
+            filas.map((f) => (Number(f.pesajes) === 0 ? null : (f.valor_orden ?? ''))),
+        );
+
+        const operadores = filas.map((fila, indice) => {
+            const pesajes = Number(fila.pesajes);
+            const fueraDeRango = Number(fila.fuera_de_rango);
+            const aprobados = Number(fila.aprobados);
+            const rechazados = Number(fila.rechazados);
+
+            return {
+                posicion: posiciones[indice],
+                id: fila.id,
+                nombre: fila.nombre,
+                rol: fila.rol,
+                pesajes,
+                lotes: Number(fila.lotes),
+                por_unidad: desglose
+                    .filter((d) => d.usuario_id === fila.id)
+                    .map((d) => ({
+                        unidad_medida: d.unidad_medida,
+                        pesajes: Number(d.pesajes),
+                        peso_neto_total: this.dosDecimales(d.peso_neto_total),
+                    })),
+                fuera_de_rango: fueraDeRango,
+                porcentaje_fuera_de_rango:
+                    pesajes > 0
+                        ? this.dosDecimales((fueraDeRango * 100) / pesajes)
+                        : null,
+                aprobados_por_aprobador: aprobados,
+                rechazados_por_aprobador: rechazados,
+                porcentaje_rechazado_por_aprobador:
+                    pesajes > 0
+                        ? this.dosDecimales((rechazados * 100) / pesajes)
+                        : null,
+                sin_revisar_por_aprobador: pesajes - aprobados - rechazados,
+            };
+        });
+
+        return {
+            ...cabecera,
+            total_operadores: total,
+            mostrados: operadores.length,
+            operadores,
+            ...(avisoUnidades ? { aviso: avisoUnidades } : {}),
+        };
+    }
+
+    /** El criterio de `pesajes_por_operador` en una frase. */
+    private criterioOperadorEnPalabras(
+        criterio: CriterioOperador,
+        ascendente: boolean,
+    ): string {
+        const nombres: Record<CriterioOperador, string> = {
+            pesajes: 'cantidad de pesajes activos',
+            peso_neto_total: 'peso neto total',
+            fuera_de_rango: 'pesajes fuera de rango',
+            porcentaje_fuera_de_rango: 'porcentaje de pesajes fuera de rango',
+            rechazados_por_aprobador: 'pesajes rechazados por el aprobador',
+            porcentaje_rechazado_por_aprobador:
+                'porcentaje de pesajes rechazados por el aprobador',
+        };
+
+        return `${nombres[criterio]}, ${ascendente ? 'de menor a mayor' : 'de mayor a menor'}; quienes no pesaron van al final sin posicion`;
+    }
+
     /**
      * El estado de un lote en el vocabulario del chat, leido de las senales
      * canonicas de la tabla de discriminadores: el rechazo primero, siempre,
@@ -2801,6 +3127,28 @@ export class ChatRepository {
         if (lote.estado === 'abierto') return 'abierto';
         if (lote.aprobado_por !== null) return 'pendiente_aprobacion';
         return 'cerrado';
+    }
+
+    /**
+     * La posicion de cada fila de una lista YA ordenada, con empates
+     * compartidos (1, 1, 3). Un valor `null` es una fila que no compite —un lote
+     * u operador sin pesajes— y se queda sin posicion. Las que compiten van
+     * siempre antes que las nulas, porque la consulta las ordena asi.
+     */
+    private posiciones(valores: unknown[]): (number | null)[] {
+        let posicionAnterior = 0;
+        let valorAnterior: string | undefined;
+
+        return valores.map((crudo, indice) => {
+            if (crudo === null) return null;
+
+            const valor = this.valorComparable(crudo);
+            const posicion =
+                indice > 0 && valor === valorAnterior ? posicionAnterior : indice + 1;
+            posicionAnterior = posicion;
+            valorAnterior = valor;
+            return posicion;
+        });
     }
 
     /**
@@ -2899,6 +3247,13 @@ export class ChatRepository {
         return CRITERIOS_COMPARACION.includes(valor as CriterioComparacion)
             ? (valor as CriterioComparacion)
             : 'mas_reciente';
+    }
+
+    /** El criterio de `pesajes_por_operador`, o `pesajes` si no vale. */
+    private aCriterioOperador(valor: unknown): CriterioOperador {
+        return CRITERIOS_OPERADOR.includes(valor as CriterioOperador)
+            ? (valor as CriterioOperador)
+            : 'pesajes';
     }
 
     /** El estado en palabras, para las frases de "no hay nada que mostrar". */

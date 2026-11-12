@@ -862,6 +862,151 @@ describe('ChatRepository / despachador', () => {
     });
 });
 
+describe('ChatRepository / pesajes_por_operador', () => {
+    const contexto = {
+        usuario: { id: 7, nombre: 'Ana Supervisora' },
+        clientes: [{ id: 3, nombre: 'Agroexport' }],
+    };
+
+    const operador = (
+        id: number,
+        extra: Partial<Record<string, unknown>> = {},
+    ) => ({
+        id,
+        nombre: `OPERADOR ${id}`,
+        rol: 'OPERADOR',
+        pesajes: '4',
+        lotes: '2',
+        fuera_de_rango: '1',
+        aprobados: '2',
+        rechazados: '1',
+        valor_orden: '4',
+        ...extra,
+    });
+
+    const sinPesajes = (id: number) =>
+        operador(id, {
+            pesajes: '0',
+            lotes: '0',
+            fuera_de_rango: '0',
+            aprobados: '0',
+            rechazados: '0',
+            valor_orden: '0',
+        });
+
+    const porOperador = async (
+        cola: unknown[],
+        argumentos: Record<string, unknown> = {},
+    ) => {
+        const { repo, llamadas } = crearRepositorio(cola, jest.fn());
+        const resultado = (await repo.despachar(
+            { nombre: 'pesajes_por_operador', argumentos },
+            contexto,
+        )) as Record<string, unknown> & {
+            operadores: Record<string, unknown>[];
+        };
+        return { resultado, llamadas };
+    };
+
+    it('sin argumentos es la planta de hoy e incluye a los operadores que no pesaron', async () => {
+        const { resultado, llamadas } = await porOperador([
+            { total: 3 },
+            [operador(1), operador(2), sinPesajes(3)],
+            [
+                { usuario_id: 1, unidad_medida: 'Libras', pesajes: '3', peso_neto_total: '30.5' },
+                { usuario_id: 1, unidad_medida: 'Quintales', pesajes: '1', peso_neto_total: '2' },
+                { usuario_id: 2, unidad_medida: 'Libras', pesajes: '4', peso_neto_total: '40' },
+            ],
+        ]);
+
+        expect(resultado).toMatchObject({
+            alcance: 'la planta entera',
+            total_operadores: 3,
+            mostrados: 3,
+        });
+        expect(resultado.filtros_aplicados).toContain('solo los de hoy');
+        expect(resultado.operadores.map((o) => o.posicion)).toEqual([1, 1, null]);
+        // El peso va por unidad y nunca se suma entre unidades.
+        expect(resultado.operadores[0].por_unidad).toEqual([
+            { unidad_medida: 'Libras', pesajes: 3, peso_neto_total: 30.5 },
+            { unidad_medida: 'Quintales', pesajes: 1, peso_neto_total: 2 },
+        ]);
+        expect(resultado.operadores[0]).not.toHaveProperty('peso_neto_total');
+        expect(resultado.operadores[0]).toMatchObject({
+            porcentaje_fuera_de_rango: 25,
+            porcentaje_rechazado_por_aprobador: 25,
+            sin_revisar_por_aprobador: 1,
+        });
+        expect(resultado.operadores[2]).toMatchObject({
+            pesajes: 0,
+            por_unidad: [],
+            porcentaje_fuera_de_rango: null,
+        });
+        // El desglose solo pide a quienes pesaron.
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['pesajes.usuario_id', 'in', [1, 2]],
+        });
+    });
+
+    it('con un lote no corta a hoy y solo salen quienes pesaron ahi', async () => {
+        const { resultado, llamadas } = await porOperador(
+            [{ nombre_lote: 'BILLS2026' }, { total: 0 }],
+            { lote_id: 41 },
+        );
+
+        expect(resultado.alcance).toBe('el lote BILLS2026');
+        expect(resultado.filtros_aplicados).toContain('sin limite de fecha');
+        expect(resultado.quien_sale).toContain('solo quienes registraron');
+        expect(resultado.aviso).toBe(
+            'Nadie registro pesajes activos en el lote BILLS2026. Los pesajes anulados no se cuentan.',
+        );
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['pesajes.lote_id', '=', 41],
+        });
+    });
+
+    it('ordenar por peso con varias unidades cae a pesajes y lo avisa', async () => {
+        const { resultado } = await porOperador(
+            [{ total: 2 }, { total: 1 }, [operador(1)], []],
+            { orden_por: 'peso_neto_total', periodo: 'este_mes' },
+        );
+
+        expect(resultado.criterio).toContain('cantidad de pesajes');
+        expect(resultado.aviso).toContain('unidades de medida distintas');
+    });
+
+    it('ordenar por peso con una sola unidad se respeta', async () => {
+        const { resultado } = await porOperador(
+            [{ total: 1 }, { total: 1 }, [operador(1)], []],
+            { orden_por: 'peso_neto_total', periodo: 'este_mes' },
+        );
+
+        expect(resultado.criterio).toContain('peso neto total');
+        expect(resultado.aviso).toBeUndefined();
+    });
+
+    it('un cliente inexistente responde con texto', async () => {
+        const { resultado } = await porOperador([undefined], { cliente_id: 4242 });
+
+        expect(resultado.error).toBe('No existe ningun cliente con id 4242.');
+    });
+
+    it('acepta cada criterio declarado y no interpreta los demas', () => {
+        const { repo } = crearRepositorio([], jest.fn());
+        const p = privado(repo);
+        const propiedades = HERRAMIENTAS_CHAT.find(
+            (h) => h.name === 'pesajes_por_operador',
+        )?.parameters.properties as Record<string, { enum?: string[] }>;
+
+        for (const criterio of propiedades.orden_por.enum ?? []) {
+            expect(p.aCriterioOperador(criterio)).toBe(criterio);
+        }
+        expect(p.aCriterioOperador('peso')).toBe('pesajes');
+    });
+});
+
 describe('ChatRepository / comparar_lotes', () => {
     const contexto = {
         usuario: { id: 7, nombre: 'Ana Supervisora' },

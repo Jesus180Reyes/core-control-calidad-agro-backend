@@ -21,7 +21,7 @@ export class ChatController {
         summary: 'Un turno de conversacion sobre lotes y pesajes',
         description:
             'Responde en lenguaje natural preguntas sobre lotes, pesajes, clientes y operadores. ' +
-            'El modelo no consulta la base: elige entre catorce funciones de SOLO LECTURA y el backend ' +
+            'El modelo no consulta la base: elige entre quince funciones de SOLO LECTURA y el backend ' +
             'decide si las ejecuta, asi que desde aqui no se puede aprobar, rechazar, finalizar ni ' +
             'registrar nada. ' +
             'sugerencias es un arreglo de strings que viene SIEMPRE: vacio en un turno normal, y con 2 o 3 ' +

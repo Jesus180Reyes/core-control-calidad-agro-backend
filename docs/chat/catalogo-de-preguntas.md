@@ -18,7 +18,7 @@ Documento vivo. Lo mantiene el agente `edith`: en cada revisión anticipa pregun
   - *fuera de alcance*: escritura, un dato que el sistema no tiene, o algo que un spec dejó fuera a propósito.
 - **Cadena**: las herramientas en orden. `→` separa vueltas y `+` llamadas paralelas dentro de una vuelta.
 
-Estado del código revisado: 14 herramientas (`comparar_lotes` añadida el 2026-11-12; P17–P22, P26 y P37 verificadas ese día con Gemini real contra la base `agro_demo`, en 1 o 2 llamadas cada una; el mismo día `pesajes_de_cliente` pasó a aceptar la planta entera sin `cliente_id`, verificado con P24, P25 y P27).
+Estado del código revisado: 15 herramientas (`pesajes_por_operador` añadida el 2026-11-12 y verificada con P28, P29, P30, P33, P65 y P66; `comparar_lotes` añadida el 2026-11-12; P17–P22, P26 y P37 verificadas ese día con Gemini real contra la base `agro_demo`, en 1 o 2 llamadas cada una; el mismo día `pesajes_de_cliente` pasó a aceptar la planta entera sin `cliente_id`, verificado con P24, P25 y P27).
 
 ---
 
@@ -58,12 +58,12 @@ Estado del código revisado: 14 herramientas (`comparar_lotes` añadida el 2026-
 | P25 | que pesajes hubo hoy? / lo digo en general | observada ×2 | cubierta | `pesajes_de_cliente` sin `cliente_id`. La regla de a quién pertenecen los pesajes manda "en general" a la planta y gana a la de asumir el único cliente de la cartera | — |
 | P26 | que lotes se trabajaron hoy? | observada ×1 | cubierta | `comparar_lotes` `periodo: hoy`: solo salen los lotes con pesajes en la ventana | — |
 | P27 | que actividades hubieron hoy? | observada ×1 | cubierta | `pesajes_de_cliente` sin cliente + `comparar_lotes` + `lotes_aprobados` + `lotes_finalizados`, en paralelo en una vuelta | — |
-| P28 | quienes son los operadores que pesaron en estos lotes? | observada ×3 | hueco | Un turno declinó y otro terminó en `TEXTO_NO_CONVERGE` tras 12 llamadas. Hoy solo sale de las filas de `pesajes_de_lote` | 48 |
-| P29 | dame lo que pesaron todos los operadores en los lotes | observada ×2 | hueco | `TEXTO_NO_CONVERGE` tras 8 llamadas. Pide un agregado por operador | — |
-| P30 | dame los nombres de los operadores activos | observada ×1 | hueco | Declinó. El dato existe (`usuarios` + rol, spec 39 lo expone como catálogo) | 39 |
+| P28 | quienes son los operadores que pesaron en estos lotes? | observada ×3 | cubierta | `buscar_persona` → `pesajes_por_operador` con `lote_id` (o `cliente_id`). Solo salen quienes pesaron ahí | — |
+| P29 | dame lo que pesaron todos los operadores en los lotes | observada ×2 | cubierta | `pesajes_por_operador`. El peso va en `por_unidad`, nunca sumado entre unidades | — |
+| P30 | dame los nombres de los operadores activos | observada ×1 | cubierta | `pesajes_por_operador` sin cliente ni lote: lista a los operadores activos (rol `OPERADOR`) aunque no hayan pesado | 39 |
 | P31 | dame lo que chambeo `<persona>` esta semana | observada ×1 | cubierta | `buscar_persona` → `pesajes_de_usuario` | 28 |
 | P32 | ¿qué pesó `<persona>` ayer? | observada ×1 | cubierta | `buscar_persona` → `pesajes_de_usuario` `periodo: ayer` | 28 |
-| P33 | quien peso mas hoy / compara a Carlos con Pedro | anticipada | hueco | No hay agregado por operador. Con dos `pesajes_de_usuario` el modelo tendría que comparar totales | — |
+| P33 | quien peso mas hoy / compara a Carlos con Pedro | anticipada | cubierta | `pesajes_por_operador`, con la posición calculada. Para dos personas muestra las dos cifras; la diferencia no se calcula | — |
 | P34 | compara lo de hoy con lo de ayer | anticipada | frágil | Dos llamadas con distinto `periodo`. Presenta las dos cifras, pero la diferencia no la puede calcular | — |
 | P35 | que lotes se aprobaron hoy | observada ×7 | cubierta | `lotes_aprobados`. Antes de esa herramienta declinaba 5 de 5 veces | — |
 | P36 | que lotes se finalizaron hoy / que terminaron hoy | observada ×9 | cubierta | `lotes_finalizados`. Antes declinaba o confundía con `lotes_aprobados` | — |
@@ -72,6 +72,8 @@ Estado del código revisado: 14 herramientas (`comparar_lotes` añadida el 2026-
 | P39 | Qué se hizo con lo malo del lote `<lote>` | observada ×2 | frágil | `buscar_persona` → `rechazos_por_destino`. Una vez encadenó además `pesajes_de_lote` y terminó en `TEXTO_NO_CONVERGE` | 47 |
 | P40 | los de antier / los ultimos 15 dias | anticipada | frágil | Fuera del enum `periodo`. El prompt hace que lo diga y ofrezca el más cercano. Es una negativa explicada, no un fallo | 28 |
 | P41 | aprueba el lote `<lote>` | anticipada | fuera de alcance | Escritura. `FRASE_SOLO_LECTURA` | 28 |
+| P65 | quien no ha pesado hoy? | anticipada | cubierta | `pesajes_por_operador` `periodo: hoy`: los operadores activos sin pesajes salen al final, sin posición | — |
+| P66 | que operador tiene mas fuera de rango / a quien le rechazan mas | anticipada | cubierta | `pesajes_por_operador` `orden_por: fuera_de_rango` o `rechazados_por_aprobador` (también en porcentaje) | — |
 
 ## Aprobador
 
@@ -115,12 +117,14 @@ Estado del código revisado: 14 herramientas (`comparar_lotes` añadida el 2026-
 
 ## Totales de esta revisión
 
-64 preguntas (P01–P64): 40 cubiertas, 9 frágiles, 8 huecos y 7 fuera de alcance. 43 son intenciones observadas en `chat_log` (153 turnos entre el 2026-09-20 y el 2026-10-22) y 21 son anticipadas. Siguiente número libre: **P65**.
+66 preguntas (P01–P66): 46 cubiertas, 9 frágiles, 4 huecos y 7 fuera de alcance. 43 son intenciones observadas en `chat_log` (153 turnos entre el 2026-09-20 y el 2026-10-22) y 23 son anticipadas. Siguiente número libre: **P67**.
 
-Los huecos se concentran en tres familias:
+Las tres familias de huecos de la revisión del 2026-10-23 quedaron resueltas el 2026-11-12:
 
 - **Comparar y ordenar lotes**: P17–P22, con 14 turnos observados, 5 de ellos en `TEXTO_NO_CONVERGE`. Resuelta el 2026-11-12 con `comparar_lotes`, que también cubre P26 y P37 y deja P56 frágil. P28 (operadores de esos lotes) pasa a la familia de agregados por operador.
 - **Pesajes de la planta entera, sin cliente ni persona**: P24–P27, con 5 turnos. Resuelta el 2026-11-12: `pesajes_de_cliente` sin `cliente_id` (P24, P25, P27) y `comparar_lotes` con periodo (P26).
-- **Agregados por operador**: P28, P29, P30 y P33, con 6 turnos.
+- **Agregados por operador**: P28, P29, P30 y P33, con 6 turnos. Resuelta el 2026-11-12 con `pesajes_por_operador`, que también cubre P65 y P66.
 
-**Última revisión:** 2026-11-12 (solo `comparar_lotes`; `chat_log` no se volvió a revisar desde el 2026-10-23).
+Quedan 4 huecos sueltos, con un solo turno observado entre todos (P54): P11 (por qué se pidió PIN), P51 (lo que rechacé yo), P54 y P55 (calidad global del spec 35).
+
+**Última revisión:** 2026-11-12 (`comparar_lotes`, la planta entera en `pesajes_de_cliente` y `pesajes_por_operador`; `chat_log` no se volvió a revisar desde el 2026-10-23).

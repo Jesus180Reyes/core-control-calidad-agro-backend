@@ -277,6 +277,30 @@ describe('chat.prompt / pesajes de la planta entera', () => {
     });
 });
 
+describe('chat.prompt / pesajes_por_operador', () => {
+    it('esta declarada, sin argumentos obligatorios', () => {
+        const declaracion = HERRAMIENTAS_CHAT.find(
+            (h) => h.name === 'pesajes_por_operador',
+        );
+        expect(declaracion).toBeDefined();
+        expect(
+            (declaracion?.parameters as { required?: string[] }).required,
+        ).toBeUndefined();
+    });
+
+    it('el vocabulario la manda a comparar personas y gana a pesajes_de_usuario', () => {
+        const pos = INSTRUCCION_SISTEMA_CHAT.indexOf('- Comparar operadores:');
+        expect(pos).toBeGreaterThan(INSTRUCCION_SISTEMA_CHAT.indexOf('VOCABULARIO:'));
+        const regla = INSTRUCCION_SISTEMA_CHAT.slice(
+            pos,
+            INSTRUCCION_SISTEMA_CHAT.indexOf('- Anulado no es', pos),
+        );
+        expect(regla).toContain('pesajes_por_operador');
+        expect(regla).toContain('nunca lo sumes');
+        expect(regla).toContain('esta regla gana');
+    });
+});
+
 describe('chat.prompt / comparar_lotes', () => {
     it('esta declarada, sin argumentos obligatorios', () => {
         const declaracion = HERRAMIENTAS_CHAT.find(
