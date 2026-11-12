@@ -4,7 +4,7 @@ import { Kysely } from 'kysely';
 import { DatabaseService } from 'src/database/database.service';
 import { Database } from 'src/database/types/types';
 import { GeminiService, TurnoGemini } from 'src/ia/gemini.service';
-import { FRASE_SUGERENCIAS } from 'src/ia/prompts/chat.prompt';
+import { FRASE_SUGERENCIAS, HERRAMIENTAS_CHAT } from 'src/ia/prompts/chat.prompt';
 import { PreguntarDto } from '../dto/preguntar.dto';
 import { ChatRepository, textoConSugerencias } from './chat.repository';
 
@@ -773,6 +773,223 @@ describe('ChatRepository / despachador', () => {
                 (l) => l.metodo === 'where' && l.args[0] === 'lotes.finalizado_en',
             ),
         ).toBe(true);
+    });
+});
+
+describe('ChatRepository / comparar_lotes', () => {
+    const contexto = {
+        usuario: { id: 7, nombre: 'Ana Supervisora' },
+        clientes: [{ id: 3, nombre: 'Agroexport' }],
+    };
+
+    /** Una fila tal como la devuelve MySQL: agregados como cadena. */
+    const fila = (
+        id: number,
+        extra: Partial<Record<string, unknown>> = {},
+    ) => ({
+        id,
+        nombre_lote: `LOTE${id}`,
+        cliente: 'Agroexport',
+        producto: 'Okra',
+        unidad_medida: 'Gramos',
+        estado: 'cerrado',
+        motivo_rechazo: null,
+        aprobado_por: 4,
+        finalizado_por: 9,
+        created_at: new Date(2026, 10, id, 8, 0),
+        pesajes: '3',
+        peso_neto_total: '300.97',
+        fuera_de_rango: '2',
+        aprobados: '1',
+        rechazados: '2',
+        valor_orden: '2',
+        ...extra,
+    });
+
+    const comparar = async (
+        cola: unknown[],
+        argumentos: Record<string, unknown> = {},
+    ) => {
+        const { repo, llamadas } = crearRepositorio(cola, jest.fn());
+        const resultado = (await repo.despachar(
+            { nombre: 'comparar_lotes', argumentos },
+            contexto,
+        )) as Record<string, unknown> & {
+            lotes: Record<string, unknown>[];
+        };
+        return { resultado, llamadas };
+    };
+
+    it('sin argumentos compara todos los lotes de clientes activos, sin ventana', async () => {
+        const { resultado, llamadas } = await comparar([
+            { total: 1 },
+            [fila(4, { valor_orden: new Date(2026, 10, 4) })],
+        ]);
+
+        expect(resultado).toMatchObject({
+            cliente: 'todos los clientes activos',
+            estado_consultado: 'todos',
+            total_lotes: 1,
+            mostrados: 1,
+        });
+        expect(resultado.filtros_aplicados).toContain('sin limite de fecha');
+        expect(resultado.criterio).toContain('fecha de apertura');
+        expect(resultado.lotes[0]).toMatchObject({
+            posicion: 1,
+            estado: 'finalizado',
+            pesajes: 3,
+            peso_neto_total: 300.97,
+            porcentaje_fuera_de_rango: 66.67,
+            porcentaje_rechazado_por_aprobador: 66.67,
+            sin_revisar_por_aprobador: 0,
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['clientes.isActive', '=', 1],
+        });
+        // Sin ventana es LEFT JOIN puro: no se exige que el lote tenga pesajes.
+        expect(
+            llamadas.some((l) => l.metodo === 'where' && l.args.length === 1),
+        ).toBe(false);
+    });
+
+    it('los empates comparten posicion y los lotes sin pesajes no tienen', async () => {
+        const { resultado } = await comparar(
+            [
+                { total: 4 },
+                [
+                    fila(1, { valor_orden: '2' }),
+                    fila(2, { valor_orden: 2 }),
+                    fila(3, { valor_orden: '1', rechazados: '1' }),
+                    fila(4, {
+                        valor_orden: '0',
+                        pesajes: '0',
+                        peso_neto_total: '0',
+                        fuera_de_rango: '0',
+                        aprobados: '0',
+                        rechazados: '0',
+                    }),
+                ],
+            ],
+            { orden_por: 'rechazados_por_aprobador' },
+        );
+
+        expect(resultado.lotes.map((l) => l.posicion)).toEqual([1, 1, 3, null]);
+        expect(resultado.lotes[3]).toMatchObject({
+            porcentaje_fuera_de_rango: null,
+            porcentaje_rechazado_por_aprobador: null,
+        });
+        expect(resultado.criterio).toContain('de mayor a menor');
+    });
+
+    it('ordenar por peso con unidades distintas lo avisa', async () => {
+        const { resultado } = await comparar(
+            [{ total: 2 }, [fila(1), fila(2)], { total: 2 }],
+            { orden_por: 'peso_neto_total' },
+        );
+
+        expect(resultado.aviso).toContain('unidades de medida distintas');
+    });
+
+    it('ordenar por peso con una sola unidad no avisa', async () => {
+        const { resultado } = await comparar(
+            [{ total: 2 }, [fila(1), fila(2)], { total: 1 }],
+            { orden_por: 'peso_neto_total' },
+        );
+
+        expect(resultado.aviso).toBeUndefined();
+    });
+
+    it('con periodo solo salen los lotes con pesajes en la ventana', async () => {
+        const { resultado, llamadas } = await comparar(
+            [{ total: 0 }],
+            { periodo: 'este_mes' },
+        );
+
+        expect(resultado.total_lotes).toBe(0);
+        expect(resultado.filtros_aplicados).toContain('desde el dia 1 de este mes');
+        expect(resultado.aviso).toBe(
+            'No hay ningun lote con pesajes activos en esas fechas.',
+        );
+        expect(
+            llamadas.some(
+                (l) => l.metodo === 'where' && l.args[0] === 'pesajes.created_at',
+            ),
+        ).toBe(true);
+        // La condicion que convierte el LEFT JOIN en "tuvo pesajes".
+        expect(
+            llamadas.some((l) => l.metodo === 'where' && l.args.length === 1),
+        ).toBe(true);
+    });
+
+    it('rechazado se lee de motivo_rechazo, la senal canonica', async () => {
+        const { resultado, llamadas } = await comparar(
+            [{ total: 1 }, [fila(5, { motivo_rechazo: 'Mal estado', finalizado_por: null })]],
+            { estado: 'rechazado' },
+        );
+
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['lotes.motivo_rechazo', 'is not', null],
+        });
+        // Rechazado por el aprobador: conserva aprobado_por, y aun asi es rechazado.
+        expect(resultado.lotes[0].estado).toBe('rechazado');
+    });
+
+    it('pendiente resuelve la etapa por su codigo, como lotes_de_cliente', async () => {
+        const { llamadas } = await comparar([{ id: 2 }, { total: 0 }], {
+            estado: 'pendiente_aprobacion',
+        });
+
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['codigo', '=', 'CLIENTE_FINAL'],
+        });
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['lotes.etapa_id', '=', 2],
+        });
+    });
+
+    it('con cliente no filtra clientes activos y lo dice si esta rechazado', async () => {
+        const { resultado, llamadas } = await comparar(
+            [{ nombre: 'Agroexport', isActive: 0 }, { total: 0 }],
+            { cliente_id: 3 },
+        );
+
+        expect(resultado.cliente).toBe('Agroexport');
+        expect(resultado.cliente_rechazado).toBe(true);
+        expect(llamadas).toContainEqual({
+            metodo: 'where',
+            args: ['lotes.cliente_id', '=', 3],
+        });
+        expect(llamadas).not.toContainEqual({
+            metodo: 'where',
+            args: ['clientes.isActive', '=', 1],
+        });
+    });
+
+    it('un cliente inexistente responde con texto', async () => {
+        const { resultado } = await comparar([undefined], { cliente_id: 4242 });
+
+        expect(resultado.error).toBe('No existe ningun cliente con id 4242.');
+    });
+
+    it('acepta cada valor de los enums declarados y no interpreta los demas', () => {
+        const { repo } = crearRepositorio([], jest.fn());
+        const p = privado(repo);
+        const propiedades = HERRAMIENTAS_CHAT.find(
+            (h) => h.name === 'comparar_lotes',
+        )?.parameters.properties as Record<string, { enum?: string[] }>;
+
+        for (const estado of propiedades.estado.enum ?? []) {
+            expect(p.aEstadoComparacion(estado)).toBe(estado);
+        }
+        for (const criterio of propiedades.orden_por.enum ?? []) {
+            expect(p.aCriterioComparacion(criterio)).toBe(criterio);
+        }
+        expect(p.aEstadoComparacion('cerrado')).toBe('todos');
+        expect(p.aCriterioComparacion('calidad')).toBe('mas_reciente');
     });
 });
 

@@ -34,6 +34,38 @@ type ResultadoHerramienta = Record<string, unknown>;
 type EstadoDeLote = 'abierto' | 'finalizado' | 'pendiente_aprobacion';
 
 /**
+ * Los estados que acepta `comparar_lotes`: los tres del vocabulario, mas
+ * `rechazado` (`motivo_rechazo IS NOT NULL`, la senal canonica) y `todos`.
+ * `lotes_de_cliente` no los conoce a proposito: alli el default es `abierto`
+ * y un listado de lotes rechazados no tenia pregunta detras.
+ */
+const ESTADOS_COMPARACION = [
+    'abierto',
+    'pendiente_aprobacion',
+    'finalizado',
+    'rechazado',
+    'todos',
+] as const;
+type EstadoComparacion = (typeof ESTADOS_COMPARACION)[number];
+
+/**
+ * Los criterios por los que `comparar_lotes` ordena. Cada uno es una columna
+ * que la consulta ya calcula: el modelo nunca compara cifras, recibe la
+ * posicion hecha.
+ */
+const CRITERIOS_COMPARACION = [
+    'mas_reciente',
+    'pesajes',
+    'peso_neto_total',
+    'fuera_de_rango',
+    'porcentaje_fuera_de_rango',
+    'aprobados_por_aprobador',
+    'rechazados_por_aprobador',
+    'porcentaje_rechazado_por_aprobador',
+] as const;
+type CriterioComparacion = (typeof CRITERIOS_COMPARACION)[number];
+
+/**
  * La ventana relativa que el modelo puede pedir. Se resuelve SIEMPRE en MySQL
  * con `CURDATE()`, nunca en Node y menos en el modelo: el reloj que cuenta es
  * el mismo con el que `NOW()` escribio los `created_at`.
@@ -752,6 +784,19 @@ export class ChatRepository {
                         limite: ChatRepository.MAX_FILAS_MODELO,
                     },
                 );
+
+            case 'comparar_lotes':
+                return await this.compararLotes(this.aEntero(args.cliente_id), {
+                    estado: this.aEstadoComparacion(args.estado),
+                    orden_por: this.aCriterioComparacion(args.orden_por),
+                    ascendente: args.direccion === 'asc',
+                    ventana: {
+                        desde: this.aFecha(args.desde),
+                        hasta: this.aFecha(args.hasta),
+                        periodo: this.aPeriodo(args.periodo),
+                        limite: this.aLimite(args.limite),
+                    },
+                });
 
             case 'sugerir_preguntas':
                 // No es una consulta: `responder` la intercepta antes de llegar
@@ -2415,6 +2460,364 @@ export class ChatRepository {
     }
 
     // ---------------------------------------------------------------------
+    // Herramienta 14: comparar_lotes
+    // ---------------------------------------------------------------------
+
+    /**
+     * Los lotes, ya contados y ordenados por un criterio, de todos los clientes
+     * activos o de uno. Es la respuesta a "cual tiene mas rechazados", "cuadro
+     * comparativo de los lotes de X" o "las metricas de los lotes de este mes".
+     *
+     * Existe porque esas preguntas no tenian herramienta y en `chat_log` el
+     * modelo recorria `metricas_de_lote` o `resumen_del_lote` lote por lote —11
+     * a 15 llamadas— hasta agotar las vueltas, y cuando llegaba a redactar tenia
+     * que comparar cifras, que el prompt le prohibe. Aqui todo sale de UNA
+     * consulta y la `posicion` viene puesta.
+     *
+     * Las cifras son las de `metricas_de_lote` (pesajes activos, `isActive = 1`)
+     * agregadas en una subconsulta por `lote_id` y unidas a `lotes`:
+     *
+     * - **Sin ventana** es un `LEFT JOIN`: salen todos los lotes del estado, y
+     *   los que no tienen pesajes van al final con los porcentajes en null.
+     * - **Con ventana** la subconsulta solo cuenta los pesajes de esas fechas y
+     *   el lote tiene que tener alguno: es "los lotes que se trabajaron en el
+     *   periodo", con las cifras de ese periodo, no las de toda su vida.
+     *
+     * Sin cliente se limita a los clientes activos, como `lotes_pendientes`: en
+     * un ranking de toda la planta un cliente rechazado es ruido. Con cliente se
+     * consulta aunque este rechazado, y se dice.
+     *
+     * Los porcentajes se calculan dos veces por necesidad: en SQL para ordenar
+     * y en Node, con `dosDecimales`, para lo que se devuelve, igual que en
+     * `metricas_de_lote`. El de rechazo es sobre los pesajes activos, no sobre
+     * los revisados, por la misma razon que el de fuera de rango.
+     *
+     * **Los empates comparten posicion** (1, 1, 3): decidir quien gana un
+     * empate seria inventar un criterio que nadie pidio. El orden secundario por
+     * fecha y id existe solo para que la lista sea estable.
+     */
+    private async compararLotes(
+        clienteId: number | undefined,
+        opciones: {
+            estado: EstadoComparacion;
+            orden_por: CriterioComparacion;
+            ascendente: boolean;
+            ventana: FiltrosDePesajes;
+        },
+    ): Promise<ResultadoHerramienta> {
+        const { estado, orden_por: criterio, ascendente } = opciones;
+        const ventana = this.ventanaDelPeriodo(opciones.ventana);
+
+        let cliente: { nombre: string; isActive: number | null } | undefined;
+        if (clienteId !== undefined) {
+            cliente = await this.db
+                .selectFrom('clientes')
+                .select(['nombre', 'isActive'])
+                .where('id', '=', clienteId)
+                .executeTakeFirst();
+
+            if (!cliente) {
+                return { error: `No existe ningun cliente con id ${clienteId}.` };
+            }
+        }
+
+        // Pendiente se pide igual que en `lotes_de_cliente`, por etapa resuelta
+        // por su `codigo`, para que las dos herramientas cuenten la misma
+        // bandeja. Finalizado y rechazado usan su senal canonica y no necesitan
+        // ninguna etapa.
+        let etapaPendienteId: number | undefined;
+        if (estado === 'pendiente_aprobacion') {
+            const etapa = await this.db
+                .selectFrom('etapas')
+                .select(['id'])
+                .where('codigo', '=', 'CLIENTE_FINAL')
+                .executeTakeFirst();
+
+            if (!etapa) {
+                return {
+                    error: "La etapa 'CLIENTE_FINAL' no esta configurada en esta base de datos, asi que no puedo comparar los lotes pendientes.",
+                };
+            }
+            etapaPendienteId = etapa.id;
+        }
+
+        let agregados = this.db
+            .selectFrom('pesajes')
+            .select([
+                'pesajes.lote_id',
+                sql<number | string>`COUNT(*)`.as('pesajes'),
+                sql<number | string>`SUM(pesajes.peso_neto)`.as('peso_neto_total'),
+                sql<number | string>`SUM(pesajes.fuera_de_rango = 1)`.as(
+                    'fuera_de_rango',
+                ),
+                sql<number | string>`SUM(pesajes.aprobado = 1)`.as('aprobados'),
+                sql<number | string>`SUM(pesajes.aprobado = 0)`.as('rechazados'),
+            ])
+            .where('pesajes.isActive', '=', 1);
+
+        if (ventana.desde !== undefined) {
+            agregados = agregados.where('pesajes.created_at', '>=', ventana.desde);
+        }
+        if (ventana.hasta !== undefined) {
+            agregados = agregados.where('pesajes.created_at', '<', ventana.hasta);
+        }
+
+        // Cada criterio es una expresion sobre la subconsulta. Los porcentajes
+        // dividen con NULLIF para que un lote sin pesajes de NULL y no un error.
+        const expresiones: Record<CriterioComparacion, RawBuilder<unknown>> = {
+            mas_reciente: sql`lotes.created_at`,
+            pesajes: sql`COALESCE(agg.pesajes, 0)`,
+            peso_neto_total: sql`COALESCE(agg.peso_neto_total, 0)`,
+            fuera_de_rango: sql`COALESCE(agg.fuera_de_rango, 0)`,
+            porcentaje_fuera_de_rango: sql`agg.fuera_de_rango * 100 / NULLIF(agg.pesajes, 0)`,
+            aprobados_por_aprobador: sql`COALESCE(agg.aprobados, 0)`,
+            rechazados_por_aprobador: sql`COALESCE(agg.rechazados, 0)`,
+            porcentaje_rechazado_por_aprobador: sql`agg.rechazados * 100 / NULLIF(agg.pesajes, 0)`,
+        };
+        const expresion = expresiones[criterio];
+
+        let consulta = this.db
+            .selectFrom('lotes')
+            .innerJoin('clientes', 'clientes.id', 'lotes.cliente_id')
+            .leftJoin(
+                agregados.groupBy('pesajes.lote_id').as('agg'),
+                'agg.lote_id',
+                'lotes.id',
+            )
+            .leftJoin('productos', 'productos.id', 'lotes.producto_id')
+            .leftJoin(
+                'unidades_medida',
+                'unidades_medida.id',
+                'lotes.unidad_medida_id',
+            )
+            .select([
+                'lotes.id',
+                'lotes.nombre_lote',
+                'clientes.nombre as cliente',
+                'productos.nombre as producto',
+                'unidades_medida.nombre as unidad_medida',
+                'lotes.estado',
+                'lotes.motivo_rechazo',
+                'lotes.aprobado_por',
+                'lotes.finalizado_por',
+                'lotes.created_at',
+                sql<number | string>`COALESCE(agg.pesajes, 0)`.as('pesajes'),
+                sql<number | string>`COALESCE(agg.peso_neto_total, 0)`.as(
+                    'peso_neto_total',
+                ),
+                sql<number | string>`COALESCE(agg.fuera_de_rango, 0)`.as(
+                    'fuera_de_rango',
+                ),
+                sql<number | string>`COALESCE(agg.aprobados, 0)`.as('aprobados'),
+                sql<number | string>`COALESCE(agg.rechazados, 0)`.as('rechazados'),
+                expresion.as('valor_orden'),
+            ]);
+
+        if (ventana.desde !== undefined || ventana.hasta !== undefined) {
+            consulta = consulta.where(sql<boolean>`agg.lote_id IS NOT NULL`);
+        }
+        if (clienteId !== undefined) {
+            consulta = consulta.where('lotes.cliente_id', '=', clienteId);
+        } else {
+            consulta = consulta.where('clientes.isActive', '=', 1);
+        }
+
+        switch (estado) {
+            case 'abierto':
+                consulta = consulta.where('lotes.estado', '=', 'abierto');
+                break;
+            case 'pendiente_aprobacion':
+                consulta = consulta
+                    .where('lotes.estado', '=', 'cerrado')
+                    .where('lotes.etapa_id', '=', etapaPendienteId as number);
+                break;
+            case 'finalizado':
+                consulta = consulta.where('lotes.finalizado_por', 'is not', null);
+                break;
+            case 'rechazado':
+                consulta = consulta.where('lotes.motivo_rechazo', 'is not', null);
+                break;
+        }
+
+        const total = await this.contarFiltrados(consulta);
+
+        const cabecera = {
+            cliente: cliente?.nombre ?? 'todos los clientes activos',
+            ...(cliente ? { cliente_rechazado: cliente.isActive !== 1 } : {}),
+            estado_consultado: estado,
+            filtros_aplicados: ventana.descripcion
+                ? `solo los lotes que tuvieron pesajes en la ventana (${ventana.descripcion}), y las cifras cuentan solo esos pesajes`
+                : 'todos los pesajes activos de cada lote, sin limite de fecha',
+            criterio: this.criterioEnPalabras(criterio, ascendente),
+        };
+
+        if (total === 0) {
+            return {
+                ...cabecera,
+                lotes: [],
+                total_lotes: 0,
+                aviso: ventana.descripcion
+                    ? `No hay ningun ${this.estadoComparacionEnPalabras(estado)} con pesajes activos en esas fechas.`
+                    : `No hay ningun ${this.estadoComparacionEnPalabras(estado)} con esos criterios.`,
+            };
+        }
+
+        const direccion = ascendente ? 'asc' : 'desc';
+        const sinPesajesAlFinal = criterio !== 'mas_reciente';
+
+        let ordenada = consulta;
+        if (sinPesajesAlFinal) {
+            ordenada = ordenada.orderBy(sql`COALESCE(agg.pesajes, 0) = 0`, 'asc');
+        }
+        const filas = await ordenada
+            .orderBy(expresion, direccion)
+            .orderBy('lotes.created_at', 'desc')
+            .orderBy('lotes.id', 'desc')
+            .limit(Math.min(opciones.ventana.limite, ChatRepository.MAX_FILAS_MODELO))
+            .execute();
+
+        // Ordenar por peso solo tiene sentido dentro de una misma unidad. Se
+        // cuenta sobre todos los lotes del resultado, no solo los mostrados,
+        // pero solo los que tienen pesajes: un lote vacio no compite en el orden.
+        let avisoUnidades: string | undefined;
+        if (criterio === 'peso_neto_total') {
+            const unidades = await consulta
+                .where(sql<boolean>`agg.lote_id IS NOT NULL`)
+                .clearSelect()
+                .select(
+                    sql<number | string>`COUNT(DISTINCT lotes.unidad_medida_id)`.as(
+                        'total',
+                    ),
+                )
+                .executeTakeFirst();
+            if (Number(unidades?.total ?? 0) > 1) {
+                avisoUnidades =
+                    'Los lotes usan unidades de medida distintas: el orden por peso neto mezcla unidades y no compara lo mismo. Dilo en la respuesta.';
+            }
+        }
+
+        let posicionAnterior = 0;
+        let valorAnterior: string | undefined;
+
+        const lotes = filas.map((fila, indice) => {
+            const pesajes = Number(fila.pesajes);
+            const fueraDeRango = Number(fila.fuera_de_rango);
+            const aprobados = Number(fila.aprobados);
+            const rechazados = Number(fila.rechazados);
+
+            let posicion: number | null;
+            if (sinPesajesAlFinal && pesajes === 0) {
+                posicion = null;
+            } else {
+                const valor = this.valorComparable(fila.valor_orden);
+                posicion =
+                    indice > 0 && valor === valorAnterior
+                        ? posicionAnterior
+                        : indice + 1;
+                posicionAnterior = posicion;
+                valorAnterior = valor;
+            }
+
+            return {
+                posicion,
+                id: fila.id,
+                nombre_lote: fila.nombre_lote,
+                cliente: fila.cliente,
+                producto: fila.producto,
+                unidad_medida: fila.unidad_medida,
+                estado: this.estadoDeLoteEnChat(fila),
+                abierto_en: this.fechaHora(fila.created_at),
+                pesajes,
+                peso_neto_total: this.dosDecimales(fila.peso_neto_total),
+                fuera_de_rango: fueraDeRango,
+                porcentaje_fuera_de_rango:
+                    pesajes > 0
+                        ? this.dosDecimales((fueraDeRango * 100) / pesajes)
+                        : null,
+                aprobados_por_aprobador: aprobados,
+                rechazados_por_aprobador: rechazados,
+                porcentaje_rechazado_por_aprobador:
+                    pesajes > 0
+                        ? this.dosDecimales((rechazados * 100) / pesajes)
+                        : null,
+                sin_revisar_por_aprobador: pesajes - aprobados - rechazados,
+            };
+        });
+
+        return {
+            ...cabecera,
+            total_lotes: total,
+            mostrados: lotes.length,
+            lotes,
+            ...(avisoUnidades ? { aviso: avisoUnidades } : {}),
+        };
+    }
+
+    /**
+     * El estado de un lote en el vocabulario del chat, leido de las senales
+     * canonicas de la tabla de discriminadores: el rechazo primero, siempre,
+     * porque un lote rechazado por el aprobador conserva `aprobado_por`.
+     */
+    private estadoDeLoteEnChat(lote: {
+        estado: 'abierto' | 'cerrado' | null;
+        motivo_rechazo: string | null;
+        aprobado_por: number | null;
+        finalizado_por: number | null;
+    }): string {
+        if (lote.motivo_rechazo !== null) return 'rechazado';
+        if (lote.finalizado_por !== null) return 'finalizado';
+        if (lote.estado === 'abierto') return 'abierto';
+        if (lote.aprobado_por !== null) return 'pendiente_aprobacion';
+        return 'cerrado';
+    }
+
+    /**
+     * El valor por el que se ordeno, normalizado para detectar empates. MySQL
+     * devuelve los decimales como cadena y las fechas como `Date`; comparar
+     * ambos como texto evita que `'3.0000'` y `3` parezcan distintos por tipo.
+     */
+    private valorComparable(valor: unknown): string {
+        if (valor instanceof Date) return String(valor.getTime());
+        if (valor === null || valor === undefined) return '';
+        const numero = Number(valor);
+        if (Number.isFinite(numero)) return String(numero);
+        return typeof valor === 'string' ? valor : JSON.stringify(valor);
+    }
+
+    /** El criterio de orden en una frase, para que la respuesta lo diga. */
+    private criterioEnPalabras(
+        criterio: CriterioComparacion,
+        ascendente: boolean,
+    ): string {
+        const nombres: Record<CriterioComparacion, string> = {
+            mas_reciente: 'fecha de apertura del lote',
+            pesajes: 'cantidad de pesajes activos',
+            peso_neto_total: 'peso neto total',
+            fuera_de_rango: 'pesajes fuera de rango',
+            porcentaje_fuera_de_rango: 'porcentaje de pesajes fuera de rango',
+            aprobados_por_aprobador: 'pesajes aprobados por el aprobador',
+            rechazados_por_aprobador: 'pesajes rechazados por el aprobador',
+            porcentaje_rechazado_por_aprobador:
+                'porcentaje de pesajes rechazados por el aprobador',
+        };
+
+        if (criterio === 'mas_reciente') {
+            return ascendente
+                ? 'por fecha de apertura, del mas antiguo al mas reciente'
+                : 'por fecha de apertura, del mas reciente al mas antiguo';
+        }
+
+        return `${nombres[criterio]}, ${ascendente ? 'de menor a mayor' : 'de mayor a menor'}; los lotes sin pesajes van al final sin posicion`;
+    }
+
+    /** "lote" y el estado pedido, para el aviso de resultado vacio. */
+    private estadoComparacionEnPalabras(estado: EstadoComparacion): string {
+        if (estado === 'todos') return 'lote';
+        if (estado === 'rechazado') return 'lote rechazado';
+        return `lote ${this.enPalabras(estado)}`;
+    }
+
+    // ---------------------------------------------------------------------
     // Coercion de argumentos y formato
     // ---------------------------------------------------------------------
 
@@ -2447,6 +2850,23 @@ export class ChatRepository {
             valor === 'pendiente_aprobacion'
             ? valor
             : undefined;
+    }
+
+    /**
+     * El estado de `comparar_lotes`. Ausente o invalido es `todos`: un cuadro
+     * comparativo sin estado pide todos los lotes, no los abiertos.
+     */
+    private aEstadoComparacion(valor: unknown): EstadoComparacion {
+        return ESTADOS_COMPARACION.includes(valor as EstadoComparacion)
+            ? (valor as EstadoComparacion)
+            : 'todos';
+    }
+
+    /** El criterio de `comparar_lotes`, o `mas_reciente` si no vale. */
+    private aCriterioComparacion(valor: unknown): CriterioComparacion {
+        return CRITERIOS_COMPARACION.includes(valor as CriterioComparacion)
+            ? (valor as CriterioComparacion)
+            : 'mas_reciente';
     }
 
     /** El estado en palabras, para las frases de "no hay nada que mostrar". */

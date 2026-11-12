@@ -29,7 +29,7 @@
  *    mensaje mixto pierde la cortesia, la veracidad y la memoria, no los datos:
  *    se contesta solo la parte de datos.
  *
- * Las trece funciones son de SOLO LECTURA, y eso esta escrito aqui y tambien en
+ * Las catorce funciones de datos son de SOLO LECTURA, y eso esta escrito aqui y tambien en
  * el despachador, que no conoce ninguna escritura. Aunque el modelo alucine un
  * `rechazar_lote`, no hay nada detras que despachar.
  */
@@ -226,6 +226,18 @@ SUGERIDAS.
   con buscar_persona y lee cierre.observaciones_aprobador. No uses
   resumen_del_lote para eso, porque el resumen no trae la observacion. Si cierre
   no viene, el lote no esta finalizado y no tiene observacion todavia.
+- Comparar lotes: "cual tiene mas", "el que menos", "el mejor", "el peor",
+  "ranking", "cuadro comparativo", "compara los lotes", "como salieron los
+  lotes", "las metricas de los lotes", "cuantos lotes", "que lotes se
+  trabajaron" o "que lotes rechazaron" es comparar_lotes, en UNA llamada, con
+  el criterio en orden_por y, si hay un tiempo, el periodo. No recorras lotes
+  con metricas_de_lote ni con resumen_del_lote para comparar. Copia la
+  posicion tal como llega y no ordenes tu: si dos lotes comparten posicion,
+  dilo como empate. "El mejor" o "el que mejor salio" sin mas detalle es
+  porcentaje_fuera_de_rango con direccion asc: dilo en la respuesta. Si el
+  resultado trae aviso, repitelo. "Cuantos lotes" se contesta con
+  total_lotes. Lotes con posicion null no tienen pesajes: van al final y no
+  compiten.
 - Anulado no es lo mismo que rechazado. "Anulado", "borrado", "eliminado" o
   "cancelado" es un pesaje que el operador anulo: no aparece en ninguna lista y
   solo se ve con detalle_de_pesaje por su id. "Rechazado por el aprobador" o "no
@@ -774,6 +786,80 @@ export const HERRAMIENTAS_CHAT = [
                     ],
                     description:
                         'Ventana relativa sobre la fecha del rechazo, resuelta por el sistema. Usala en vez de calcular la fecha tu. Por defecto hoy, salvo con lote_id.',
+                },
+            },
+        },
+    },
+    {
+        name: 'comparar_lotes',
+        description:
+            'Compara y ordena lotes en UNA llamada, de todos los clientes activos o de uno: cada lote trae su posicion ya calculada, cuantos pesajes activos tiene, el peso neto total, cuantos y que porcentaje quedaron fuera de rango, cuantos aprobo y rechazo el aprobador con su porcentaje, y cuantos le quedan sin revisar. Trae ademas total_lotes. Usala para "cual lote tiene mas rechazados", "el que mas salio fuera de rango", "cuadro comparativo de los lotes de X", "los lotes que mejor salieron", "las metricas de los lotes de este mes", "que lotes se trabajaron hoy", "cuantos lotes hay" o "que lotes rechazaron". Nunca llames a metricas_de_lote ni a resumen_del_lote lote por lote para comparar. Con periodo o fechas solo salen los lotes que tuvieron pesajes en esa ventana y las cifras cuentan solo esos pesajes.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                cliente_id: {
+                    type: 'INTEGER',
+                    description:
+                        'Opcional. Deja solo los lotes de ese cliente. Resuelvelo antes con buscar_persona o mis_clientes; nunca lo inventes. Sin el, compara los lotes de todos los clientes activos.',
+                },
+                estado: {
+                    type: 'STRING',
+                    enum: [
+                        'todos',
+                        'abierto',
+                        'pendiente_aprobacion',
+                        'finalizado',
+                        'rechazado',
+                    ],
+                    description:
+                        'todos: cualquier estado. abierto: sigue recibiendo pesajes. pendiente_aprobacion: espera al aprobador. finalizado: el aprobador lo cerro del todo. rechazado: el lote entero fue rechazado (por el supervisor o por el aprobador). Por defecto todos.',
+                },
+                orden_por: {
+                    type: 'STRING',
+                    enum: [
+                        'mas_reciente',
+                        'pesajes',
+                        'peso_neto_total',
+                        'fuera_de_rango',
+                        'porcentaje_fuera_de_rango',
+                        'aprobados_por_aprobador',
+                        'rechazados_por_aprobador',
+                        'porcentaje_rechazado_por_aprobador',
+                    ],
+                    description:
+                        'El criterio del orden. mas_reciente ordena por fecha de apertura. Por defecto mas_reciente.',
+                },
+                direccion: {
+                    type: 'STRING',
+                    enum: ['desc', 'asc'],
+                    description:
+                        'desc pone primero el valor mas alto ("el que mas", "el peor" en rechazos o fuera de rango); asc el mas bajo ("el que menos", "el mejor" en rechazos o fuera de rango). Por defecto desc.',
+                },
+                desde: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia.',
+                },
+                hasta: {
+                    type: 'STRING',
+                    description: 'Fecha concreta AAAA-MM-DD. Incluye ese dia entero.',
+                },
+                periodo: {
+                    type: 'STRING',
+                    enum: [
+                        'hoy',
+                        'ayer',
+                        'esta_semana',
+                        'semana_pasada',
+                        'ultimos_7_dias',
+                        'este_mes',
+                        'mes_pasado',
+                    ],
+                    description:
+                        'Ventana relativa sobre la fecha de los pesajes, resuelta por el sistema. Usala en vez de calcular la fecha tu. Sin periodo ni fechas no hay limite de fecha.',
+                },
+                limite: {
+                    type: 'INTEGER',
+                    description: 'Cuantos lotes devolver. Por defecto 10, maximo 20.',
                 },
             },
         },

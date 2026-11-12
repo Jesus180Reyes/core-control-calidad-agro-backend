@@ -256,3 +256,30 @@ describe('chat.prompt / preguntas sugeridas', () => {
         expect(INSTRUCCION_SISTEMA_CHAT).toContain(FRASE_DECLINACION);
     });
 });
+
+describe('chat.prompt / comparar_lotes', () => {
+    it('esta declarada, sin argumentos obligatorios', () => {
+        const declaracion = HERRAMIENTAS_CHAT.find(
+            (h) => h.name === 'comparar_lotes',
+        );
+        expect(declaracion).toBeDefined();
+        expect(
+            (declaracion?.parameters as { required?: string[] }).required,
+        ).toBeUndefined();
+    });
+
+    it('el vocabulario manda a comparar_lotes y prohibe recorrer lotes', () => {
+        const pos = INSTRUCCION_SISTEMA_CHAT.indexOf('- Comparar lotes:');
+        expect(pos).toBeGreaterThan(INSTRUCCION_SISTEMA_CHAT.indexOf('VOCABULARIO:'));
+        expect(pos).toBeLessThan(
+            INSTRUCCION_SISTEMA_CHAT.indexOf('PREGUNTAS SUGERIDAS:'),
+        );
+        const regla = INSTRUCCION_SISTEMA_CHAT.slice(
+            pos,
+            INSTRUCCION_SISTEMA_CHAT.indexOf('- Anulado no es', pos),
+        );
+        expect(regla).toContain('comparar_lotes');
+        expect(regla).toContain('No recorras lotes');
+        expect(regla).toContain('total_lotes');
+    });
+});
